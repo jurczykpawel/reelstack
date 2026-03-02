@@ -2,7 +2,7 @@
  * Word Grouper - groups transcription words into SubtitleCue objects.
  * Inspired by OpenReel's transcription-service.ts:262-308.
  */
-import type { SubtitleCue, CaptionAnimationStyle } from '@subtitle-burner/types';
+import type { SubtitleCue, CaptionAnimationStyle } from '@reelstack/types';
 import type { TranscriptionWord, WordGroupingConfig } from './types';
 import { DEFAULT_GROUPING_CONFIG } from './types';
 

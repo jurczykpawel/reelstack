@@ -5,7 +5,7 @@
  * Pure function: takes a cue + currentTime, returns an array of WordSegments
  * describing how each word should be rendered at that instant.
  */
-import type { SubtitleCue, SubtitleWord } from '@subtitle-burner/types';
+import type { SubtitleCue, SubtitleWord } from '@reelstack/types';
 
 export type WordSegmentStyle = 'normal' | 'highlighted' | 'hidden' | 'active';
 
@@ -51,8 +51,11 @@ function renderWordHighlight(
   highlightColor: string,
   upcomingColor?: string,
 ): AnimatedCaptionFrame {
+  const lastWord = words[words.length - 1];
   const segments: WordSegment[] = words.map((word) => {
-    const isActive = currentTime >= word.startTime && currentTime < word.endTime;
+    const isLastWord = word === lastWord;
+    const isActive = currentTime >= word.startTime
+      && (isLastWord || currentTime < word.endTime);
     const isUpcoming = currentTime < word.startTime;
 
     let color: string | undefined;
@@ -102,14 +105,19 @@ function renderKaraoke(
   highlightColor: string,
   upcomingColor: string,
 ): AnimatedCaptionFrame {
+  const lastWord = words[words.length - 1];
   const segments: WordSegment[] = words.map((word) => {
     const wordDuration = word.endTime - word.startTime;
     const elapsed = currentTime - word.startTime;
     const progress = clamp(wordDuration > 0 ? elapsed / wordDuration : 1, 0, 1);
 
     const isUpcoming = currentTime < word.startTime;
-    const isActive = currentTime >= word.startTime && currentTime < word.endTime;
-    const isComplete = currentTime >= word.endTime;
+    // For the last word in cue, treat it as active even at/past endTime
+    // (the cue-level fade-out handles disappearance)
+    const isLastWord = word === lastWord;
+    const isActive = currentTime >= word.startTime
+      && (isLastWord || currentTime < word.endTime);
+    const isComplete = !isActive && currentTime >= word.endTime;
 
     let style: WordSegmentStyle = 'normal';
     let color: string | undefined;
@@ -121,8 +129,10 @@ function renderKaraoke(
       style = 'highlighted';
       color = highlightColor;
     } else if (isActive) {
+      // Active word gets highlight color immediately
+      // (CSS color doesn't support linear-gradient, so use solid swap)
       style = 'active';
-      color = `linear-gradient(90deg, ${highlightColor} ${progress * 100}%, ${upcomingColor} ${progress * 100}%)`;
+      color = highlightColor;
     }
 
     return { text: word.text, style, opacity: 1, scale: isActive ? 1.05 : 1, offsetY: 0, color };

@@ -233,6 +233,10 @@ export const API_SCOPES = {
   RENDER_WRITE: 'render:write',
   PROJECTS_READ: 'projects:read',
   PROJECTS_WRITE: 'projects:write',
+  REEL_READ: 'reel:read',
+  REEL_WRITE: 'reel:write',
+  PUBLISH_READ: 'publish:read',
+  PUBLISH_WRITE: 'publish:write',
   FULL_ACCESS: '*',
 } as const;
 
@@ -241,11 +245,14 @@ export type ApiScope = (typeof API_SCOPES)[keyof typeof API_SCOPES];
 export const SCOPE_PRESETS = {
   full: [API_SCOPES.FULL_ACCESS],
   renderOnly: [API_SCOPES.VIDEOS_WRITE, API_SCOPES.RENDER_WRITE, API_SCOPES.RENDER_READ],
+  reelOnly: [API_SCOPES.REEL_WRITE, API_SCOPES.REEL_READ, API_SCOPES.PUBLISH_WRITE, API_SCOPES.PUBLISH_READ],
   readOnly: [
     API_SCOPES.VIDEOS_READ,
     API_SCOPES.TEMPLATES_READ,
     API_SCOPES.RENDER_READ,
     API_SCOPES.PROJECTS_READ,
+    API_SCOPES.REEL_READ,
+    API_SCOPES.PUBLISH_READ,
   ],
   templateManager: [API_SCOPES.TEMPLATES_READ, API_SCOPES.TEMPLATES_WRITE],
 } as const;
@@ -324,7 +331,81 @@ export interface StorageAdapter {
   delete(path: string): Promise<void>;
 }
 
+export type QueueName = 'render' | 'reel-render' | 'reel-publish';
+
 export interface QueueAdapter {
-  enqueue(jobId: string, payload: Record<string, unknown>): Promise<void>;
-  getStatus(jobId: string): Promise<JobStatus>;
+  enqueue(jobId: string, payload: Record<string, unknown>, queueName?: QueueName): Promise<void>;
+  getStatus(jobId: string, queueName?: QueueName): Promise<JobStatus>;
+}
+
+// ==========================================
+// Reel Types
+// ==========================================
+
+export type ReelLayout = 'split-screen' | 'fullscreen' | 'picture-in-picture';
+
+export interface MediaSource {
+  readonly url: string;
+  readonly type: 'video' | 'image' | 'color' | 'split-screen';
+  readonly label?: string;
+  readonly startFrom?: number; // seconds - trim start
+  readonly endAt?: number; // seconds - trim end
+}
+
+export type TransitionType = 'crossfade' | 'slide-left' | 'slide-right' | 'zoom-in' | 'wipe' | 'none';
+
+export interface BRollTransition {
+  readonly type: TransitionType;
+  readonly durationMs?: number; // default 300ms
+}
+
+export interface BRollSegment {
+  readonly startTime: number; // seconds
+  readonly endTime: number; // seconds
+  readonly media: MediaSource;
+  readonly animation?: 'spring-scale' | 'fade' | 'slide' | 'none';
+  readonly transition?: BRollTransition;
+}
+
+export interface ReelJob {
+  readonly id: string;
+  readonly userId: string;
+  readonly status: JobStatus;
+  readonly progress: number;
+  readonly script?: string;
+  readonly reelConfig?: Record<string, unknown>;
+  readonly outputUrl?: string;
+  readonly error?: string;
+  readonly apiKeyId?: string;
+  readonly projectId?: string;
+  readonly publishStatus?: Record<string, unknown>;
+  readonly createdAt: string;
+  readonly startedAt?: string;
+  readonly completedAt?: string;
+}
+
+export interface ReelConfig {
+  readonly layout: ReelLayout;
+  readonly width: number;
+  readonly height: number;
+  readonly fps: number;
+  readonly durationInSeconds: number;
+
+  // Media sources
+  readonly primaryVideo?: MediaSource; // talking head / main video
+  readonly secondaryVideo?: MediaSource; // screen recording / demo
+  readonly bRollSegments: readonly BRollSegment[];
+
+  // Audio
+  readonly voiceoverUrl?: string;
+  readonly musicUrl?: string;
+  readonly musicVolume?: number; // 0-1
+
+  // Captions
+  readonly cues: readonly SubtitleCue[];
+  readonly captionStyle: SubtitleStyle;
+
+  // Visual
+  readonly showProgressBar?: boolean;
+  readonly backgroundColor?: string;
 }
