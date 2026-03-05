@@ -1,5 +1,5 @@
-# Dependencies
-node_modules/
+# Dependencies (** required - matches node_modules at all levels of monorepo)
+**/node_modules/
 .pnpm-store/
 
 # Build artifacts
