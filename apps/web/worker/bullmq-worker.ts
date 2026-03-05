@@ -18,6 +18,9 @@ const worker = new Worker(
       password: url.password || undefined,
     },
     concurrency: 2,
+    // Render pipeline can take 3-5min (TTS + Remotion bundle + render)
+    // Default lockDuration is 30s - must be longer than the longest blocking operation
+    lockDuration: 300_000, // 5 minutes
   },
 );
 
