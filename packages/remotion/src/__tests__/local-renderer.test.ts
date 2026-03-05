@@ -5,6 +5,8 @@ const mockRenderMedia = vi.fn();
 const mockSelectComposition = vi.fn();
 const mockMkdirSync = vi.fn();
 const mockStatSync = vi.fn();
+const mockExistsSync = vi.fn();
+const mockRmSync = vi.fn();
 
 vi.mock('child_process', () => ({
   execSync: (...args: unknown[]) => mockExecSync(...args),
@@ -18,6 +20,8 @@ vi.mock('@remotion/renderer', () => ({
 vi.mock('fs', () => ({
   mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
   statSync: (...args: unknown[]) => mockStatSync(...args),
+  existsSync: (...args: unknown[]) => mockExistsSync(...args),
+  rmSync: (...args: unknown[]) => mockRmSync(...args),
 }));
 
 const { LocalRenderer } = await import('../render/local-renderer');
@@ -65,7 +69,10 @@ describe('LocalRenderer', () => {
     const renderer = new LocalRenderer();
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4' });
 
-    expect(mockExecSync).not.toHaveBeenCalled();
+    expect(mockExecSync).not.toHaveBeenCalledWith(
+      expect.stringContaining('bunx remotion bundle'),
+      expect.anything(),
+    );
     expect(mockSelectComposition).toHaveBeenCalledWith(
       expect.objectContaining({ serveUrl: '/app/remotion-bundle' }),
     );
