@@ -19,19 +19,22 @@ COPY packages/remotion/package.json packages/remotion/
 COPY packages/tts/package.json packages/tts/
 COPY packages/publisher/package.json packages/publisher/
 RUN bun install --frozen-lockfile
-RUN echo "=== Prisma binaries after bun install (deps stage) ===" && find /app/node_modules -name 'libquery_engine*' 2>/dev/null || echo "(none)"
 
 # Build
 FROM base AS builder
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
-RUN echo "=== Project files that are node_modules ===" && ls /app/packages/database/ 2>/dev/null && ls /app/apps/web/ 2>/dev/null | grep node_modules || echo "(no nested node_modules)"
-RUN echo "=== Prisma binaries after bun install ===" && find /app/node_modules -name 'libquery_engine*' 2>/dev/null || echo "(none)"
 RUN ./node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma
-RUN echo "=== Prisma binaries after prisma generate ===" && find /app/node_modules -name 'libquery_engine*' 2>/dev/null || echo "(none)"
+# Remove any darwin/mac binaries that may have leaked in - Linux-only from here
+RUN find /app/node_modules -name 'libquery_engine-darwin*' -delete
 RUN bun run build
-RUN echo "=== Prisma binaries in standalone ===" && find /app/apps/web/.next/standalone -name 'libquery_engine*' 2>/dev/null || echo "(none)"
+
+# Ensure Linux Prisma binary is in standalone output (not included by Next.js file tracing)
+RUN cp /app/node_modules/.bun/@prisma+client@6.3.1+63eb1ec23c1e0836/node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node \
+       /app/apps/web/.next/standalone/node_modules/.bun/@prisma+client@6.3.1+63eb1ec23c1e0836/node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node \
+    && echo "Prisma binary copied to standalone" \
+    || echo "Prisma binary not found - will use env var fallback"
 
 # Production
 FROM base AS runner
