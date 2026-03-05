@@ -5,7 +5,7 @@ const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const url = new URL(redisUrl);
 
 const worker = new Worker(
-  'render',
+  'reel-render',
   async (job) => {
     console.info(`[worker] Processing render job: ${job.id}`);
     await processRenderJob(job.data.jobId);
