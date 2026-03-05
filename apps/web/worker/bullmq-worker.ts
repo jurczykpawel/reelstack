@@ -1,5 +1,5 @@
 import { Worker } from 'bullmq';
-import { processRenderJob } from '../src/lib/worker/render-worker';
+import { processReelPipelineJob } from '../src/lib/worker/reel-pipeline-worker';
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const url = new URL(redisUrl);
@@ -8,7 +8,7 @@ const worker = new Worker(
   'reel-render',
   async (job) => {
     console.info(`[worker] Processing render job: ${job.id}`);
-    await processRenderJob(job.data.jobId);
+    await processReelPipelineJob(job.data.jobId);
     console.info(`[worker] Completed render job: ${job.id}`);
   },
   {
