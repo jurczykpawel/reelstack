@@ -43,6 +43,7 @@ export class LocalRenderer implements RemotionRenderer {
     }
 
     const compositionId = options.compositionId ?? 'Reel';
+    console.log(`[LocalRenderer] before selectComposition cwd=${process.cwd()}`);
 
     const composition = await selectComposition({
       serveUrl: bundlePath,
@@ -69,9 +70,11 @@ export class LocalRenderer implements RemotionRenderer {
     const concurrency = Math.min(requestedConcurrency, Math.max(1, remotionMaxCpus));
 
     console.log(`[LocalRenderer] remotionMaxCpus=${remotionMaxCpus} requestedConcurrency=${requestedConcurrency} concurrency=${concurrency}`);
+    console.log(`[LocalRenderer] cwd=${process.cwd()} bundlePath=${bundlePath}`);
 
     const startMs = performance.now();
 
+    try {
     await renderMedia({
       composition,
       serveUrl: bundlePath,
@@ -81,6 +84,10 @@ export class LocalRenderer implements RemotionRenderer {
       concurrency,
       ...(options.crf !== undefined ? { crf: options.crf } : {}),
     });
+    } catch (e) {
+      console.error('[LocalRenderer] renderMedia error:', (e as Error).stack ?? (e as Error).message);
+      throw e;
+    }
 
     const durationMs = performance.now() - startMs;
     const stats = statSync(options.outputPath);

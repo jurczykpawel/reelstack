@@ -64,6 +64,7 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
       completedAt: new Date(),
     });
   } catch (err) {
+    console.error('[Pipeline] Error stack:', err instanceof Error ? err.stack : String(err));
     await updateReelJobStatus(jobId, {
       status: 'FAILED',
       error: err instanceof Error ? err.message : 'Unknown error',
