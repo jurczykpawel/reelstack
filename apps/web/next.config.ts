@@ -1,7 +1,10 @@
 import type { NextConfig } from 'next';
+import path from 'path';
 
 const nextConfig: NextConfig = {
   output: 'standalone',
+  // Monorepo root - ensures Prisma native binaries in root node_modules are traced
+  outputFileTracingRoot: path.join(__dirname, '../../'),
   poweredByHeader: false,
   experimental: {
     proxyClientMaxBodySize: '500mb',
