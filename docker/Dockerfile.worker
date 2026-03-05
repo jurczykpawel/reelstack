@@ -33,8 +33,10 @@ RUN groupadd --system --gid 1001 worker && useradd --system --uid 1001 --gid 100
 
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
-# Pipeline copies voiceover to packages/remotion/public/ for Remotion staticFile()
-RUN mkdir -p /app/packages/remotion/public && chown worker:worker /app/packages/remotion/public
+# Pipeline writes to remotion/public/ (voiceover) and app node_modules/.remotion (Chrome cache)
+RUN mkdir -p /app/packages/remotion/public /app/apps/web/node_modules/.remotion && \
+    chown worker:worker /app/packages/remotion/public && \
+    chown -R worker:worker /app/apps/web/node_modules/.remotion
 COPY --from=builder /app/apps/web/src/lib/worker ./apps/web/src/lib/worker
 COPY --from=builder /app/apps/web/worker ./apps/web/worker
 COPY --from=builder /app/apps/web/node_modules ./apps/web/node_modules
