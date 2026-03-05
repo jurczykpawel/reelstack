@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { API_SCOPES } from '@subtitle-burner/types';
-import { getPublicTemplates } from '@subtitle-burner/database';
-import { BUILT_IN_TEMPLATES } from '@subtitle-burner/core';
+import { API_SCOPES } from '@reelstack/types';
+import { getPublicTemplates } from '@reelstack/database';
+import { BUILT_IN_TEMPLATES } from '@reelstack/core';
 import { withAuth, successResponse, paginatedResponse } from '@/lib/api/v1/middleware';
 import { paginationSchema } from '@/lib/api/v1/schemas';
 

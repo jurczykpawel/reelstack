@@ -28,8 +28,15 @@ export interface ReelCreationRequest {
   readonly outputPath?: string;
 }
 
+export interface CaptionTemplate {
+  readonly fontFamily?: string;
+  readonly fontSize?: number;
+  readonly fontColor?: string;
+  readonly backgroundColor?: string;
+}
+
 export interface BrandPreset {
-  readonly captionTemplate?: string;
+  readonly captionTemplate?: CaptionTemplate;
   readonly highlightColor?: string;
   readonly backgroundColor?: string;
   readonly defaultTransition?: 'crossfade' | 'slide-left' | 'slide-right' | 'zoom-in' | 'wipe' | 'none';

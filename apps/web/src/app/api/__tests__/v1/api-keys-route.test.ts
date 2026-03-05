@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
 vi.mock('@/lib/auth', () => ({
@@ -8,7 +9,7 @@ vi.mock('@/lib/auth', () => ({
 const mockGetApiKeysByUser = vi.fn();
 const mockCreateApiKey = vi.fn();
 const mockApiKeyCount = vi.fn();
-vi.mock('@subtitle-burner/database', () => ({
+vi.mock('@reelstack/database', () => ({
   getApiKeysByUser: (...args: unknown[]) => mockGetApiKeysByUser(...args),
   createApiKey: (...args: unknown[]) => mockCreateApiKey(...args),
   prisma: {
@@ -18,8 +19,8 @@ vi.mock('@subtitle-burner/database', () => ({
   },
 }));
 
-vi.mock('@subtitle-burner/types', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@subtitle-burner/types')>();
+vi.mock('@reelstack/types', async (importOriginal) => {
+  const original = await importOriginal<typeof import('@reelstack/types')>();
   return {
     ...original,
   };
@@ -32,12 +33,12 @@ vi.mock('@/lib/api/v1/api-keys', () => ({
 
 const { GET, POST } = await import('../../v1/api-keys/route');
 
-function makePostRequest(body: unknown): Request {
+function makePostRequest(body: unknown): NextRequest {
   return new Request('http://localhost/api/v1/api-keys', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }) as unknown as NextRequest;
 }
 
 describe('GET /api/v1/api-keys', () => {
@@ -65,7 +66,7 @@ describe('GET /api/v1/api-keys', () => {
       {
         id: 'key-1',
         name: 'Test Key',
-        keyPrefix: 'sb_live_abc',
+        keyPrefix: 'rs_live_abc',
         scopes: ['*'],
         rateLimitPerMinute: 60,
         isActive: true,
@@ -110,7 +111,7 @@ describe('POST /api/v1/api-keys', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: 'not json',
-    });
+    }) as unknown as NextRequest;
     const response = await POST(req);
     expect(response.status).toBe(400);
     const body = await response.json();
@@ -136,14 +137,14 @@ describe('POST /api/v1/api-keys', () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
     mockApiKeyCount.mockResolvedValue(0);
     mockGenerateApiKey.mockReturnValue({
-      plaintext: 'sb_live_full_key_value',
-      prefix: 'sb_live_abcd',
+      plaintext: 'rs_live_full_key_value',
+      prefix: 'rs_live_abcd',
       hash: 'hashed_value',
     });
     mockCreateApiKey.mockResolvedValue({
       id: 'key-new',
       name: 'New Key',
-      keyPrefix: 'sb_live_abcd',
+      keyPrefix: 'rs_live_abcd',
       scopes: ['*'],
       expiresAt: null,
       createdAt: new Date('2024-01-01'),
@@ -153,7 +154,7 @@ describe('POST /api/v1/api-keys', () => {
     expect(response.status).toBe(201);
     const body = await response.json();
     expect(body.data.id).toBe('key-new');
-    expect(body.data.key).toBe('sb_live_full_key_value');
-    expect(body.data.keyPrefix).toBe('sb_live_abcd');
+    expect(body.data.key).toBe('rs_live_full_key_value');
+    expect(body.data.keyPrefix).toBe('rs_live_abcd');
   });
 });

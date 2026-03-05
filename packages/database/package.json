@@ -1,5 +1,5 @@
 {
-  "name": "@subtitle-burner/database",
+  "name": "@reelstack/database",
   "version": "0.0.1",
   "private": true,
   "license": "MIT",
@@ -11,7 +11,8 @@
     "db:migrate": "prisma migrate dev",
     "db:studio": "prisma studio",
     "lint": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@prisma/client": "~6.3.1"

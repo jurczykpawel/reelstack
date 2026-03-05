@@ -1,0 +1,65 @@
+FROM node:22-slim AS base
+WORKDIR /app
+
+# Install system dependencies: Chromium (for Remotion), FFmpeg (for audio processing), fonts
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    chromium \
+    ffmpeg \
+    fonts-noto-cjk \
+    fonts-noto-color-emoji \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Bun as package manager
+RUN npm install -g bun@1.3
+
+# Chromium configuration for Remotion
+ENV CHROME_PATH=/usr/bin/chromium
+ENV PUPPETEER_SKIP_CHROMIUM_DOWNLOAD=true
+
+# Install dependencies
+FROM base AS deps
+WORKDIR /app
+COPY package.json bun.lock bunfig.toml ./
+COPY apps/web/package.json apps/web/
+COPY packages/types/package.json packages/types/
+COPY packages/ffmpeg/package.json packages/ffmpeg/
+COPY packages/database/package.json packages/database/
+COPY packages/queue/package.json packages/queue/
+COPY packages/core/package.json packages/core/
+COPY packages/storage/package.json packages/storage/
+COPY packages/transcription/package.json packages/transcription/
+COPY packages/remotion/package.json packages/remotion/
+COPY packages/tts/package.json packages/tts/
+COPY packages/publisher/package.json packages/publisher/
+RUN bun install --frozen-lockfile
+
+# Build: generate Prisma client + pre-bundle Remotion composition
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN ./node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma
+
+# Pre-bundle Remotion composition (saves 10-30s per render)
+RUN npx remotion bundle \
+    --entry-point packages/remotion/src/index.ts \
+    --out-dir /app/remotion-bundle \
+    --log-level warn
+
+# Production
+FROM base AS runner
+ENV NODE_ENV=production
+ENV REMOTION_BUNDLE_PATH=/app/remotion-bundle
+
+RUN addgroup --system --gid 1001 worker && adduser --system --uid 1001 worker
+
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
+COPY --from=builder /app/apps/web/src/lib/worker ./apps/web/src/lib/worker
+COPY --from=builder /app/apps/web/worker ./apps/web/worker
+COPY --from=builder /app/apps/web/package.json ./apps/web/
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/remotion-bundle ./remotion-bundle
+
+USER worker
+CMD ["bun", "run", "--cwd", "apps/web", "reel-worker"]

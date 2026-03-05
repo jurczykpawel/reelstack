@@ -1,7 +1,7 @@
 import { Inngest } from 'inngest';
 import { processRenderJob } from './render-worker';
 
-export const inngest = new Inngest({ id: 'subtitle-burner' });
+export const inngest = new Inngest({ id: 'reelstack' });
 
 export const renderJobHandler = inngest.createFunction(
   { id: 'render-video', retries: 1 },

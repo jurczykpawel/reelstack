@@ -1,11 +1,11 @@
 import { NextRequest } from 'next/server';
-import { API_SCOPES } from '@subtitle-burner/types';
+import { API_SCOPES } from '@reelstack/types';
 import {
   getTemplateById,
   updateTemplate as dbUpdateTemplate,
   deleteTemplate as dbDeleteTemplate,
-} from '@subtitle-burner/database';
-import { sanitizeStyle, BUILT_IN_TEMPLATES } from '@subtitle-burner/core';
+} from '@reelstack/database';
+import { sanitizeStyle, BUILT_IN_TEMPLATES } from '@reelstack/core';
 import { withAuth, successResponse, errorResponse } from '@/lib/api/v1/middleware';
 import { updateTemplateSchema } from '@/lib/api/v1/schemas';
 import type { AuthContext } from '@/lib/api/v1/types';

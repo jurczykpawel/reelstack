@@ -48,11 +48,11 @@ vi.mock('@/lib/api/rate-limit', () => ({
 }));
 
 const mockGetPublicTemplates = vi.fn();
-vi.mock('@subtitle-burner/database', () => ({
+vi.mock('@reelstack/database', () => ({
   getPublicTemplates: (...args: unknown[]) => mockGetPublicTemplates(...args),
 }));
 
-vi.mock('@subtitle-burner/core', () => ({
+vi.mock('@reelstack/core', () => ({
   BUILT_IN_TEMPLATES: [
     {
       id: 'built-in-1',
@@ -77,7 +77,7 @@ describe('GET /api/v1/templates/gallery', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticate.mockResolvedValue(null);
-    const response = await GET(new Request('http://localhost/api/v1/templates/gallery'));
+    const response = await GET(new Request('http://localhost/api/v1/templates/gallery') as unknown as NextRequest);
     expect(response.status).toBe(401);
   });
 
@@ -95,7 +95,7 @@ describe('GET /api/v1/templates/gallery', () => {
     mockAuthenticate.mockResolvedValue(mockAuthCtx);
     mockGetPublicTemplates.mockResolvedValue(publicTemplates);
 
-    const response = await GET(new Request('http://localhost/api/v1/templates/gallery'));
+    const response = await GET(new Request('http://localhost/api/v1/templates/gallery') as unknown as NextRequest);
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data).toHaveLength(2);
@@ -119,7 +119,7 @@ describe('GET /api/v1/templates/gallery', () => {
     mockGetPublicTemplates.mockResolvedValue(templates);
 
     const response = await GET(
-      new Request('http://localhost/api/v1/templates/gallery?cursor=pub-1&limit=10')
+      new Request('http://localhost/api/v1/templates/gallery?cursor=pub-1&limit=10') as unknown as NextRequest
     );
     expect(response.status).toBe(200);
     const body = await response.json();
@@ -130,7 +130,7 @@ describe('GET /api/v1/templates/gallery', () => {
   it('calls getPublicTemplates with undefined cursor for first page', async () => {
     mockAuthenticate.mockResolvedValue(mockAuthCtx);
     mockGetPublicTemplates.mockResolvedValue([]);
-    await GET(new Request('http://localhost/api/v1/templates/gallery'));
+    await GET(new Request('http://localhost/api/v1/templates/gallery') as unknown as NextRequest);
     expect(mockGetPublicTemplates).toHaveBeenCalledWith(undefined, 20);
   });
 });

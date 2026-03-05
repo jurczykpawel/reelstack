@@ -8,8 +8,8 @@
 ## Quick Setup
 
 ```bash
-git clone https://github.com/jurczykpawel/subtitle-burner.git
-cd subtitle-burner
+git clone https://github.com/jurczykpawel/reelstack.git
+cd reelstack
 cp .env.example .env
 ```
 
@@ -23,7 +23,7 @@ MINIO_ENDPOINT=minio
 MINIO_PORT=9000
 MINIO_ACCESS_KEY=minioadmin
 MINIO_SECRET_KEY=minioadmin
-MINIO_BUCKET=subtitle-burner
+MINIO_BUCKET=reelstack
 NODE_ENV=production
 ```
 

@@ -134,6 +134,13 @@ export async function createReel(
       primaryVideoUrl: request.primaryVideoUrl,
       secondaryVideoUrl: request.secondaryVideoUrl,
       voiceoverUrl: 'voiceover.mp3',
+      pipSegments: [],
+      lowerThirds: [],
+      ctaSegments: [],
+      counters: [],
+      zoomSegments: [],
+      highlights: [],
+      dynamicCaptionPosition: false,
       bRollSegments: directorOutput.bRollSegments.map((seg) => {
         const transition = seg.transition ? {
           type: seg.transition.type as 'crossfade' | 'slide-left' | 'slide-right' | 'zoom-in' | 'wipe' | 'none',
@@ -177,6 +184,8 @@ export async function createReel(
         padding: 16,
         highlightColor: request.brandPreset?.highlightColor ?? '#F59E0B',
         upcomingColor: request.brandPreset?.captionTemplate?.fontColor ?? '#8888A0',
+        highlightMode: 'text' as const,
+        textTransform: 'none' as const,
       },
       musicVolume: 0,
       showProgressBar: true,

@@ -16,7 +16,10 @@ export function createDB(): PrismaClient {
   return prisma;
 }
 
-// Query helpers
+// ==========================================
+// User queries
+// ==========================================
+
 export async function getUserByEmail(email: string) {
   return prisma.user.findUnique({ where: { email } });
 }
@@ -33,114 +36,56 @@ export async function upsertUser(id: string, email: string) {
   });
 }
 
-export async function createUserWithPassword(email: string, hashedPassword: string) {
-  return prisma.user.create({
-    data: { email, password: hashedPassword },
+
+export async function getUserPreferences(userId: string): Promise<Record<string, unknown>> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { preferences: true },
+  });
+  return (user?.preferences as Record<string, unknown>) ?? {};
+}
+
+export async function updateUserPreferences(
+  userId: string,
+  data: Record<string, unknown>
+): Promise<Record<string, unknown>> {
+  const existing = await getUserPreferences(userId);
+  const merged = { ...existing, ...data };
+  await prisma.user.update({
+    where: { id: userId },
+    data: { preferences: merged as Record<string, unknown> as Parameters<typeof prisma.user.update>[0]['data']['preferences'] },
+  });
+  return merged;
+}
+
+export async function updateUserTier(userId: string, tier: 'FREE' | 'SOLO' | 'PRO' | 'AGENCY') {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { tier },
   });
 }
 
-export async function createVideo(data: {
-  userId: string;
-  filename: string;
-  filePath: string;
-  fileSize: bigint;
-  duration: number;
-  width: number;
-  height: number;
-  mimeType: string;
-}) {
-  return prisma.video.create({ data });
+export async function getUserBySellfCustomerId(sellfCustomerId: string) {
+  return prisma.user.findUnique({ where: { sellfCustomerId } });
 }
 
-export async function getVideosByUser(userId: string) {
-  return prisma.video.findMany({
-    where: { userId },
-    orderBy: { createdAt: 'desc' },
-    include: { _count: { select: { subtitles: true, renderJobs: true } } },
+export async function linkSellfCustomer(userId: string, sellfCustomerId: string) {
+  return prisma.user.update({
+    where: { id: userId },
+    data: { sellfCustomerId },
   });
 }
 
-export async function getVideoById(id: string, userId: string) {
-  return prisma.video.findFirst({ where: { id, userId } });
-}
+// ==========================================
+// Usage queries
+// ==========================================
 
-export async function deleteVideo(id: string, userId: string) {
-  return prisma.video.deleteMany({ where: { id, userId } });
-}
-
-export async function getSubtitlesByVideo(videoId: string, userId: string) {
-  return prisma.subtitle.findFirst({
-    where: {
-      videoId,
-      video: { userId },
-    },
-    orderBy: { updatedAt: 'desc' },
-  });
-}
-
-export async function upsertSubtitle(
-  videoId: string,
-  content: unknown,
-  style?: unknown
-) {
-  const existing = await prisma.subtitle.findFirst({ where: { videoId } });
-  if (existing) {
-    return prisma.subtitle.update({
-      where: { id: existing.id },
-      data: { content: content as object, style: style as object },
-    });
-  }
-  return prisma.subtitle.create({
-    data: {
-      videoId,
-      content: content as object,
-      style: style as object,
-    },
-  });
-}
-
-export async function createRenderJob(data: {
-  userId: string;
-  videoId: string;
-  style: unknown;
-}) {
-  return prisma.renderJob.create({
-    data: {
-      userId: data.userId,
-      videoId: data.videoId,
-      style: data.style as object,
-    },
-  });
-}
-
-export async function getRenderJob(id: string, userId: string) {
-  return prisma.renderJob.findFirst({ where: { id, userId } });
-}
-
-/** Internal use only - worker needs to read job without userId scoping */
-export async function getRenderJobInternal(id: string) {
-  return prisma.renderJob.findUnique({ where: { id } });
-}
-
-export async function updateRenderJobStatus(
-  id: string,
-  updates: {
-    status?: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
-    progress?: number;
-    outputUrl?: string;
-    error?: string;
-    startedAt?: Date;
-    completedAt?: Date;
-  }
-) {
-  return prisma.renderJob.update({ where: { id }, data: updates });
-}
-
-export async function countUserRendersToday(userId: string): Promise<number> {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-  return prisma.renderJob.count({
-    where: { userId, createdAt: { gte: startOfDay } },
+export async function getMonthlyRenderCount(userId: string): Promise<number> {
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+  return prisma.reelJob.count({
+    where: { userId, createdAt: { gte: startOfMonth } },
   });
 }
 
@@ -291,118 +236,172 @@ export async function touchApiKey(id: string, ip?: string) {
 }
 
 // ==========================================
-// Project queries
+// Token & credit queries
 // ==========================================
 
-export async function createProject(data: {
-  userId: string;
-  name: string;
-  videoId?: string;
-  settings?: object;
-}) {
-  return prisma.project.create({ data });
+/**
+ * Consume a render credit: first checks tier monthly limit,
+ * then falls back to token balance. Returns true if consumed.
+ */
+export async function consumeTokenOrCredit(
+  userId: string,
+  monthlyLimit: number
+): Promise<{ consumed: boolean; source: 'tier' | 'token' | null }> {
+  const startOfMonth = new Date();
+  startOfMonth.setDate(1);
+  startOfMonth.setHours(0, 0, 0, 0);
+
+  try {
+    const result = await prisma.$transaction(async (tx) => {
+      const reelCount = await tx.reelJob.count({
+        where: { userId, createdAt: { gte: startOfMonth } },
+      });
+
+      if (reelCount < monthlyLimit) {
+        return { consumed: true, source: 'tier' as const };
+      }
+
+      // Tier limit exhausted - try token balance
+      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
+      if (user.tokenBalance > 0) {
+        await tx.user.update({
+          where: { id: userId },
+          data: { tokenBalance: { decrement: 1 } },
+        });
+        await tx.tokenTransaction.create({
+          data: { userId, amount: -1, reason: 'render' },
+        });
+        return { consumed: true, source: 'token' as const };
+      }
+
+      return { consumed: false, source: null };
+    });
+    return result;
+  } catch (err) {
+    throw err;
+  }
 }
 
-export async function getProjectsByUser(
+export async function addTokens(
   userId: string,
-  cursor?: string,
-  limit = 20
+  amount: number,
+  reason: string,
+  sellfOrderId?: string
 ) {
-  return prisma.project.findMany({
+  return prisma.$transaction(async (tx) => {
+    await tx.user.update({
+      where: { id: userId },
+      data: { tokenBalance: { increment: amount } },
+    });
+    return tx.tokenTransaction.create({
+      data: { userId, amount, reason, sellfOrderId },
+    });
+  });
+}
+
+export async function getTokenBalance(userId: string): Promise<number> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { tokenBalance: true },
+  });
+  return user?.tokenBalance ?? 0;
+}
+
+export async function getTokenTransactions(userId: string, limit = 50) {
+  return prisma.tokenTransaction.findMany({
     where: { userId },
-    orderBy: { updatedAt: 'desc' },
-    take: limit + 1,
-    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
-    include: { video: { select: { id: true, filename: true, duration: true } } },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
   });
-}
-
-export async function getProjectById(id: string, userId: string) {
-  return prisma.project.findFirst({
-    where: { id, userId },
-    include: { video: true },
-  });
-}
-
-export async function updateProject(
-  id: string,
-  userId: string,
-  data: { name?: string; videoId?: string; settings?: object }
-) {
-  return prisma.project.updateMany({
-    where: { id, userId },
-    data,
-  });
-}
-
-export async function deleteProject(id: string, userId: string) {
-  return prisma.project.deleteMany({ where: { id, userId } });
 }
 
 // ==========================================
-// RenderJob - extended queries
+// ReelJob queries
 // ==========================================
 
-export async function createRenderJobV2(data: {
+export async function createReelJob(data: {
   userId: string;
-  videoId: string;
-  style: object;
-  templateId?: string;
+  script?: string;
+  reelConfig?: object;
   apiKeyId?: string;
 }) {
-  return prisma.renderJob.create({
+  return prisma.reelJob.create({
     data: {
       userId: data.userId,
-      videoId: data.videoId,
-      style: data.style,
-      templateId: data.templateId,
+      script: data.script,
+      reelConfig: data.reelConfig as object | undefined,
       apiKeyId: data.apiKeyId,
     },
   });
 }
 
-/**
- * Atomic credit check - prevents TOCTOU race condition.
- *
- * Uses a Prisma transaction with a raw SQL atomic increment pattern:
- * count current jobs AND create a placeholder in a single transaction,
- * rolling back if the limit is exceeded.
- */
-export async function tryConsumeRenderCredit(
-  userId: string,
-  dailyLimit: number
-): Promise<boolean> {
-  const startOfDay = new Date();
-  startOfDay.setHours(0, 0, 0, 0);
-
-  // Use an interactive transaction to ensure atomicity.
-  // The count and the check happen inside the same serializable snapshot.
-  try {
-    await prisma.$transaction(async (tx) => {
-      const count = await tx.renderJob.count({
-        where: { userId, createdAt: { gte: startOfDay } },
-      });
-      if (count >= dailyLimit) {
-        throw new Error('LIMIT_EXCEEDED');
-      }
-      // The actual renderJob will be created outside this transaction,
-      // but by holding the transaction open until the check passes,
-      // we serialise concurrent attempts for the same user.
-    });
-    return true;
-  } catch (err) {
-    if (err instanceof Error && err.message === 'LIMIT_EXCEEDED') {
-      return false;
-    }
-    throw err;
-  }
+export async function getReelJob(id: string, userId: string) {
+  return prisma.reelJob.findFirst({ where: { id, userId } });
 }
 
-export async function updateRenderJobProjectFile(id: string, projectFile: string) {
-  return prisma.renderJob.update({
-    where: { id },
-    data: { projectFile },
+export async function getReelJobInternal(id: string) {
+  return prisma.reelJob.findUnique({ where: { id } });
+}
+
+export async function updateReelJobStatus(
+  id: string,
+  updates: {
+    status?: 'QUEUED' | 'PROCESSING' | 'COMPLETED' | 'FAILED';
+    progress?: number;
+    outputUrl?: string;
+    error?: string;
+    publishStatus?: object;
+    startedAt?: Date;
+    completedAt?: Date;
+  }
+) {
+  return prisma.reelJob.update({ where: { id }, data: updates });
+}
+
+export async function getReelJobsByUser(userId: string, limit = 20) {
+  return prisma.reelJob.findMany({
+    where: { userId },
+    orderBy: { createdAt: 'desc' },
+    take: limit,
   });
+}
+
+// ==========================================
+// TierConfig queries
+// ==========================================
+
+const TIER_CONFIG_DEFAULTS = [
+  { tier: 'FREE',   rendersPerMonth: 3,   maxFileSizeMb: 100,    maxDurationSec: 120  },
+  { tier: 'SOLO',   rendersPerMonth: 30,  maxFileSizeMb: 500,    maxDurationSec: 300  },
+  { tier: 'PRO',    rendersPerMonth: 100, maxFileSizeMb: 2048,   maxDurationSec: 1800 },
+  { tier: 'AGENCY', rendersPerMonth: 500, maxFileSizeMb: 10240,  maxDurationSec: -1   },
+] as const;
+
+export async function getAllTierConfigs(productSlug = 'reelstack') {
+  return prisma.tierConfig.findMany({ where: { productSlug } });
+}
+
+export async function upsertTierConfig(
+  tier: string,
+  productSlug: string,
+  data: { rendersPerMonth: number; maxFileSizeMb: number; maxDurationSec: number; active?: boolean }
+) {
+  return prisma.tierConfig.upsert({
+    where: { tier_productSlug: { tier, productSlug } },
+    update: data,
+    create: { tier, productSlug, ...data },
+  });
+}
+
+/** Idempotent seed — inserts defaults only for missing (tier, productSlug) pairs. */
+export async function seedTierDefaults(productSlug = 'reelstack') {
+  for (const row of TIER_CONFIG_DEFAULTS) {
+    await prisma.tierConfig.upsert({
+      where: { tier_productSlug: { tier: row.tier, productSlug } },
+      update: {},
+      create: { ...row, productSlug },
+    });
+  }
 }
 
 export { PrismaClient };

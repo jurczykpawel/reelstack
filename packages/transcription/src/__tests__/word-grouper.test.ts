@@ -97,4 +97,59 @@ describe('groupWordsIntoCues', () => {
     expect(cues).toHaveLength(1);
     expect(cues[0].text).toBe('Hello.');
   });
+
+  describe('orphan avoidance', () => {
+    it('moves trailing orphan word to next cue', () => {
+      const words = makeWords(['Zobacz', 'jak', 'w', 'trzydzieści', 'sekund']);
+      const cues = groupWordsIntoCues(words, { maxWordsPerCue: 3, avoidOrphans: true });
+      // Without orphan fix: ["Zobacz jak w", "trzydzieści sekund"]
+      // With orphan fix: ["Zobacz jak", "w trzydzieści sekund"]
+      expect(cues[0].text).toBe('Zobacz jak');
+      expect(cues[1].text).toBe('w trzydzieści sekund');
+    });
+
+    it('moves Polish preposition orphan', () => {
+      const words = makeWords(['aplikację', 'i', 'od', 'razu', 'ją']);
+      const cues = groupWordsIntoCues(words, { maxWordsPerCue: 2, avoidOrphans: true });
+      // Cue boundaries: ["aplikację i"] -> orphan "i" -> ["aplikację", "i od"]
+      // Then "od" at end of cue 2 -> ["i", "od razu"]... depends on grouping
+      // Key: no cue ends with a short orphan word
+      for (let i = 0; i < cues.length - 1; i++) {
+        const lastWord = cues[i].words![cues[i].words!.length - 1].text;
+        const clean = lastWord.replace(/[.,!?;:]/g, '').toLowerCase();
+        if (clean.length <= 3) {
+          expect(['aplikację', 'razu', 'ją']).toContain(clean);
+        }
+      }
+    });
+
+    it('does not move orphan if cue has only one word', () => {
+      const words = makeWords(['w', 'domu']);
+      const cues = groupWordsIntoCues(words, { maxWordsPerCue: 1, avoidOrphans: true });
+      // Can't move orphan from single-word cue (would leave it empty)
+      expect(cues.length).toBeGreaterThanOrEqual(1);
+      expect(cues.every((c) => c.text.length > 0)).toBe(true);
+    });
+
+    it('preserves timing when moving orphan', () => {
+      const words: TranscriptionWord[] = [
+        { text: 'Zobacz', startTime: 0, endTime: 0.5 },
+        { text: 'jak', startTime: 0.5, endTime: 0.8 },
+        { text: 'w', startTime: 0.8, endTime: 0.9 },
+        { text: 'trzydzieści', startTime: 0.9, endTime: 1.5 },
+        { text: 'sekund', startTime: 1.5, endTime: 2.0 },
+      ];
+      const cues = groupWordsIntoCues(words, { maxWordsPerCue: 3, avoidOrphans: true });
+      // "w" moved to next cue - its timing should be preserved
+      expect(cues[0].endTime).toBe(0.8); // ends at "jak"
+      expect(cues[1].startTime).toBe(0.8); // starts at "w"
+      expect(cues[1].words![0].text).toBe('w');
+    });
+
+    it('does not fix orphans when disabled', () => {
+      const words = makeWords(['Zobacz', 'jak', 'w', 'trzydzieści', 'sekund']);
+      const cues = groupWordsIntoCues(words, { maxWordsPerCue: 3, avoidOrphans: false });
+      expect(cues[0].text).toBe('Zobacz jak w');
+    });
+  });
 });

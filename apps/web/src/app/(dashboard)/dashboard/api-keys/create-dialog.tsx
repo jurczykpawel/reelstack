@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { SCOPE_PRESETS } from '@subtitle-burner/types';
+import { SCOPE_PRESETS } from '@reelstack/types';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -26,12 +26,13 @@ interface CreateApiKeyDialogProps {
   onCreated: () => void;
 }
 
-type ScopePreset = 'full' | 'renderOnly' | 'readOnly';
+type ScopePreset = 'full' | 'reelOnly' | 'readOnly' | 'templateManager';
 
 const PRESET_LABELS: Record<ScopePreset, string> = {
   full: 'Full Access',
-  renderOnly: 'Render Only',
+  reelOnly: 'Reel Only',
   readOnly: 'Read Only',
+  templateManager: 'Template Manager',
 };
 
 const EXPIRATION_OPTIONS = [

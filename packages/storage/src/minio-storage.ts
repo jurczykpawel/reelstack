@@ -1,5 +1,5 @@
 import * as Minio from 'minio';
-import type { StorageAdapter } from '@subtitle-burner/types';
+import type { StorageAdapter } from '@reelstack/types';
 
 export class MinioStorageAdapter implements StorageAdapter {
   private client: Minio.Client;
@@ -18,7 +18,7 @@ export class MinioStorageAdapter implements StorageAdapter {
       accessKey,
       secretKey,
     });
-    this.bucket = process.env.MINIO_BUCKET || 'subtitle-burner';
+    this.bucket = process.env.MINIO_BUCKET || 'reelstack';
   }
 
   private async ensureBucket(): Promise<void> {

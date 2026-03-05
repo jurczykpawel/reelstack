@@ -26,20 +26,31 @@ export default defineConfig({
   retries: 0,
   outputDir: './e2e/test-results',
   use: {
-    baseURL: 'http://localhost:3001',
+    baseURL: process.env.E2E_BASE_URL || 'http://localhost:3077',
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
+    navigationTimeout: 15000,
+    // Force connection close to avoid keep-alive issues with streaming Next.js responses
+    extraHTTPHeaders: process.env.E2E_BASE_URL ? { 'Connection': 'close' } : {},
   },
-  webServer: {
-    command: 'bun run dev',
-    port: 3001,
-    reuseExistingServer: !process.env.CI,
+  webServer: process.env.E2E_BASE_URL ? undefined : {
+    command: 'npx next dev --port 3077',
+    port: 3077,
+    reuseExistingServer: true,
   },
   projects: [
+    // Auth setup - creates test user session
     {
       name: 'setup',
       testMatch: /auth\.setup\.ts/,
     },
+    // Public pages (no auth needed)
+    {
+      name: 'no-auth',
+      use: { ...devices['Desktop Chrome'] },
+      testMatch: /landing\.spec\.ts/,
+    },
+    // Authenticated pages (depends on setup)
     {
       name: 'chromium',
       use: {
@@ -47,12 +58,7 @@ export default defineConfig({
         storageState: authFile,
       },
       dependencies: ['setup'],
-      testIgnore: [/auth\.setup\.ts/, /landing\.spec\.ts/],
-    },
-    {
-      name: 'no-auth',
-      use: { ...devices['Desktop Chrome'] },
-      testMatch: /landing\.spec\.ts/,
+      testMatch: /dashboard\.spec\.ts/,
     },
   ],
 });

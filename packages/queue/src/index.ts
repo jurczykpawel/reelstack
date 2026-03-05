@@ -1,4 +1,4 @@
-import type { QueueAdapter, DeploymentMode } from '@subtitle-burner/types';
+import type { QueueAdapter, DeploymentMode } from '@reelstack/types';
 
 export function detectDeploymentMode(): DeploymentMode {
   if (process.env.NEXT_PUBLIC_SUPABASE_URL && process.env.INNGEST_EVENT_KEY) {

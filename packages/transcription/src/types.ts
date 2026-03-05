@@ -95,10 +95,25 @@ export interface WordGroupingConfig {
   readonly maxWordsPerCue: number;
   readonly maxDurationPerCue: number;
   readonly breakOnPunctuation: boolean;
+  readonly avoidOrphans: boolean;
 }
 
 export const DEFAULT_GROUPING_CONFIG: WordGroupingConfig = {
   maxWordsPerCue: 10,
   maxDurationPerCue: 5,
   breakOnPunctuation: true,
+  avoidOrphans: true,
 };
+
+/** Short words that should not end a cue alone (Polish + common English). */
+export const ORPHAN_WORDS = new Set([
+  // Polish
+  'w', 'z', 'i', 'o', 'a', 'u', 'e',
+  'na', 'do', 'po', 'ze', 'we', 'od', 'ku', 'za', 'ni',
+  'to', 'co', 'że', 'by', 'bo', 'no', 'je', 'go', 'tu',
+  'nie', 'jak', 'ale', 'czy', 'dla', 'bez', 'nad', 'pod', 'lub',
+  // English
+  'a', 'an', 'the', 'of', 'in', 'on', 'at', 'to', 'by', 'or',
+  'is', 'it', 'as', 'if', 'so', 'no', 'my', 'we', 'he',
+  'and', 'but', 'for', 'not', 'you', 'can', 'has', 'its', 'are',
+]);

@@ -1,76 +1,27 @@
 import NextAuth from 'next-auth';
 import type { Provider } from 'next-auth/providers';
-import Credentials from 'next-auth/providers/credentials';
 import { PrismaAdapter } from '@auth/prisma-adapter';
-import { prisma } from '@subtitle-burner/database';
-import bcrypt from 'bcryptjs';
-import { rateLimit } from './api/rate-limit';
+import { prisma } from '@reelstack/database';
+import { rateLimit } from '@/lib/api/rate-limit';
+
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const Nodemailer = require('next-auth/providers/nodemailer').default;
 
 const providers: Provider[] = [
-  Credentials({
-    name: 'credentials',
-    credentials: {
-      email: { label: 'Email', type: 'email' },
-      password: { label: 'Password', type: 'password' },
+  Nodemailer({
+    server: {
+      host: process.env.SMTP_HOST,
+      port: Number(process.env.SMTP_PORT || 587),
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
     },
-    async authorize(credentials, request) {
-      const email = credentials?.email as string | undefined;
-      if (!email || !credentials?.password) return null;
-
-      // Rate limit: 5 login attempts per minute per email
-      const rl = rateLimit(`auth:login:${email}`, { maxRequests: 5, windowMs: 60_000 });
-      if (!rl.success) {
-        const ip = request?.headers?.get?.('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-        console.warn(`[auth] Login rate limited: email=${email}, ip=${ip}`);
-        return null;
-      }
-
-      const user = await prisma.user.findUnique({
-        where: { email },
-      });
-
-      if (!user?.password) {
-        console.warn(`[auth] Login failed (user not found): email=${email}`);
-        return null;
-      }
-
-      const valid = await bcrypt.compare(
-        credentials.password as string,
-        user.password,
-      );
-
-      if (!valid) {
-        console.warn(`[auth] Login failed (invalid password): email=${email}`);
-        return null;
-      }
-
-      return { id: user.id, email: user.email, name: user.name };
-    },
+    from: process.env.EMAIL_FROM || 'noreply@reelstack.io',
   }),
 ];
 
-// Add email/magic link provider only if SMTP is configured.
-// Uses dynamic import to avoid pulling in nodemailer (Node.js stream module)
-// into edge runtime bundles at compile time.
-if (process.env.SMTP_HOST) {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const Nodemailer = require('next-auth/providers/nodemailer').default;
-  providers.push(
-    Nodemailer({
-      server: {
-        host: process.env.SMTP_HOST,
-        port: Number(process.env.SMTP_PORT || 587),
-        auth: {
-          user: process.env.SMTP_USER,
-          pass: process.env.SMTP_PASS,
-        },
-      },
-      from: process.env.EMAIL_FROM || 'noreply@subtitleburner.com',
-    }),
-  );
-}
-
-const useSecureCookies = process.env.NODE_ENV === 'production';
+const useSecureCookies = (process.env.NODE_ENV as string) === 'production';
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(prisma as never),
@@ -78,7 +29,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
   providers,
   pages: {
     signIn: '/login',
-    error: '/login',
+    verifyRequest: '/login?verify=1',
   },
   cookies: {
     sessionToken: {
@@ -101,6 +52,20 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   },
   callbacks: {
+    async signIn({ user, account }) {
+      // Rate-limit magic link requests: 5 per 10 minutes per email
+      if (account?.provider === 'nodemailer' && user.email) {
+        const rl = rateLimit(
+          `magic-link:${user.email}`,
+          { maxRequests: 5, windowMs: 10 * 60 * 1000 },
+        );
+        if (!rl.success) {
+          console.warn(`[auth] Magic link rate limit exceeded for ${user.email}`);
+          return false;
+        }
+      }
+      return true;
+    },
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id;

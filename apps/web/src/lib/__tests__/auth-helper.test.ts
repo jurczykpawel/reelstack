@@ -8,7 +8,7 @@ vi.mock('@/lib/auth', () => ({
 
 // Mock database
 const mockFindUnique = vi.fn();
-vi.mock('@subtitle-burner/database', () => ({
+vi.mock('@reelstack/database', () => ({
   prisma: {
     user: {
       findUnique: (...args: unknown[]) => mockFindUnique(...args),

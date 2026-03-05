@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@subtitle-burner/database';
+import { prisma } from '@reelstack/database';
 import { generateApiKey } from '@/lib/api/v1/api-keys';
 import { successResponse, errorResponse } from '@/lib/api/v1/middleware';
 

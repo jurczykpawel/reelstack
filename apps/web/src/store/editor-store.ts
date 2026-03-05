@@ -1,95 +1,34 @@
 import { create } from 'zustand';
-import type { SubtitleCue, SubtitleStyle, VideoMetadata } from '@subtitle-burner/types';
-import { DEFAULT_SUBTITLE_STYLE } from '@subtitle-burner/types';
+import type { SubtitleCue, SubtitleStyle } from '@reelstack/types';
+
+interface VideoMeta {
+  id: string;
+  filename: string;
+  fileSize: number;
+  mimeType: string;
+  width: number;
+  height: number;
+  duration: number;
+}
 
 interface EditorState {
-  // Video
-  video: VideoMetadata | null;
-  videoUrl: string | null;
-  videoFile: File | null;
-  setVideo: (video: VideoMetadata | null, url: string | null, file?: File | null) => void;
-
-  // Playback
-  currentTime: number;
-  duration: number;
-  isPlaying: boolean;
-  setCurrentTime: (time: number) => void;
-  setDuration: (duration: number) => void;
-  setIsPlaying: (playing: boolean) => void;
-
-  // Subtitles
   cues: SubtitleCue[];
-  selectedCueId: string | null;
+  style: SubtitleStyle | null;
+  video: VideoMeta | null;
+  videoUrl: string | null;
   setCues: (cues: SubtitleCue[]) => void;
-  addCue: (cue: SubtitleCue) => void;
-  updateCue: (id: string, updates: Partial<SubtitleCue>) => void;
-  removeCue: (id: string) => void;
-  setSelectedCueId: (id: string | null) => void;
-
-  // Style
-  style: SubtitleStyle;
-  setStyle: (style: Partial<SubtitleStyle>) => void;
-
-  // UI State
-  zoom: number;
-  setZoom: (zoom: number) => void;
-
-  // Reset
+  setStyle: (style: SubtitleStyle) => void;
+  setVideo: (video: VideoMeta, url: string) => void;
   reset: () => void;
 }
 
 export const useEditorStore = create<EditorState>((set) => ({
-  // Video
+  cues: [],
+  style: null,
   video: null,
   videoUrl: null,
-  videoFile: null,
-  setVideo: (video, url, file = null) => set({ video, videoUrl: url, videoFile: file }),
-
-  // Playback
-  currentTime: 0,
-  duration: 0,
-  isPlaying: false,
-  setCurrentTime: (currentTime) => set({ currentTime }),
-  setDuration: (duration) => set({ duration }),
-  setIsPlaying: (isPlaying) => set({ isPlaying }),
-
-  // Subtitles
-  cues: [],
-  selectedCueId: null,
   setCues: (cues) => set({ cues }),
-  addCue: (cue) => set((state) => ({ cues: [...state.cues, cue] })),
-  updateCue: (id, updates) =>
-    set((state) => ({
-      cues: state.cues.map((c) => (c.id === id ? { ...c, ...updates } : c)),
-    })),
-  removeCue: (id) =>
-    set((state) => ({
-      cues: state.cues.filter((c) => c.id !== id),
-      selectedCueId: state.selectedCueId === id ? null : state.selectedCueId,
-    })),
-  setSelectedCueId: (selectedCueId) => set({ selectedCueId }),
-
-  // Style
-  style: DEFAULT_SUBTITLE_STYLE,
-  setStyle: (updates) =>
-    set((state) => ({ style: { ...state.style, ...updates } })),
-
-  // UI
-  zoom: 1,
-  setZoom: (zoom) => set({ zoom }),
-
-  // Reset
-  reset: () =>
-    set({
-      video: null,
-      videoUrl: null,
-      videoFile: null,
-      currentTime: 0,
-      duration: 0,
-      isPlaying: false,
-      cues: [],
-      selectedCueId: null,
-      style: DEFAULT_SUBTITLE_STYLE,
-      zoom: 1,
-    }),
+  setStyle: (style) => set({ style }),
+  setVideo: (video, videoUrl) => set({ video, videoUrl }),
+  reset: () => set({ cues: [], style: null, video: null, videoUrl: null }),
 }));

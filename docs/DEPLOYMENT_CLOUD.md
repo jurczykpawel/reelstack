@@ -24,7 +24,7 @@ DATABASE_URL="your-connection-string" ./node_modules/.bin/prisma migrate deploy 
 
 ### 3. Create Storage Bucket (Supabase)
 
-In Supabase Dashboard > Storage, create a bucket named `subtitle-burner`.
+In Supabase Dashboard > Storage, create a bucket named `reelstack`.
 Note the **Project URL** and **Service Role Key** from Settings > API.
 
 ### 4. Deploy to Vercel
@@ -46,7 +46,7 @@ DATABASE_URL=postgresql://...
 # Supabase (storage only — NOT used for auth)
 NEXT_PUBLIC_SUPABASE_URL=https://your-project.supabase.co
 SUPABASE_SERVICE_ROLE_KEY=your-service-role-key
-SUPABASE_STORAGE_BUCKET=subtitle-burner
+SUPABASE_STORAGE_BUCKET=reelstack
 
 # Inngest (for server-side rendering)
 INNGEST_EVENT_KEY=your-event-key

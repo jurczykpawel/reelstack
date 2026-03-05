@@ -1,16 +1,17 @@
 {
-  "name": "@subtitle-burner/storage",
+  "name": "@reelstack/storage",
   "version": "0.0.1",
   "private": true,
   "license": "MIT",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@subtitle-burner/queue": "workspace:*",
-    "@subtitle-burner/types": "workspace:*",
+    "@reelstack/queue": "workspace:*",
+    "@reelstack/types": "workspace:*",
     "@supabase/supabase-js": "^2.49.1",
     "minio": "^8.0.6"
   },

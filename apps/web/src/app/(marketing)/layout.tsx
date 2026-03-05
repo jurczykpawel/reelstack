@@ -6,7 +6,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       <header className="border-b">
         <div className="mx-auto flex h-14 max-w-6xl items-center justify-between px-4">
           <Link href="/" className="text-lg font-bold">
-            Subtitle Burner
+            ReelStack
           </Link>
           <nav className="flex items-center gap-4">
             <Link href="/pricing" className="text-sm text-muted-foreground hover:text-foreground">
@@ -23,7 +23,7 @@ export default function MarketingLayout({ children }: { children: React.ReactNod
       </header>
       <main>{children}</main>
       <footer className="border-t py-8 text-center text-sm text-muted-foreground">
-        Subtitle Burner — Open Source
+        ReelStack - Programmatic Video Pipeline
       </footer>
     </div>
   );

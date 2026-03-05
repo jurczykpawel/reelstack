@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { generateASS } from './ass-generator';
-import { DEFAULT_SUBTITLE_STYLE } from '@subtitle-burner/types';
-import type { SubtitleCue } from '@subtitle-burner/types';
+import { DEFAULT_SUBTITLE_STYLE } from '@reelstack/types';
+import type { SubtitleCue } from '@reelstack/types';
 
 const SAMPLE_CUES: SubtitleCue[] = [
   { id: '1', startTime: 1, endTime: 4, text: 'Hello, world!' },

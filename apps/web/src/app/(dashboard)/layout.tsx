@@ -9,9 +9,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const { user, signOut } = useAuth();
 
   const nav = [
-    { label: 'Projects', href: '/dashboard' },
+    { label: 'Create Reel', href: '/dashboard/reel/new' },
+    { label: 'My Reels', href: '/dashboard' },
     { label: 'Templates', href: '/dashboard/templates' },
     { label: 'API Keys', href: '/dashboard/api-keys' },
+    { label: 'Settings', href: '/dashboard/settings' },
   ];
 
   return (
@@ -20,7 +22,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       <aside className="flex w-56 flex-col border-r">
         <div className="flex h-14 items-center border-b px-4">
           <Link href="/" className="text-lg font-bold">
-            Subtitle Burner
+            ReelStack
           </Link>
         </div>
         <nav className="flex-1 space-y-1 p-2">

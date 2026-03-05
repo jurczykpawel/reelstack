@@ -43,3 +43,13 @@ jobs:
           tags: ghcr.io/${{ github.repository }}-worker:latest
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+      - name: Build and push reel-worker
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile.reel-worker
+          push: true
+          tags: ghcr.io/${{ github.repository }}-reel-worker:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

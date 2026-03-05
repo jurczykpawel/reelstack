@@ -1,5 +1,5 @@
 {
-  "name": "@subtitle-burner/ffmpeg",
+  "name": "@reelstack/ffmpeg",
   "version": "0.0.1",
   "private": true,
   "license": "MIT",
@@ -7,10 +7,11 @@
   "types": "./src/index.ts",
   "scripts": {
     "test": "vitest run",
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@subtitle-burner/types": "workspace:*"
+    "@reelstack/types": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.7.3",

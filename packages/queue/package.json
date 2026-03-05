@@ -1,15 +1,16 @@
 {
-  "name": "@subtitle-burner/queue",
+  "name": "@reelstack/queue",
   "version": "0.0.1",
   "private": true,
   "license": "MIT",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@subtitle-burner/types": "workspace:*",
+    "@reelstack/types": "workspace:*",
     "bullmq": "^5.34.8",
     "inngest": "^3.29.1"
   },

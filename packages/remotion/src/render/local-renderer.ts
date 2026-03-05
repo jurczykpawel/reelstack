@@ -1,12 +1,14 @@
 import path from 'path';
 import os from 'os';
-import type { ReelProps } from '../schemas/reel-props';
 import type { RemotionRenderer, RenderOptions, RenderResult } from './types';
 
-const REMOTION_PKG_DIR = path.resolve(import.meta.dirname, '../..');
+import { fileURLToPath } from 'url';
+
+const __dirname = import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
+const REMOTION_PKG_DIR = path.resolve(__dirname, '../..');
 
 export class LocalRenderer implements RemotionRenderer {
-  async render(props: ReelProps, options: RenderOptions): Promise<RenderResult> {
+  async render(props: Record<string, unknown>, options: RenderOptions): Promise<RenderResult> {
     // Dynamic imports - these are heavy Node.js modules, avoid bundling at top level
     const { renderMedia, selectComposition } = await import('@remotion/renderer');
     const { mkdirSync, statSync } = await import('fs');
@@ -27,9 +29,11 @@ export class LocalRenderer implements RemotionRenderer {
       bundlePath = outDir;
     }
 
+    const compositionId = options.compositionId ?? 'Reel';
+
     const composition = await selectComposition({
       serveUrl: bundlePath,
-      id: 'Reel',
+      id: compositionId,
       inputProps: props,
     });
 

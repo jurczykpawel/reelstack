@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x"]
 }
 
 datasource db {
@@ -9,8 +10,9 @@ datasource db {
 
 enum Tier {
   FREE
+  SOLO
   PRO
-  ENTERPRISE
+  AGENCY
 }
 
 enum JobStatus {
@@ -21,22 +23,24 @@ enum JobStatus {
 }
 
 model User {
-  id            String    @id @default(uuid())
-  email         String    @unique
-  emailVerified DateTime?
-  name          String?
-  image         String?
-  password      String?
-  tier          Tier      @default(FREE)
-  accounts      Account[]
-  sessions      Session[]
-  videos        Video[]
-  renderJobs    RenderJob[]
-  templates     Template[]
-  apiKeys       ApiKey[]
-  projects      Project[]
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id               String             @id @default(uuid())
+  email            String             @unique
+  emailVerified    DateTime?
+  name             String?
+  image            String?
+  password         String?
+  tier             Tier               @default(FREE)
+  tokenBalance     Int                @default(0)
+  preferences      Json?
+  sellfCustomerId  String?            @unique
+  accounts         Account[]
+  sessions         Session[]
+  reelJobs         ReelJob[]
+  templates        Template[]
+  apiKeys          ApiKey[]
+  tokenTransactions TokenTransaction[]
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @updatedAt
 }
 
 model Account {
@@ -71,62 +75,6 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
-}
-
-model Video {
-  id         String      @id @default(uuid())
-  userId     String
-  user       User        @relation(fields: [userId], references: [id], onDelete: Cascade)
-  filename   String
-  filePath   String
-  fileSize   BigInt
-  duration   Float
-  width      Int
-  height     Int
-  mimeType   String      @default("video/mp4")
-  subtitles  Subtitle[]
-  renderJobs RenderJob[]
-  projects   Project[]
-  createdAt  DateTime    @default(now())
-  updatedAt  DateTime    @updatedAt
-
-  @@index([userId])
-}
-
-model Subtitle {
-  id        String   @id @default(uuid())
-  videoId   String
-  video     Video    @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  content   Json     // Array of SubtitleCue objects
-  style     Json?    // SubtitleStyle object
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  @@index([videoId])
-}
-
-model RenderJob {
-  id          String    @id @default(uuid())
-  userId      String
-  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  videoId     String
-  video       Video     @relation(fields: [videoId], references: [id], onDelete: Cascade)
-  style       Json
-  status      JobStatus @default(QUEUED)
-  progress    Int       @default(0)
-  outputUrl   String?
-  error       String?
-  templateId  String?
-  apiKeyId    String?
-  projectFile String?
-  startedAt   DateTime?
-  completedAt DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  @@index([userId])
-  @@index([videoId])
-  @@index([status])
 }
 
 model Template {
@@ -170,16 +118,53 @@ model ApiKey {
   @@index([keyHash])
 }
 
-model Project {
-  id        String   @id @default(uuid())
-  userId    String
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  name      String
-  videoId   String?
-  video     Video?   @relation(fields: [videoId], references: [id], onDelete: SetNull)
-  settings  Json?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+model TokenTransaction {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  amount       Int
+  reason       String
+  sellfOrderId String?  @unique
+  createdAt    DateTime @default(now())
 
   @@index([userId])
+}
+
+model WebhookEvent {
+  id          String   @id @default(uuid())
+  eventId     String   @unique
+  processedAt DateTime @default(now())
+}
+
+model TierConfig {
+  tier            String
+  productSlug     String   @default("reelstack")
+  rendersPerMonth Int
+  maxFileSizeMb   Int
+  maxDurationSec  Int      // -1 = unlimited
+  active          Boolean  @default(true)
+  updatedAt       DateTime @updatedAt
+
+  @@id([tier, productSlug])
+}
+
+model ReelJob {
+  id            String    @id @default(uuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  status        JobStatus @default(QUEUED)
+  progress      Int       @default(0)
+  script        String?
+  reelConfig    Json?
+  outputUrl     String?
+  error         String?
+  apiKeyId      String?
+  publishStatus Json?
+  startedAt     DateTime?
+  completedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([userId])
+  @@index([status])
 }

@@ -1,4 +1,4 @@
-import type { SubtitleCue, SubtitleStyle } from '@subtitle-burner/types';
+import type { SubtitleCue, SubtitleStyle } from '@reelstack/types';
 import { formatTime } from './time-utils';
 
 /**

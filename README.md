@@ -1,89 +1,91 @@
 <div align="center">
 
-<!-- Replace with your actual logo/banner when available -->
-<img src="docs/assets/banner-placeholder.svg" alt="Subtitle Burner" width="600" />
+# ReelStack
 
-# Subtitle Burner
+**Programmatic video pipeline -- generate reels, YouTube videos, and captioned content from text. Self-hostable, API-first, no vendor lock-in.**
 
-**Burn styled subtitles into any video -- in the browser or on your server. Open source, self-hostable, no vendor lock-in.**
-
-[![CI](https://github.com/jurczykpawel/subtitle-burner/actions/workflows/ci.yml/badge.svg)](https://github.com/jurczykpawel/subtitle-burner/actions/workflows/ci.yml)
+[![CI](https://github.com/jurczykpawel/reelstack/actions/workflows/ci.yml/badge.svg)](https://github.com/jurczykpawel/reelstack/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-[![Status: Beta](https://img.shields.io/badge/Status-Beta-orange.svg)](https://github.com/jurczykpawel/subtitle-burner)
+[![Status: Beta](https://img.shields.io/badge/Status-Beta-orange.svg)](https://github.com/jurczykpawel/reelstack)
+[![Open Source](https://img.shields.io/badge/Open%20Source-100%25-brightgreen.svg)](LICENSE)
 [![PRs Welcome](https://img.shields.io/badge/PRs-Welcome-brightgreen.svg)](docs/CONTRIBUTING.md)
 
-[Documentation](docs/) | [API Reference](#public-api-v1) | [Community](https://github.com/jurczykpawel/subtitle-burner/discussions) | [Report Bug](https://github.com/jurczykpawel/subtitle-burner/issues)
+[Live Demo](https://reelstack.sellf.app) | [Documentation](docs/) | [Pipeline Guide](docs/REEL_PIPELINE.md) | [API Reference](#public-api-v1) | [Report Bug](https://github.com/jurczykpawel/reelstack/issues)
 
 </div>
 
 ---
 
-## Why Subtitle Burner?
+## Why ReelStack?
 
-Most subtitle tools are either closed-source SaaS products with usage limits, or command-line FFmpeg scripts that require manual timing. Subtitle Burner fills the gap:
+Most video tools are either closed-source SaaS products with usage limits, or scattered scripts requiring manual assembly. ReelStack is a complete pipeline:
 
-- **No upload required** -- client-side rendering with FFmpeg.wasm keeps your video on your machine
-- **Visual timeline editor** -- drag, resize, and fine-tune subtitle timing instead of hand-editing SRT timestamps
-- **Word-level animations** -- 6 caption animation styles (karaoke, bounce, typewriter, and more) that go beyond static text
-- **Auto-transcription built in** -- Whisper runs directly in the browser, no external API keys needed
-- **Fully self-hostable** -- deploy on your own VPS with Docker or use Vercel + Supabase. Your data, your infrastructure
+- **Script to reel in seconds** -- write text, get a finished video with voiceover, karaoke captions, transitions, and effects
+- **11 composable effects** -- text cards, B-roll cutaways, punch-in zoom, highlight boxes, animated counters, lower thirds, CTAs, PiP, and more
+- **Two output formats** -- 9:16 reels (Instagram/TikTok/Shorts) and 16:9 YouTube videos with the same effect library
+- **Real karaoke captions** -- TTS voiceover + whisper.cpp word-level timestamps = pixel-accurate word-by-word highlighting
+- **API-first** -- REST API with auth, rate limiting, and scoped permissions. Automate from your app or n8n workflow
+- **Fully self-hostable** -- deploy on your own VPS with Docker. Your data, your infrastructure
 
 ### What It Does
 
-Subtitle Burner is a web application for adding styled, animated subtitles to video files. You upload (or drop) a video, create or import subtitles, style them with templates and animations, and render the final video with subtitles permanently embedded ("burned in"). It supports both browser-based and server-based rendering.
+ReelStack is a programmatic video pipeline. You provide a script (or video + subtitles), configure effects and style, and the pipeline generates a finished MP4: text-to-speech voiceover, whisper-based word timestamps, karaoke captions, B-roll transitions, overlays, and more. It includes a web app with wizard UI, dashboard, and REST API.
 
 ### Who It's For
 
-- **Content creators** who need subtitled videos for social media (YouTube, TikTok, Instagram Reels)
-- **Video editors** who want a visual subtitle workflow without heavyweight desktop software
-- **Developers** who need programmatic subtitle rendering via a REST API
-- **Teams** who want a self-hosted solution with no per-video fees
+- **Content creators** who want to generate reels and YouTube clips from scripts without editing software
+- **Developers** who need programmatic video rendering via API or CLI
+- **Agencies** who produce video content at scale with batch rendering
+- **Educators** who teach video production with code
 
 ### Alternative To
 
-Subtitle Burner can replace tools like **Kapwing**, **Descript** (subtitle features), **VEED.io**, or manual **FFmpeg** command-line workflows -- without subscription fees or upload limits.
+ReelStack replaces manual editing workflows in tools like **Kapwing**, **Descript**, **VEED.io**, **Opus Clip**, or scattered **FFmpeg** scripts -- with a single self-hosted pipeline.
 
 ---
 
 ## Features
 
-### Subtitle Editing
+### Reel & YouTube Pipeline
+
+- **Script to video** -- write text, generate voiceover (Edge TTS / ElevenLabs / OpenAI), auto-caption with whisper.cpp, render with Remotion
+- **Two compositions** -- 9:16 vertical reels and 16:9 horizontal YouTube, sharing the same effect library
+- **Karaoke captions** -- word-by-word highlighting with real whisper.cpp word-level timestamps
+- **11 composable effects** -- text cards, B-roll cutaways, punch-in zoom, highlight boxes, animated counters, lower thirds, CTAs, PiP, chapter cards, progress bar
+- **5 transition types** -- crossfade, slide-left, slide-right, zoom-in, wipe
+
+### Subtitle Editor
 
 - **Visual timeline editor** -- drag and resize subtitle blocks with snap-to-grid
 - **8 built-in templates** -- Classic, Cinematic, Bold Box, Modern, Minimal Top, Neon, Yellow Box, Typewriter
 - **Full style control** -- font family, size, color, outline, shadow, position, alignment
 - **SRT import/export** -- load existing subtitle files, edit visually, export back to SRT
-- **Project files (.sbp)** -- save and restore full project state as JSON
-- **Undo/redo** -- action system with up to 50 history entries
-
-### Caption Animations
-
-- **6 animation styles** -- word-highlight, word-by-word, karaoke, bounce, typewriter, or no animation
-- **Per-word timing** -- each word can have individual start/end timestamps for precise animation control
-
-### Auto-Transcription
-
-- **In-browser Whisper** -- powered by Hugging Face Transformers.js, runs entirely client-side
-- **Word-level timestamps** -- automatic word grouping with configurable max words, max duration, and punctuation breaks
-- **No API keys required** -- the model loads and runs in your browser
 
 ### Rendering
 
-- **Client-side rendering** -- FFmpeg.wasm burns subtitles directly in the browser. No upload, no server needed
-- **Server-side rendering** -- queue jobs to a server with native FFmpeg for faster processing of longer videos
-- **3 render presets** -- speed, balanced, and quality modes with configurable resolution
+- **Remotion-based** -- React compositions rendered to MP4 with @remotion/renderer
+- **Client-side rendering** -- FFmpeg.wasm for subtitle burning in the browser
+- **Server-side rendering** -- queue jobs to server with BullMQ for longer videos
+- **3 render presets** -- speed, balanced, and quality modes
 
 ### Public API v1
 
-- **REST API** with API key authentication (`Authorization: Bearer sb_...`)
-- **21 endpoints** -- render jobs, project management, template CRUD, API key management
+- **REST API** with API key authentication (`Authorization: Bearer sk_...`)
+- **Reel pipeline endpoint** -- POST /api/v1/reel/create with script, TTS config, style
+- **Full CRUD** -- render jobs, projects, templates, API keys
 - **Zod-validated** requests and responses
+
+### Monetization
+
+- **Sellf webhook integration** -- tier upgrades (Free/Pro/Enterprise) and token purchases
+- **Token system** -- render credits with daily limits per tier + purchasable token packs
+- **API key scoping** -- granular permissions (render, reel, publish, templates, projects)
 
 ### Self-Hosting
 
-- **Two deployment modes** -- VPS (Docker with PostgreSQL, Redis, MinIO) or Cloud (Vercel + Supabase + Inngest)
-- **Automatic detection** -- the app auto-detects deployment mode from environment variables
-- **No vendor lock-in** -- swap storage or queue backends without changing application code
+- **Docker deployment** -- PostgreSQL, Redis, MinIO, all in Docker Compose
+- **Cloud deployment** -- Vercel + Supabase + Inngest alternative
+- **No vendor lock-in** -- swap storage or queue backends without code changes
 
 ---
 
@@ -103,8 +105,8 @@ Subtitle Burner can replace tools like **Kapwing**, **Descript** (subtitle featu
 **1. Clone and install**
 
 ```bash
-git clone https://github.com/jurczykpawel/subtitle-burner.git
-cd subtitle-burner
+git clone https://github.com/jurczykpawel/reelstack.git
+cd reelstack
 bun install
 ```
 
@@ -176,7 +178,9 @@ For full deployment instructions:
 | **Server Rendering** | [FFmpeg](https://ffmpeg.org/) (native) | Server-side subtitle burning |
 | **Transcription** | [Transformers.js](https://huggingface.co/docs/transformers.js/) (Whisper) | In-browser speech-to-text with word timestamps |
 | **Monorepo** | [Turborepo](https://turbo.build/) + [Bun](https://bun.sh/) workspaces | Build orchestration and dependency management |
-| **Testing** | [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/) | 414 unit tests + E2E tests |
+| **Video Rendering** | [Remotion](https://www.remotion.dev/) | React-based video compositions (Reel + YouTube) |
+| **TTS** | [Edge TTS](https://github.com/niconiahi/edge-tts) / [ElevenLabs](https://elevenlabs.io/) | Text-to-speech voiceover generation |
+| **Testing** | [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/) | 537+ unit tests + E2E tests |
 
 ---
 
@@ -185,7 +189,7 @@ For full deployment instructions:
 ### Directory Structure
 
 ```
-subtitle-burner/
+reelstack/
 ├── apps/web/                  # Next.js application
 │   ├── src/
 │   │   ├── app/               # Pages & API routes (internal + v1)
@@ -197,29 +201,33 @@ subtitle-burner/
 ├── packages/
 │   ├── types/                 # Shared TypeScript interfaces
 │   ├── core/                  # Engines, action system, serializer, templates
+│   ├── remotion/              # Remotion compositions + video components
+│   ├── tts/                   # Text-to-speech (Edge TTS, ElevenLabs, OpenAI)
+│   ├── transcription/         # whisper.cpp wrapper + word grouping
 │   ├── ffmpeg/                # SRT parser, ASS generator, time utils
 │   ├── database/              # Prisma schema + query helpers
 │   ├── queue/                 # Queue adapters (Inngest, BullMQ)
-│   ├── storage/               # Storage adapters (Supabase, MinIO)
-│   └── transcription/         # Audio extraction, Whisper, word grouping
+│   └── storage/               # Storage adapters (Supabase, MinIO)
 ├── docker/                    # Dockerfiles + nginx config
 ├── scripts/                   # Setup scripts
 └── docs/                      # Documentation
 ```
 
-### Key Technologies
+### Key Packages
 
 | Package | Purpose |
 |---------|---------|
-| **`packages/core`** | Pure-function engines (SubtitleEngine, TemplateEngine, RenderEngine, PlaybackController, CaptionAnimationRenderer, ActionSystem, ProjectSerializer). No side effects -- accepts state, returns new state. |
-| **`packages/ffmpeg`** | Parses SRT files, generates ASS subtitle files (including karaoke timing tags), and provides time-format utilities. |
-| **`packages/database`** | Prisma schema defining 10 tables (User, Video, Subtitle, RenderJob, Template, ApiKey, Project, etc.) plus type-safe query helpers. |
-| **`packages/queue`** | Adapter pattern -- auto-detects Inngest (cloud) or BullMQ (VPS) based on environment variables. |
-| **`packages/storage`** | Adapter pattern -- auto-detects Supabase Storage (cloud) or MinIO (VPS) based on environment variables. |
-| **`packages/transcription`** | Extracts audio via Web Audio API, runs Whisper via Transformers.js, groups words into subtitle cues. |
-| **`packages/types`** | Shared TypeScript interfaces used across all packages. |
+| **`packages/remotion`** | Remotion compositions (Reel 9:16, YouTubeLongForm 16:9), 11 effect components (ZoomEffect, AnimatedCounter, HighlightBox, ChapterCard, etc.), schemas, and rendering helpers. See [COMPOSITION.md](packages/remotion/COMPOSITION.md). |
+| **`packages/tts`** | Text-to-speech providers: Edge TTS (free), ElevenLabs, OpenAI. Unified interface for synthesis. |
+| **`packages/transcription`** | whisper.cpp integration, audio normalization, BPE token merging, word-to-cue grouping. Produces karaoke-ready cues. |
+| **`packages/core`** | Pure-function engines (SubtitleEngine, TemplateEngine, RenderEngine, ActionSystem, ProjectSerializer). |
+| **`packages/ffmpeg`** | SRT parser, ASS generator (including karaoke timing tags), time-format utilities. |
+| **`packages/database`** | Prisma schema (User, Video, RenderJob, ReelJob, Template, ApiKey, TokenTransaction, etc.) + query helpers. |
+| **`packages/queue`** | Adapter: auto-detects Inngest (cloud) or BullMQ (VPS). |
+| **`packages/storage`** | Adapter: auto-detects Supabase Storage (cloud) or MinIO (VPS). |
+| **`packages/types`** | Shared TypeScript interfaces and API scope constants. |
 
-For a detailed system design diagram, adapter pattern explanation, and full API route reference, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+For full architecture details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). For the reel generation pipeline, see [docs/REEL_PIPELINE.md](docs/REEL_PIPELINE.md).
 
 ---
 
@@ -266,7 +274,7 @@ The public API uses API key authentication. Generate a key from the dashboard or
 
 ```bash
 curl -X POST https://your-instance.com/api/v1/render \
-  -H "Authorization: Bearer sb_your_api_key" \
+  -H "Authorization: Bearer rs_live_your_api_key" \
   -H "Content-Type: application/json" \
   -d '{
     "videoId": "video-uuid-here",
@@ -296,14 +304,14 @@ curl -X POST https://your-instance.com/api/v1/render \
 
 ```bash
 curl https://your-instance.com/api/v1/render/job-uuid \
-  -H "Authorization: Bearer sb_your_api_key"
+  -H "Authorization: Bearer rs_live_your_api_key"
 ```
 
 **Download rendered video:**
 
 ```bash
 curl -L https://your-instance.com/api/v1/render/job-uuid/download \
-  -H "Authorization: Bearer sb_your_api_key" \
+  -H "Authorization: Bearer rs_live_your_api_key" \
   -o output.mp4
 ```
 
@@ -311,7 +319,7 @@ curl -L https://your-instance.com/api/v1/render/job-uuid/download \
 
 ```bash
 curl https://your-instance.com/api/v1/templates/gallery \
-  -H "Authorization: Bearer sb_your_api_key"
+  -H "Authorization: Bearer rs_live_your_api_key"
 ```
 
 For the full list of 21 API endpoints, see the [API Routes section in ARCHITECTURE.md](docs/ARCHITECTURE.md#public-api-v1).
@@ -324,7 +332,7 @@ For the full list of 21 API endpoints, see the [API Routes section in ARCHITECTU
 bun install                # Install all dependencies
 bun run dev                # Start dev server (http://localhost:3000)
 bun run build              # Production build
-bun run test               # Run all 414 tests
+bun run test               # Run all tests (182+)
 bun run lint               # Lint all packages
 bun run format             # Format with Prettier
 bun run format:check       # Check formatting without writing
@@ -356,31 +364,30 @@ bun run format:check       # Check formatting without writing
 
 ## Roadmap
 
+See **[docs/ROADMAP.md](docs/ROADMAP.md)** for the full roadmap with phase details.
+
 ### Completed
 
 - [x] Visual timeline editor with drag and resize
-- [x] 8 built-in subtitle templates
-- [x] 6 caption animation styles with per-word timing
-- [x] Client-side rendering with FFmpeg.wasm
-- [x] Server-side rendering with BullMQ worker
+- [x] 8 built-in subtitle templates, 6 caption animation styles
+- [x] Client-side + server-side rendering (FFmpeg.wasm / BullMQ)
 - [x] Auto-transcription with in-browser Whisper
-- [x] SRT import/export
-- [x] Project file format (.sbp) with save/restore
-- [x] Public REST API v1 with 21 endpoints
-- [x] Undo/redo action system
-- [x] API key management with scoped permissions
-- [x] Dual deployment modes (VPS Docker / Cloud Vercel)
-- [x] 414 tests across 7 packages
+- [x] Public REST API v1 (21 endpoints)
+- [x] Remotion-based reel rendering (React video compositions)
+- [x] TTS voiceover (ElevenLabs) + Whisper word alignment
+- [x] AI Director (Claude) for automated B-roll and style decisions
+- [x] Reel creation API + Postiz multi-platform publishing
+- [x] Sellf payment webhook (tier upgrades + token packs)
+- [x] Docker deployment with optional reel-worker (Chromium + pre-bundled Remotion)
+- [x] 182+ tests across web + database packages
 
 ### Planned
 
+- [ ] Web UI reel editor (wizard, preview, publish flow)
+- [ ] Remotion Lambda renderer (AWS serverless)
 - [ ] Multi-language subtitle tracks
-- [ ] Batch rendering via API
+- [ ] Batch reel rendering via API
 - [ ] Custom font uploads
-- [ ] Video preview with live animation playback
-- [ ] Collaborative editing (real-time sync)
-- [ ] Plugin system for custom animation styles
-- [ ] WebVTT and TTML import/export
 - [ ] GPU-accelerated server rendering
 
 ---
@@ -389,10 +396,10 @@ bun run format:check       # Check formatting without writing
 
 Contributions are welcome and appreciated. There are many ways to help:
 
-- **Report bugs** -- open an [issue](https://github.com/jurczykpawel/subtitle-burner/issues) with steps to reproduce
-- **Suggest features** -- start a [discussion](https://github.com/jurczykpawel/subtitle-burner/discussions) or open an issue tagged `enhancement`
+- **Report bugs** -- open an [issue](https://github.com/jurczykpawel/reelstack/issues) with steps to reproduce
+- **Suggest features** -- start a [discussion](https://github.com/jurczykpawel/reelstack/discussions) or open an issue tagged `enhancement`
 - **Submit pull requests** -- bug fixes, new features, documentation improvements
-- **Improve tests** -- the project has 414 tests but more coverage is always welcome
+- **Improve tests** -- the project has 182+ tests but more coverage is always welcome
 - **Write documentation** -- tutorials, guides, or translations
 
 Please read **[docs/CONTRIBUTING.md](docs/CONTRIBUTING.md)** for development setup, code style guidelines, commit conventions, and the PR process.
@@ -405,7 +412,7 @@ This project is licensed under the **MIT License**. See the [LICENSE](LICENSE) f
 
 ### Security and Privacy
 
-Subtitle Burner can process user-uploaded video files and stores user accounts with email and hashed passwords. If you self-host this application:
+ReelStack can process user-uploaded video files and stores user accounts identified by email. Login is passwordless (magic link only). If you self-host this application:
 
 - Review the [SECURITY.md](SECURITY.md) file for the security policy and vulnerability reporting process
 - All video files are stored in your configured storage backend (MinIO or Supabase) -- no data is sent to third parties
@@ -417,15 +424,15 @@ Subtitle Burner can process user-uploaded video files and stores user accounts w
 
 ## Support
 
-- **Bug reports and feature requests** -- [GitHub Issues](https://github.com/jurczykpawel/subtitle-burner/issues)
-- **Questions and discussions** -- [GitHub Discussions](https://github.com/jurczykpawel/subtitle-burner/discussions)
-- **Security vulnerabilities** -- email **security@subtitleburner.com** (see [SECURITY.md](SECURITY.md))
+- **Bug reports and feature requests** -- [GitHub Issues](https://github.com/jurczykpawel/reelstack/issues)
+- **Questions and discussions** -- [GitHub Discussions](https://github.com/jurczykpawel/reelstack/discussions)
+- **Security vulnerabilities** -- email **security@reelstack.io** (see [SECURITY.md](SECURITY.md))
 
 ---
 
 ## Acknowledgments
 
-Subtitle Burner is built on top of these excellent open-source projects:
+ReelStack is built on top of these excellent open-source projects:
 
 | Project | Role |
 |---------|------|
@@ -441,3 +448,5 @@ Subtitle Burner is built on top of these excellent open-source projects:
 | [Turborepo](https://turbo.build/) | Monorepo build system |
 | [Vitest](https://vitest.dev/) | Unit testing framework |
 | [Playwright](https://playwright.dev/) | End-to-end testing |
+
+![](https://stats.techskills.academy/pixels/github?url=/readme/reelstack)

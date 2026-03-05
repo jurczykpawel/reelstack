@@ -1,7 +1,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { fetchFile, toBlobURL } from '@ffmpeg/util';
-import { generateASS } from '@subtitle-burner/ffmpeg';
-import type { SubtitleCue, SubtitleStyle } from '@subtitle-burner/types';
+import { generateASS } from '@reelstack/ffmpeg';
+import type { SubtitleCue, SubtitleStyle } from '@reelstack/types';
 
 let ffmpeg: FFmpeg | null = null;
 

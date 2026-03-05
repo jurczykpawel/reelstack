@@ -1,18 +1,25 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { LambdaRenderer } from '../render/lambda-renderer';
 
 describe('LambdaRenderer', () => {
-  it('throws not implemented error', async () => {
-    const renderer = new LambdaRenderer();
-    const props = { layout: 'fullscreen' as const, cues: [], bRollSegments: [], musicVolume: 0, showProgressBar: false, backgroundColor: '#000' };
-    await expect(renderer.render(props, { outputPath: '/tmp/out.mp4' }))
-      .rejects.toThrow('Lambda renderer not yet implemented');
+  beforeEach(() => {
+    delete process.env.AWS_REGION;
+    delete process.env.REMOTION_LAMBDA_FUNCTION_NAME;
+    delete process.env.REMOTION_LAMBDA_SERVE_URL;
   });
 
-  it('includes Remotion Lambda docs link in error', async () => {
+  it('throws when env vars are missing', () => {
+    expect(() => new LambdaRenderer()).toThrow(
+      'Lambda renderer requires: AWS_REGION, REMOTION_LAMBDA_FUNCTION_NAME, REMOTION_LAMBDA_SERVE_URL',
+    );
+  });
+
+  it('constructs when all env vars are set', () => {
+    process.env.AWS_REGION = 'eu-central-1';
+    process.env.REMOTION_LAMBDA_FUNCTION_NAME = 'remotion-render-test';
+    process.env.REMOTION_LAMBDA_SERVE_URL = 'https://example.s3.amazonaws.com/sites/test';
+
     const renderer = new LambdaRenderer();
-    const props = { layout: 'fullscreen' as const, cues: [], bRollSegments: [], musicVolume: 0, showProgressBar: false, backgroundColor: '#000' };
-    await expect(renderer.render(props, { outputPath: '/tmp/out.mp4' }))
-      .rejects.toThrow('remotion.dev/docs/lambda');
+    expect(renderer).toBeInstanceOf(LambdaRenderer);
   });
 });

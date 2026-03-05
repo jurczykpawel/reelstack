@@ -1,12 +1,13 @@
 {
-  "name": "@subtitle-burner/types",
+  "name": "@reelstack/types",
   "version": "0.0.1",
   "private": true,
   "license": "MIT",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
   "scripts": {
-    "lint": "tsc --noEmit"
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

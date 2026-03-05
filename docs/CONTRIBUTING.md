@@ -11,8 +11,8 @@
 ### Getting Started
 
 ```bash
-git clone https://github.com/jurczykpawel/subtitle-burner.git
-cd subtitle-burner
+git clone https://github.com/jurczykpawel/reelstack.git
+cd reelstack
 bun install
 cp .env.example .env
 ```

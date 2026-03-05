@@ -16,6 +16,13 @@ function makeProps(overrides: Record<string, unknown> = {}) {
       layout: 'split-screen' as const,
       bRollSegments: [],
       cues: [],
+      pipSegments: [],
+      lowerThirds: [],
+      ctaSegments: [],
+      counters: [],
+      zoomSegments: [],
+      highlights: [],
+      dynamicCaptionPosition: false,
       musicVolume: 0.3,
       showProgressBar: true,
       backgroundColor: '#000000',
@@ -24,6 +31,7 @@ function makeProps(overrides: Record<string, unknown> = {}) {
     defaultProps: {} as never,
     abortSignal: new AbortController().signal,
     compositionId: 'Reel',
+    isRendering: false,
   };
 }
 

@@ -59,6 +59,18 @@ async function main() {
     brandPreset = JSON.parse(fs.readFileSync(args['brand'], 'utf-8'));
   }
 
+  // Load color preset
+  let colorPreset: any;
+  if (args['preset']) {
+    const presetsPath = path.join(REMOTION_PKG_DIR, 'brands', 'caption-presets.json');
+    const presets = JSON.parse(fs.readFileSync(presetsPath, 'utf-8'));
+    colorPreset = presets[args['preset']];
+    if (!colorPreset) {
+      console.error(`Unknown preset "${args['preset']}". Available: ${Object.keys(presets).join(', ')}`);
+      process.exit(1);
+    }
+  }
+
   const lang = args['lang'] ?? 'pl-PL';
   const layout = (args['layout'] ?? 'fullscreen') as ReelProps['layout'];
   const style = (args['style'] ?? 'dynamic') as 'dynamic' | 'calm' | 'cinematic' | 'educational';
@@ -168,23 +180,28 @@ async function main() {
     );
 
     const captionStyle = {
-      fontFamily: brandPreset?.captionTemplate?.fontFamily ?? 'Outfit, sans-serif',
+      fontFamily: colorPreset?.fontFamily ?? brandPreset?.captionTemplate?.fontFamily ?? 'Outfit, sans-serif',
       fontSize: brandPreset?.captionTemplate?.fontSize ?? 64,
-      fontColor: brandPreset?.captionTemplate?.fontColor ?? '#F5F5F0',
+      fontColor: colorPreset?.fontColor ?? brandPreset?.captionTemplate?.fontColor ?? '#F5F5F0',
       fontWeight: 'bold' as const,
       fontStyle: 'normal' as const,
-      backgroundColor: brandPreset?.captionTemplate?.backgroundColor ?? '#0E0E12',
-      backgroundOpacity: 0.85,
-      outlineColor: '#0E0E12',
-      outlineWidth: 3,
-      shadowColor: '#000000',
-      shadowBlur: 12,
-      position: 75,
+      backgroundColor: colorPreset?.backgroundColor ?? brandPreset?.captionTemplate?.backgroundColor ?? '#0E0E12',
+      backgroundOpacity: colorPreset?.backgroundOpacity ?? 0.85,
+      outlineColor: colorPreset?.outlineColor ?? '#0E0E12',
+      outlineWidth: colorPreset?.outlineWidth ?? 3,
+      shadowColor: colorPreset?.shadowColor ?? '#000000',
+      shadowBlur: colorPreset?.shadowBlur ?? 12,
+      position: 67,
       alignment: 'center' as const,
       lineHeight: 1.3,
       padding: 16,
-      highlightColor: brandPreset?.highlightColor ?? '#F59E0B',
-      upcomingColor: '#8888A0',
+      highlightColor: colorPreset?.highlightColor ?? brandPreset?.highlightColor ?? '#F59E0B',
+      upcomingColor: colorPreset?.upcomingColor ?? '#8888A0',
+      highlightMode: (args['highlight'] as any) ?? colorPreset?.highlightMode ?? 'text',
+      textTransform: (args['uppercase'] === 'true' ? 'uppercase' : colorPreset?.textTransform ?? 'none') as any,
+      pillColor: colorPreset?.pillColor ?? '#F59E0B',
+      pillBorderRadius: colorPreset?.pillBorderRadius ?? 10,
+      pillPadding: colorPreset?.pillPadding ?? 12,
     };
 
     const props: ReelProps = {

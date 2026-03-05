@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
-import { prisma } from '@subtitle-burner/database';
-import { detectDeploymentMode } from '@subtitle-burner/queue';
+import { prisma } from '@reelstack/database';
+import { detectDeploymentMode } from '@reelstack/queue';
 
 export async function GET() {
   let dbOk = false;

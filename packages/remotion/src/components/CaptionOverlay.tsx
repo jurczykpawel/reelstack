@@ -89,6 +89,14 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
     captionStyle.shadowColor,
   );
 
+  const highlightMode = captionStyle.highlightMode ?? 'text';
+  const textTransform = captionStyle.textTransform ?? 'none';
+  const pillColor = captionStyle.pillColor ?? captionStyle.highlightColor ?? '#3B82F6';
+  const pillRadius = captionStyle.pillBorderRadius ?? 10;
+  const pillPad = captionStyle.pillPadding ?? 10;
+
+  const isPill = highlightMode === 'pill';
+
   return (
     <div
       style={{
@@ -111,26 +119,48 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
           borderRadius: 16,
         }}
       >
-        {segments.map((seg: WordSegment, i: number) => (
-          <span
-            key={i}
-            style={{
-              fontSize: captionStyle.fontSize,
-              fontWeight: captionStyle.fontWeight,
-              fontStyle: captionStyle.fontStyle,
-              fontFamily: captionStyle.fontFamily,
-              color: seg.color ?? captionStyle.fontColor,
-              opacity: seg.opacity,
-              transform: `scale(${seg.scale}) translateY(${seg.offsetY}px)`,
-              display: 'inline-block',
-              marginRight: 8,
-              lineHeight: captionStyle.lineHeight,
-              textShadow,
-            }}
-          >
-            {seg.text}
-          </span>
-        ))}
+        {segments.map((seg: WordSegment, i: number) => {
+          const showPill = isPill && seg.style === 'active';
+          const displayText = textTransform === 'uppercase'
+            ? seg.text.toUpperCase()
+            : seg.text;
+
+          // In pill mode: active word keeps base font color, pill provides the highlight.
+          // In text mode: color comes from the animation renderer (seg.color).
+          const textColor = isPill
+            ? captionStyle.fontColor
+            : (seg.color ?? captionStyle.fontColor);
+
+          return (
+            <span
+              key={i}
+              style={{
+                fontSize: captionStyle.fontSize,
+                fontWeight: captionStyle.fontWeight,
+                fontStyle: captionStyle.fontStyle,
+                fontFamily: captionStyle.fontFamily,
+                color: textColor,
+                opacity: seg.opacity,
+                transform: `scale(${seg.scale}) translateY(${seg.offsetY}px)`,
+                display: 'inline-block',
+                marginRight: 8,
+                lineHeight: captionStyle.lineHeight,
+                textShadow,
+                textTransform: textTransform as any,
+                // Pill highlight: colored background behind active word
+                ...(showPill ? {
+                  backgroundColor: pillColor,
+                  padding: `${pillPad * 0.4}px ${pillPad}px`,
+                  marginLeft: -pillPad * 0.3,
+                  marginRight: -pillPad * 0.3 + 8,
+                  borderRadius: pillRadius,
+                } : {}),
+              }}
+            >
+              {displayText}
+            </span>
+          );
+        })}
       </div>
     </div>
   );

@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import type { StorageAdapter } from '@subtitle-burner/types';
+import type { StorageAdapter } from '@reelstack/types';
 
 export class SupabaseStorageAdapter implements StorageAdapter {
   private supabase;

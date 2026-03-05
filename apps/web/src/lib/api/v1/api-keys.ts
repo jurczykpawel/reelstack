@@ -7,7 +7,7 @@ const KEY_LENGTH = 32;
  * Returns the plaintext key (show once) and the hash (store in DB).
  *
  * Security: SHA-256 hash stored in DB, plaintext never persisted.
- * Prefix stored for user identification (e.g. "sb_live_a1b2c3d4").
+ * Prefix stored for user identification (e.g. "rs_live_a1b2c3d4").
  */
 export function generateApiKey(mode: 'live' | 'test' = 'live'): {
   plaintext: string;
@@ -16,8 +16,8 @@ export function generateApiKey(mode: 'live' | 'test' = 'live'): {
 } {
   const randomBytes = crypto.randomBytes(KEY_LENGTH);
   const keyBody = randomBytes.toString('base64url');
-  const prefix = `sb_${mode}_${keyBody.slice(0, 8)}`;
-  const plaintext = `sb_${mode}_${keyBody}`;
+  const prefix = `rs_${mode}_${keyBody.slice(0, 8)}`;
+  const plaintext = `rs_${mode}_${keyBody}`;
   const hash = hashApiKey(plaintext);
 
   return { plaintext, prefix, hash };
@@ -48,12 +48,12 @@ export function extractApiKey(headers: Headers): string | null {
   const authHeader = headers.get('authorization');
   if (authHeader?.startsWith('Bearer ')) {
     const token = authHeader.slice(7).trim();
-    if (token.startsWith('sb_')) return token;
+    if (token.startsWith('rs_')) return token;
   }
 
   // Check X-API-Key header
   const xApiKey = headers.get('x-api-key');
-  if (xApiKey?.startsWith('sb_')) return xApiKey;
+  if (xApiKey?.startsWith('rs_')) return xApiKey;
 
   return null;
 }

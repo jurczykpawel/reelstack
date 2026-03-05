@@ -5,7 +5,7 @@ import { SessionProvider, useSession, signOut as nextAuthSignOut } from 'next-au
 import type { Session } from 'next-auth';
 
 interface AuthContextType {
-  user: { id: string; email: string; name?: string | null } | null;
+  user: { id: string; email: string; name?: string | null; tier?: string } | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
 }
@@ -24,6 +24,7 @@ function AuthContextProvider({ children }: { children: React.ReactNode }) {
         id: session.user.id!,
         email: session.user.email!,
         name: session.user.name,
+        tier: (session.user as unknown as Record<string, unknown>).tier as string | undefined,
       }
     : null;
 

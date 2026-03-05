@@ -28,7 +28,7 @@
 ## Monorepo Structure
 
 ```
-subtitle-burner/
+reelstack/
 ├── apps/web/              # Next.js application
 │   ├── src/
 │   │   ├── app/           # App Router pages & API routes

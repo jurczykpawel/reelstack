@@ -42,6 +42,18 @@ async function main() {
     process.exit(1);
   }
 
+  // Load color preset
+  let colorPreset: any;
+  if (args['preset']) {
+    const presetsPath = path.join(REMOTION_PKG_DIR, 'brands', 'caption-presets.json');
+    const presets = JSON.parse(fs.readFileSync(presetsPath, 'utf-8'));
+    colorPreset = presets[args['preset']];
+    if (!colorPreset) {
+      console.error(`Unknown preset "${args['preset']}". Available: ${Object.keys(presets).join(', ')}`);
+      process.exit(1);
+    }
+  }
+
   const probeJson = execSync(
     `ffprobe -v quiet -print_format json -show_format "${inputVideo}"`,
     { encoding: 'utf-8' },
@@ -213,23 +225,28 @@ async function main() {
 
       // TechSkills Academy brand caption style
       captionStyle: {
-        fontFamily: 'Outfit, sans-serif',
-        fontSize: 48,  // Smaller for split-screen (less vertical space)
-        fontColor: '#F5F5F0',
+        fontFamily: colorPreset?.fontFamily ?? 'Outfit, sans-serif',
+        fontSize: 48,
+        fontColor: colorPreset?.fontColor ?? '#F5F5F0',
         fontWeight: 'bold',
         fontStyle: 'normal',
-        backgroundColor: '#0E0E12',
-        backgroundOpacity: 0.85,
-        outlineColor: '#0E0E12',
-        outlineWidth: 3,
-        shadowColor: '#000000',
-        shadowBlur: 12,
-        position: 85, // Lower in split-screen since captions go over bottom half
+        backgroundColor: colorPreset?.backgroundColor ?? '#0E0E12',
+        backgroundOpacity: colorPreset?.backgroundOpacity ?? 0.85,
+        outlineColor: colorPreset?.outlineColor ?? '#0E0E12',
+        outlineWidth: colorPreset?.outlineWidth ?? 3,
+        shadowColor: colorPreset?.shadowColor ?? '#000000',
+        shadowBlur: colorPreset?.shadowBlur ?? 12,
+        position: 67,
         alignment: 'center',
         lineHeight: 1.3,
         padding: 14,
-        highlightColor: '#F59E0B', // TechSkills amber
-        upcomingColor: '#8888A0',   // TechSkills muted
+        highlightColor: colorPreset?.highlightColor ?? '#F59E0B',
+        upcomingColor: colorPreset?.upcomingColor ?? '#8888A0',
+        highlightMode: (args['highlight'] as any) ?? colorPreset?.highlightMode ?? 'text',
+        textTransform: (args['uppercase'] === 'true' ? 'uppercase' : colorPreset?.textTransform ?? 'none') as any,
+        pillColor: colorPreset?.pillColor ?? '#F59E0B',
+        pillBorderRadius: colorPreset?.pillBorderRadius ?? 10,
+        pillPadding: colorPreset?.pillPadding ?? 12,
       },
 
       musicVolume: 0,

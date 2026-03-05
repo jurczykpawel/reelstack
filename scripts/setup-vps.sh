@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "=== Subtitle Burner VPS Setup ==="
+echo "=== ReelStack VPS Setup ==="
 
 # Check Docker
 if ! command -v docker &> /dev/null; then
@@ -20,9 +20,17 @@ if [ ! -f .env ]; then
   exit 1
 fi
 
+# Check if user wants reel rendering
+PROFILE_FLAGS=""
+if [ "${ENABLE_REEL_WORKER:-}" = "true" ] || [ "$1" = "--with-reel" ]; then
+  echo "Reel worker enabled (Chromium + Remotion rendering)"
+  echo "Note: requires minimum 4GB RAM"
+  PROFILE_FLAGS="--profile reel"
+fi
+
 # Build and start
 echo "Building and starting services..."
-docker compose -f docker-compose.prod.yml up -d --build
+docker compose -f docker-compose.prod.yml $PROFILE_FLAGS up -d --build
 
 # Wait for postgres
 echo "Waiting for PostgreSQL..."
@@ -36,7 +44,18 @@ docker compose -f docker-compose.prod.yml exec web ./node_modules/.bin/prisma mi
 echo "Checking health..."
 sleep 3
 if curl -sf http://localhost/api/health > /dev/null; then
-  echo "=== Setup complete! Application is running at http://localhost ==="
+  echo ""
+  echo "=== Setup complete! ==="
+  echo "Services running:"
+  echo "  - nginx (reverse proxy)"
+  echo "  - web (Next.js app)"
+  echo "  - worker (subtitle burning)"
+  if [ -n "$PROFILE_FLAGS" ]; then
+    echo "  - reel-worker (Remotion video rendering)"
+  fi
+  echo "  - postgres, redis, minio"
+  echo ""
+  echo "Application is running at http://localhost"
 else
   echo "Warning: Health check failed. Check logs with: docker compose -f docker-compose.prod.yml logs"
 fi

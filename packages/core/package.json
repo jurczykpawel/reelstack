@@ -1,5 +1,5 @@
 {
-  "name": "@subtitle-burner/core",
+  "name": "@reelstack/core",
   "version": "0.0.1",
   "private": true,
   "license": "MIT",
@@ -8,10 +8,11 @@
   "scripts": {
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
-    "@subtitle-burner/types": "workspace:*",
+    "@reelstack/types": "workspace:*",
     "zod": "^3.23.0"
   },
   "devDependencies": {

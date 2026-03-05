@@ -1,5 +1,5 @@
-import type { User } from '@subtitle-burner/database';
-import type { ApiScope } from '@subtitle-burner/types';
+import type { User } from '@reelstack/database';
+import type { ApiScope } from '@reelstack/types';
 
 /** Authenticated context available in API v1 handlers */
 export interface AuthContext {

@@ -1,9 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma } from '@subtitle-burner/database';
-import { getApiKeyByHash, touchApiKey } from '@subtitle-burner/database';
-import type { ApiScope } from '@subtitle-burner/types';
-import { API_SCOPES } from '@subtitle-burner/types';
+import { prisma } from '@reelstack/database';
+import { getApiKeyByHash, touchApiKey } from '@reelstack/database';
+import type { ApiScope } from '@reelstack/types';
+import { API_SCOPES } from '@reelstack/types';
 import { extractApiKey, hashApiKey, verifyApiKeyHash } from './api-keys';
 import type { AuthContext, ApiV1Error, ApiV1Success, PaginatedResponse } from './types';
 import { rateLimit } from '../rate-limit';

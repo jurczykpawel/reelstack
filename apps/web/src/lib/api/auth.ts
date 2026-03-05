@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { prisma } from '@subtitle-burner/database';
+import { prisma } from '@reelstack/database';
 
 export async function getAuthUser() {
   const session = await auth();

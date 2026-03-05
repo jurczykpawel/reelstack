@@ -18,7 +18,8 @@
     "still": "remotion still Reel --frame=0 out/thumbnail.png",
     "render:test": "tsx scripts/render-test.ts",
     "lint": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@reelstack/core": "workspace:*",
@@ -28,6 +29,7 @@
     "@remotion/bundler": "4.0.431",
     "@remotion/cli": "4.0.431",
     "@remotion/google-fonts": "4.0.301",
+    "@remotion/lambda": "4.0.431",
     "@remotion/player": "4.0.431",
     "@remotion/renderer": "4.0.431",
     "react": "19.2.4",

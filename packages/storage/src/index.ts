@@ -1,5 +1,5 @@
-import type { StorageAdapter } from '@subtitle-burner/types';
-import { detectDeploymentMode } from '@subtitle-burner/queue';
+import type { StorageAdapter } from '@reelstack/types';
+import { detectDeploymentMode } from '@reelstack/queue';
 
 export async function createStorage(): Promise<StorageAdapter> {
   const mode = detectDeploymentMode();

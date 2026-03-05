@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
 import { auth } from '@/lib/auth';
-import { prisma, getApiKeysByUser, createApiKey as dbCreateApiKey } from '@subtitle-burner/database';
-import { SCOPE_PRESETS } from '@subtitle-burner/types';
+import { prisma, getApiKeysByUser, createApiKey as dbCreateApiKey } from '@reelstack/database';
+import { SCOPE_PRESETS } from '@reelstack/types';
 import { generateApiKey } from '@/lib/api/v1/api-keys';
 import { successResponse, errorResponse } from '@/lib/api/v1/middleware';
 import { createApiKeySchema } from '@/lib/api/v1/schemas';

@@ -1,5 +1,5 @@
 import { auth } from '@/lib/auth';
-import { revokeApiKey } from '@subtitle-burner/database';
+import { revokeApiKey } from '@reelstack/database';
 import { successResponse, errorResponse } from '@/lib/api/v1/middleware';
 
 /** DELETE /api/v1/api-keys/:id - Revoke an API key (session only) */

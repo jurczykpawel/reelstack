@@ -1,5 +1,5 @@
-import type { SubtitleStyle, SubtitleTemplate, TemplateCategory } from '@subtitle-burner/types';
-import { DEFAULT_SUBTITLE_STYLE } from '@subtitle-burner/types';
+import type { SubtitleStyle, SubtitleTemplate, TemplateCategory } from '@reelstack/types';
+import { DEFAULT_SUBTITLE_STYLE } from '@reelstack/types';
 
 /** Dangerous CSS patterns (security checklist: CSS/style injection) */
 const DANGEROUS_CSS_PATTERNS = [

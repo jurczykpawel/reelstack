@@ -1,7 +1,7 @@
 import { NextRequest } from 'next/server';
-import { API_SCOPES } from '@subtitle-burner/types';
-import { getTemplatesByUser, createTemplate as dbCreateTemplate } from '@subtitle-burner/database';
-import { sanitizeStyle, BUILT_IN_TEMPLATES } from '@subtitle-burner/core';
+import { API_SCOPES } from '@reelstack/types';
+import { getTemplatesByUser, createTemplate as dbCreateTemplate } from '@reelstack/database';
+import { sanitizeStyle, BUILT_IN_TEMPLATES } from '@reelstack/core';
 import { withAuth, successResponse, errorResponse } from '@/lib/api/v1/middleware';
 import { createTemplateSchema } from '@/lib/api/v1/schemas';
 import type { AuthContext } from '@/lib/api/v1/types';

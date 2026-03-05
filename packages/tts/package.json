@@ -8,7 +8,8 @@
   "scripts": {
     "test": "vitest run",
     "lint": "tsc --noEmit",
-    "tts:test": "tsx scripts/test-tts.ts"
+    "tts:test": "tsx scripts/test-tts.ts",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "msedge-tts": "^2.0.4"

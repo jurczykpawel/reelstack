@@ -1,10 +1,49 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { BUILT_IN_TEMPLATES } from '@subtitle-burner/core';
-import type { SubtitleTemplate } from '@subtitle-burner/types';
+import { BUILT_IN_TEMPLATES } from '@reelstack/core';
+import type { SubtitleTemplate } from '@reelstack/types';
+import { Button } from '@/components/ui/button';
 
-import { TemplateCard } from '@/components/editor/template-card';
+function TemplateCard({
+  template,
+  onRemove,
+}: {
+  template: SubtitleTemplate;
+  onRemove?: (id: string) => void;
+}) {
+  return (
+    <div className="rounded-lg border p-4">
+      <h3 className="truncate font-medium">{template.name}</h3>
+      <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">
+        {template.description}
+      </p>
+      <div
+        className="mt-3 flex h-10 items-center justify-center rounded text-sm font-medium"
+        style={{
+          fontFamily: template.style.fontFamily,
+          color: template.style.fontColor,
+          backgroundColor: template.style.backgroundColor,
+        }}
+      >
+        Sample Text
+      </div>
+      <div className="mt-3 flex items-center justify-between">
+        <span className="text-[11px] text-muted-foreground">{template.category}</span>
+        {onRemove && !template.isBuiltIn && (
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-destructive"
+            onClick={() => onRemove(template.id)}
+          >
+            Delete
+          </Button>
+        )}
+      </div>
+    </div>
+  );
+}
 
 export default function TemplatesPage() {
   const [userTemplates, setUserTemplates] = useState<SubtitleTemplate[]>([]);
@@ -31,7 +70,7 @@ export default function TemplatesPage() {
         <div>
           <h1 className="text-2xl font-bold">Templates</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            Manage subtitle style templates
+            Manage caption style templates for your reels
           </p>
         </div>
       </div>
@@ -43,18 +82,12 @@ export default function TemplatesPage() {
           <p className="mt-4 text-muted-foreground">Loading...</p>
         ) : userTemplates.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">
-            No custom templates yet. Create one in the editor by clicking &ldquo;Save Current as Template&rdquo;.
+            No custom templates yet. Create one via the API or import a template JSON.
           </p>
         ) : (
           <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
             {userTemplates.map((t) => (
-              <TemplateCard
-                key={t.id}
-                template={t}
-                isActive={false}
-                onApply={() => {}}
-                onRemove={handleDelete}
-              />
+              <TemplateCard key={t.id} template={t} onRemove={handleDelete} />
             ))}
           </div>
         )}
@@ -68,12 +101,7 @@ export default function TemplatesPage() {
         </p>
         <div className="mt-4 grid gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
           {BUILT_IN_TEMPLATES.map((t) => (
-            <TemplateCard
-              key={t.id}
-              template={t}
-              isActive={false}
-              onApply={() => {}}
-            />
+            <TemplateCard key={t.id} template={t} />
           ))}
         </div>
       </section>

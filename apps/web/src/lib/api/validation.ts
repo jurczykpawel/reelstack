@@ -35,16 +35,66 @@ export function sanitizeSubtitleText(text: string): string {
     .slice(0, 500);
 }
 
-const TIER_LIMITS = {
-  FREE: { maxFileSize: 100 * 1024 * 1024, maxDuration: 300, rendersPerDay: 10 },
-  PRO: { maxFileSize: 2 * 1024 * 1024 * 1024, maxDuration: 1800, rendersPerDay: Infinity },
-  ENTERPRISE: { maxFileSize: 10 * 1024 * 1024 * 1024, maxDuration: Infinity, rendersPerDay: Infinity },
-} as const;
+import { prisma } from '@reelstack/database';
 
-export function getTierLimits(tier: 'FREE' | 'PRO' | 'ENTERPRISE') {
-  return TIER_LIMITS[tier];
+export type TierName = 'FREE' | 'SOLO' | 'PRO' | 'AGENCY';
+
+export interface TierLimits {
+  maxFileSize: number;
+  maxDuration: number;
+  rendersPerMonth: number;
 }
 
-export function validateFileSize(size: number, tier: 'FREE' | 'PRO' | 'ENTERPRISE'): boolean {
-  return size <= TIER_LIMITS[tier].maxFileSize;
+/** Hardcoded fallback — used when DB is unavailable or TierConfig row is missing. */
+const TIER_DEFAULTS: Record<TierName, TierLimits> = {
+  FREE:   { maxFileSize: 100 * 1024 * 1024,        maxDuration: 120,      rendersPerMonth: 3   },
+  SOLO:   { maxFileSize: 500 * 1024 * 1024,        maxDuration: 300,      rendersPerMonth: 30  },
+  PRO:    { maxFileSize: 2 * 1024 * 1024 * 1024,   maxDuration: 1800,     rendersPerMonth: 100 },
+  AGENCY: { maxFileSize: 10 * 1024 * 1024 * 1024,  maxDuration: Infinity, rendersPerMonth: 500 },
+};
+
+// ── In-memory cache (60s TTL per tier+product key) ──────────
+const CACHE_TTL_MS = 60_000;
+const _cache = new Map<string, { limits: TierLimits; expiresAt: number }>();
+
+/**
+ * Returns tier limits for a given tier and product.
+ * Reads from DB with 60s in-memory cache. Falls back to hardcoded defaults
+ * if the DB is unavailable or no TierConfig row exists.
+ */
+export async function getTierLimits(
+  tier: TierName,
+  productSlug = 'reelstack'
+): Promise<TierLimits> {
+  const cacheKey = `${productSlug}:${tier}`;
+  const cached = _cache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt) return cached.limits;
+
+  try {
+    const config = await prisma.tierConfig.findUnique({
+      where: { tier_productSlug: { tier, productSlug } },
+    });
+    if (config && config.active) {
+      const limits: TierLimits = {
+        maxFileSize: config.maxFileSizeMb * 1024 * 1024,
+        maxDuration: config.maxDurationSec === -1 ? Infinity : config.maxDurationSec,
+        rendersPerMonth: config.rendersPerMonth,
+      };
+      _cache.set(cacheKey, { limits, expiresAt: Date.now() + CACHE_TTL_MS });
+      return limits;
+    }
+  } catch {
+    // DB unavailable — fall through to defaults
+  }
+
+  return TIER_DEFAULTS[tier];
+}
+
+/** Exported for tests — clears all cached entries so the next call hits the DB mock. */
+export function _clearTierCache() {
+  _cache.clear();
+}
+
+export function validateFileSize(size: number, maxFileSize: number): boolean {
+  return size <= maxFileSize;
 }

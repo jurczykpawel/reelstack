@@ -39,12 +39,12 @@ vi.mock('@/lib/api/rate-limit', () => ({
 
 const mockGetTemplatesByUser = vi.fn();
 const mockCreateTemplate = vi.fn();
-vi.mock('@subtitle-burner/database', () => ({
+vi.mock('@reelstack/database', () => ({
   getTemplatesByUser: (...args: unknown[]) => mockGetTemplatesByUser(...args),
   createTemplate: (...args: unknown[]) => mockCreateTemplate(...args),
 }));
 
-vi.mock('@subtitle-burner/core', () => ({
+vi.mock('@reelstack/core', () => ({
   sanitizeStyle: (s: unknown) => s,
   BUILT_IN_TEMPLATES: [
     {
@@ -65,12 +65,12 @@ const { GET, POST } = await import('../../v1/templates/route');
 const mockUser = { id: 'user-1', email: 'test@test.com', tier: 'FREE' };
 const mockAuthCtx = { user: mockUser, apiKeyId: 'key-1', scopes: ['*'] };
 
-function makePostRequest(body: unknown): Request {
+function makePostRequest(body: unknown): NextRequest {
   return new Request('http://localhost/api/v1/templates', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
-  });
+  }) as unknown as NextRequest;
 }
 
 describe('GET /api/v1/templates', () => {
@@ -80,7 +80,7 @@ describe('GET /api/v1/templates', () => {
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticate.mockResolvedValue(null);
-    const response = await GET(new Request('http://localhost/api/v1/templates'));
+    const response = await GET(new Request('http://localhost/api/v1/templates') as unknown as NextRequest);
     expect(response.status).toBe(401);
   });
 
@@ -100,7 +100,7 @@ describe('GET /api/v1/templates', () => {
     mockAuthenticate.mockResolvedValue(mockAuthCtx);
     mockGetTemplatesByUser.mockResolvedValue(userTemplates);
 
-    const response = await GET(new Request('http://localhost/api/v1/templates'));
+    const response = await GET(new Request('http://localhost/api/v1/templates') as unknown as NextRequest);
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data).toHaveLength(2);
@@ -113,7 +113,7 @@ describe('GET /api/v1/templates', () => {
   it('passes userId to getTemplatesByUser', async () => {
     mockAuthenticate.mockResolvedValue(mockAuthCtx);
     mockGetTemplatesByUser.mockResolvedValue([]);
-    await GET(new Request('http://localhost/api/v1/templates'));
+    await GET(new Request('http://localhost/api/v1/templates') as unknown as NextRequest);
     expect(mockGetTemplatesByUser).toHaveBeenCalledWith('user-1');
   });
 });
@@ -176,7 +176,7 @@ describe('POST /api/v1/templates', () => {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: 'not json',
-    });
+    }) as unknown as NextRequest;
     const response = await POST(req);
     expect(response.status).toBe(400);
   });

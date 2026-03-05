@@ -8,6 +8,12 @@ import { FullscreenLayout } from '../layouts/FullscreenLayout';
 import { CaptionOverlay } from '../components/CaptionOverlay';
 import { ProgressBar } from '../components/ProgressBar';
 import { BRollCutaway } from '../components/BRollCutaway';
+import { PictureInPicture } from '../components/PictureInPicture';
+import { LowerThird } from '../components/LowerThird';
+import { CtaOverlay } from '../components/CtaOverlay';
+import { AnimatedCounter } from '../components/AnimatedCounter';
+import { ZoomEffect } from '../components/ZoomEffect';
+import { HighlightBox } from '../components/HighlightBox';
 
 // Load brand fonts with Polish character support
 loadOutfit('normal', { weights: ['500', '600', '700'], subsets: ['latin', 'latin-ext'] });
@@ -68,14 +74,6 @@ function OverlayContent({
   primaryVideoUrl?: string;
   secondaryVideoUrl?: string;
 }) {
-  if (segment.media.type === 'split-screen') {
-    return (
-      <SplitScreenLayout
-        primaryVideoUrl={primaryVideoUrl}
-        secondaryVideoUrl={secondaryVideoUrl}
-      />
-    );
-  }
   return <BRollCutaway segment={segment} />;
 }
 
@@ -84,11 +82,18 @@ export const ReelComposition: React.FC<ReelProps> = ({
   primaryVideoUrl,
   secondaryVideoUrl,
   bRollSegments,
+  pipSegments = [],
+  lowerThirds = [],
+  ctaSegments = [],
+  counters = [],
+  zoomSegments = [],
+  highlights = [],
   voiceoverUrl,
   musicUrl,
   musicVolume = 0.3,
   cues,
   captionStyle,
+  dynamicCaptionPosition = false,
   showProgressBar = true,
   backgroundColor = '#000000',
 }) => {
@@ -149,21 +154,61 @@ export const ReelComposition: React.FC<ReelProps> = ({
 
   const activeStyle = activeOverlay ? computeEntrance(currentTime, activeOverlay) : null;
 
+  // Dynamic caption positioning: when enabled, captions move up for
+  // split-screen/B-roll, smoothly transitioning in sync with overlay entrance/exit.
+  let dynamicCaptionStyle = captionStyle;
+  if (dynamicCaptionPosition && captionStyle) {
+    const basePosition = captionStyle.position ?? 80;
+    const positionForOverlayType = (type: string | undefined): number => {
+      if (!type) return basePosition; // fullscreen
+      if (type === 'split-screen') return Math.max(basePosition - 15, 50);
+      return Math.max(basePosition - 5, 50); // B-roll
+    };
+
+    let captionPosition = positionForOverlayType(undefined);
+    if (activeOverlay) {
+      const from = positionForOverlayType(heldOverlay?.media.type);
+      const target = positionForOverlayType(activeOverlay.media.type);
+      const transitionSec = (activeOverlay.transition?.durationMs ?? DEFAULT_TRANSITION_MS) / 1000;
+      const progress = interpolate(
+        currentTime,
+        [activeOverlay.startTime, activeOverlay.startTime + transitionSec],
+        [0, 1],
+        { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+      );
+      captionPosition = interpolate(progress, [0, 1], [from, target]);
+    } else if (exitingOverlay) {
+      const from = positionForOverlayType(exitingOverlay.media.type);
+      const target = positionForOverlayType(undefined);
+      captionPosition = interpolate(exitOpacity, [1, 0], [from, target]);
+    }
+    dynamicCaptionStyle = { ...captionStyle, position: captionPosition };
+  }
+
+  // Active zoom segment
+  const activeZoom = zoomSegments.find(
+    (z) => currentTime >= z.startTime && currentTime < z.endTime,
+  );
+
+  const baseContent = hasBRoll ? (
+    <FullscreenLayout primaryVideoUrl={primaryVideoUrl} />
+  ) : layout === 'split-screen' ? (
+    <SplitScreenLayout
+      primaryVideoUrl={primaryVideoUrl}
+      secondaryVideoUrl={secondaryVideoUrl}
+    />
+  ) : (
+    <FullscreenLayout primaryVideoUrl={primaryVideoUrl} />
+  );
+
   return (
     <AbsoluteFill style={{ backgroundColor }}>
-      {/* LAYER 0: Base - always fullscreen when B-roll used, otherwise layout prop */}
-      <AbsoluteFill>
-        {hasBRoll ? (
-          <FullscreenLayout primaryVideoUrl={primaryVideoUrl} />
-        ) : layout === 'split-screen' ? (
-          <SplitScreenLayout
-            primaryVideoUrl={primaryVideoUrl}
-            secondaryVideoUrl={secondaryVideoUrl}
-          />
-        ) : (
-          <FullscreenLayout primaryVideoUrl={primaryVideoUrl} />
-        )}
-      </AbsoluteFill>
+      {/* LAYER 0: Base + Zoom */}
+      {activeZoom ? (
+        <ZoomEffect segment={activeZoom}>{baseContent}</ZoomEffect>
+      ) : (
+        <AbsoluteFill>{baseContent}</AbsoluteFill>
+      )}
 
       {/* LAYER 1a: Held overlay - previous segment kept visible during incoming entrance */}
       {heldOverlay && (
@@ -205,16 +250,41 @@ export const ReelComposition: React.FC<ReelProps> = ({
         </AbsoluteFill>
       )}
 
-      {/* LAYER 3: Audio tracks */}
+      {/* LAYER 3: Picture-in-Picture */}
+      {pipSegments.map((seg, i) => (
+        <PictureInPicture key={`pip-${i}`} segment={seg} />
+      ))}
+
+      {/* LAYER 4: Lower Thirds */}
+      {lowerThirds.map((seg, i) => (
+        <LowerThird key={`lt-${i}`} segment={seg} />
+      ))}
+
+      {/* LAYER 5: Highlight Boxes */}
+      {highlights.map((seg, i) => (
+        <HighlightBox key={`hl-${i}`} segment={seg} />
+      ))}
+
+      {/* LAYER 6: Audio tracks */}
       {voiceoverUrl && <Audio src={resolveMediaUrl(voiceoverUrl)} volume={1} />}
       {musicUrl && <Audio src={resolveMediaUrl(musicUrl)} volume={musicVolume} />}
 
-      {/* LAYER 4: Animated captions */}
+      {/* LAYER 7: Animated captions */}
       {cues.length > 0 && (
-        <CaptionOverlay cues={cues} style={captionStyle} />
+        <CaptionOverlay cues={cues} style={dynamicCaptionStyle} />
       )}
 
-      {/* LAYER 5: Progress bar */}
+      {/* LAYER 8: Animated counters */}
+      {counters.map((seg, i) => (
+        <AnimatedCounter key={`counter-${i}`} segment={seg} />
+      ))}
+
+      {/* LAYER 9: CTA overlays */}
+      {ctaSegments.map((seg, i) => (
+        <CtaOverlay key={`cta-${i}`} segment={seg} />
+      ))}
+
+      {/* LAYER 10: Progress bar */}
       {showProgressBar && <ProgressBar />}
     </AbsoluteFill>
   );

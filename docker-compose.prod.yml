@@ -53,6 +53,35 @@ services:
       timeout: 10s
       retries: 3
 
+  reel-worker:
+    profiles: ["reel"]
+    build:
+      context: .
+      dockerfile: docker/Dockerfile.reel-worker
+    env_file: .env
+    environment:
+      - REMOTION_BUNDLE_PATH=/app/remotion-bundle
+      - CHROME_PATH=/usr/bin/chromium
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'bun' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
   postgres:
     image: postgres:16-alpine
     environment:

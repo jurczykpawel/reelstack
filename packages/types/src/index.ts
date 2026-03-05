@@ -25,19 +25,13 @@ export interface SubtitleCue {
   readonly animationStyle?: CaptionAnimationStyle;
 }
 
-export interface SubtitleTrack {
-  readonly id: string;
-  readonly videoId: string;
-  readonly cues: readonly SubtitleCue[];
-  readonly createdAt: string;
-  readonly updatedAt: string;
-}
-
 // ==========================================
 // Style Types
 // ==========================================
 
 export type TextAlignment = 'left' | 'center' | 'right';
+export type HighlightMode = 'text' | 'pill';
+export type CaptionTextTransform = 'none' | 'uppercase';
 
 export interface SubtitleStyle {
   readonly fontFamily: string;
@@ -57,6 +51,11 @@ export interface SubtitleStyle {
   readonly padding: number;
   readonly highlightColor?: string;
   readonly upcomingColor?: string;
+  readonly highlightMode?: HighlightMode;
+  readonly textTransform?: CaptionTextTransform;
+  readonly pillColor?: string;
+  readonly pillBorderRadius?: number;
+  readonly pillPadding?: number;
 }
 
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
@@ -71,7 +70,7 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   outlineWidth: 2,
   shadowColor: '#000000',
   shadowBlur: 4,
-  position: 90,
+  position: 67,
   alignment: 'center',
   lineHeight: 1.4,
   padding: 8,
@@ -95,31 +94,6 @@ export interface SubtitleTemplate {
   readonly usageCount: number;
   readonly createdAt: string;
   readonly updatedAt: string;
-}
-
-// ==========================================
-// Video Types
-// ==========================================
-
-export interface VideoMetadata {
-  readonly id: string;
-  readonly filename: string;
-  readonly fileSize: number;
-  readonly duration: number;
-  readonly width: number;
-  readonly height: number;
-  readonly mimeType: string;
-}
-
-// ==========================================
-// Playback Types
-// ==========================================
-
-export interface PlaybackState {
-  readonly currentTime: number;
-  readonly duration: number;
-  readonly isPlaying: boolean;
-  readonly playbackRate: number;
 }
 
 // ==========================================
@@ -166,61 +140,6 @@ export interface RenderProgress {
 }
 
 // ==========================================
-// Project Types (.sbp)
-// ==========================================
-
-export interface SBPMetadata {
-  readonly name: string;
-  readonly createdAt: string;
-  readonly updatedAt: string;
-  readonly appVersion: string;
-  readonly generatedBy: 'ui' | 'api';
-  readonly sourceVideoHash?: string;
-  readonly sourceVideoFilename?: string;
-}
-
-export interface SBPVideo {
-  readonly filename: string;
-  readonly duration: number;
-  readonly width: number;
-  readonly height: number;
-  readonly mimeType: string;
-  readonly fileSize?: number;
-}
-
-export interface SBPRenderSettings {
-  readonly preset?: RenderQuality;
-  readonly codec?: string;
-  readonly crf?: number;
-}
-
-export interface SBPProject {
-  readonly version: 1;
-  readonly metadata: SBPMetadata;
-  readonly video: SBPVideo;
-  readonly cues: readonly SubtitleCue[];
-  readonly style: SubtitleStyle;
-  readonly template?: {
-    readonly id: string;
-    readonly name: string;
-  };
-  readonly renderSettings?: SBPRenderSettings;
-}
-
-// ==========================================
-// User Types
-// ==========================================
-
-export type UserTier = 'free' | 'pro' | 'enterprise';
-
-export interface User {
-  readonly id: string;
-  readonly email: string;
-  readonly tier: UserTier;
-  readonly createdAt: string;
-}
-
-// ==========================================
 // API Key Types
 // ==========================================
 
@@ -244,13 +163,9 @@ export type ApiScope = (typeof API_SCOPES)[keyof typeof API_SCOPES];
 
 export const SCOPE_PRESETS = {
   full: [API_SCOPES.FULL_ACCESS],
-  renderOnly: [API_SCOPES.VIDEOS_WRITE, API_SCOPES.RENDER_WRITE, API_SCOPES.RENDER_READ],
   reelOnly: [API_SCOPES.REEL_WRITE, API_SCOPES.REEL_READ, API_SCOPES.PUBLISH_WRITE, API_SCOPES.PUBLISH_READ],
   readOnly: [
-    API_SCOPES.VIDEOS_READ,
     API_SCOPES.TEMPLATES_READ,
-    API_SCOPES.RENDER_READ,
-    API_SCOPES.PROJECTS_READ,
     API_SCOPES.REEL_READ,
     API_SCOPES.PUBLISH_READ,
   ],
@@ -297,28 +212,6 @@ export interface CursorPagination {
 }
 
 // ==========================================
-// Action System Types
-// ==========================================
-
-export interface Action<TState = unknown> {
-  readonly type: string;
-  readonly description: string;
-  readonly timestamp: number;
-  execute(state: TState): TState;
-  inverse(): Action<TState>;
-}
-
-// ==========================================
-// Project State (used by stores and actions)
-// ==========================================
-
-export interface ProjectState {
-  readonly cues: readonly SubtitleCue[];
-  readonly style: SubtitleStyle;
-  readonly activeTemplateId: string | null;
-}
-
-// ==========================================
 // Adapter Types
 // ==========================================
 
@@ -344,12 +237,30 @@ export interface QueueAdapter {
 
 export type ReelLayout = 'split-screen' | 'fullscreen' | 'picture-in-picture';
 
+export interface TextCardConfig {
+  readonly headline: string;
+  readonly subtitle?: string;
+  readonly background: string; // color, gradient, or image URL
+  readonly textColor?: string; // default '#FFFFFF'
+  readonly textAlign?: TextAlignment;
+  readonly fontSize?: number; // default 64
+}
+
+export interface KenBurnsConfig {
+  readonly startScale?: number; // default 1.0
+  readonly endScale?: number; // default 1.3
+  readonly startPosition?: { readonly x: number; readonly y: number }; // 0-100%
+  readonly endPosition?: { readonly x: number; readonly y: number };
+}
+
 export interface MediaSource {
   readonly url: string;
-  readonly type: 'video' | 'image' | 'color' | 'split-screen';
+  readonly type: 'video' | 'image' | 'color' | 'split-screen' | 'text-card';
   readonly label?: string;
   readonly startFrom?: number; // seconds - trim start
   readonly endAt?: number; // seconds - trim end
+  readonly textCard?: TextCardConfig;
+  readonly kenBurns?: KenBurnsConfig;
 }
 
 export type TransitionType = 'crossfade' | 'slide-left' | 'slide-right' | 'zoom-in' | 'wipe' | 'none';
@@ -367,6 +278,51 @@ export interface BRollSegment {
   readonly transition?: BRollTransition;
 }
 
+export interface ZoomSegment {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly scale: number; // 1.2-2.0, default 1.5
+  readonly focusPoint?: { readonly x: number; readonly y: number }; // % default {50,50}
+  readonly easing?: 'spring' | 'smooth';
+}
+
+export interface ChapterSegment {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly number?: number;
+  readonly title: string;
+  readonly subtitle?: string;
+  readonly style?: 'fullscreen' | 'overlay';
+  readonly backgroundColor?: string;
+  readonly accentColor?: string;
+}
+
+export interface CounterSegment {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly value: number;
+  readonly prefix?: string;
+  readonly suffix?: string;
+  readonly format?: 'full' | 'abbreviated';
+  readonly textColor?: string;
+  readonly fontSize?: number;
+  readonly position?: 'center' | 'top' | 'bottom';
+}
+
+export interface HighlightSegment {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly x: number; // % from left
+  readonly y: number; // % from top
+  readonly width: number; // % of container width
+  readonly height: number; // % of container height
+  readonly color?: string; // default '#FF0000'
+  readonly borderWidth?: number;
+  readonly borderRadius?: number;
+  readonly label?: string;
+  readonly glow?: boolean;
+}
+
 export interface ReelJob {
   readonly id: string;
   readonly userId: string;
@@ -382,6 +338,39 @@ export interface ReelJob {
   readonly createdAt: string;
   readonly startedAt?: string;
   readonly completedAt?: string;
+}
+
+export interface PipSegment {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly videoUrl: string;
+  readonly position?: 'top-left' | 'top-right' | 'bottom-left' | 'bottom-right';
+  readonly size?: number; // % of screen width, default 30
+  readonly shape?: 'circle' | 'rounded' | 'square';
+  readonly borderColor?: string;
+  readonly borderWidth?: number;
+}
+
+export interface LowerThirdSegment {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly title: string;
+  readonly subtitle?: string;
+  readonly backgroundColor?: string; // default '#000000CC'
+  readonly textColor?: string; // default '#FFFFFF'
+  readonly position?: 'left' | 'center';
+  readonly accentColor?: string; // colored bar/accent
+}
+
+export interface CtaSegment {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly text: string;
+  readonly style?: 'button' | 'banner' | 'pill';
+  readonly backgroundColor?: string; // default '#3B82F6'
+  readonly textColor?: string; // default '#FFFFFF'
+  readonly position?: 'bottom' | 'center' | 'top';
+  readonly icon?: string; // emoji
 }
 
 export interface ReelConfig {

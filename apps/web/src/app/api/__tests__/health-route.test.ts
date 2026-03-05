@@ -1,13 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockQueryRaw = vi.fn();
-vi.mock('@subtitle-burner/database', () => ({
+vi.mock('@reelstack/database', () => ({
   prisma: {
     $queryRawUnsafe: (...args: unknown[]) => mockQueryRaw(...args),
   },
 }));
 
-vi.mock('@subtitle-burner/queue', () => ({
+vi.mock('@reelstack/queue', () => ({
   detectDeploymentMode: () => 'local',
 }));
 

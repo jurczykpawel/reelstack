@@ -13,9 +13,24 @@ const geistMono = Geist_Mono({
   subsets: ['latin'],
 });
 
+const APP_URL = process.env.NEXT_PUBLIC_APP_URL ?? 'http://localhost:3000';
+
 export const metadata: Metadata = {
-  title: 'Subtitle Burner',
-  description: 'Add styled subtitles to your videos with client or server rendering',
+  metadataBase: new URL(APP_URL),
+  title: {
+    default: 'ReelStack',
+    template: '%s · ReelStack',
+  },
+  description: 'Programmatic video pipeline — reels, YouTube, captions, TTS, all from code or API',
+  openGraph: {
+    siteName: 'ReelStack',
+    locale: 'en_US',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    site: '@reelstack',
+  },
 };
 
 export default function RootLayout({

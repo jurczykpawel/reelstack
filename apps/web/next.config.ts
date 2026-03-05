@@ -11,7 +11,7 @@ const nextConfig: NextConfig = {
     // CSP: allow self, blob: for video, unpkg for FFmpeg.wasm; block everything else
     const csp = [
       "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval'",
+      "script-src 'self' 'unsafe-inline' 'unsafe-eval' 'wasm-unsafe-eval' https://eu.altcha.org",
       "style-src 'self' 'unsafe-inline'", // Next.js injects inline styles
       "img-src 'self' blob: data:",
       "font-src 'self'",

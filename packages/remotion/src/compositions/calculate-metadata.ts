@@ -50,10 +50,22 @@ export const calculateReelMetadata: CalculateMetadataFunction<ReelProps> = async
     durations.push(lastCueEnd);
   }
 
-  // Get duration from B-roll segments
-  if (props.bRollSegments.length > 0) {
-    const lastBRollEnd = Math.max(...props.bRollSegments.map((br) => br.endTime));
-    durations.push(lastBRollEnd);
+  // All time-based segment arrays
+  const segmentArrays = [
+    props.bRollSegments,
+    props.pipSegments,
+    props.lowerThirds,
+    props.ctaSegments,
+    props.counters,
+    props.zoomSegments,
+    props.highlights,
+  ];
+
+  for (const segments of segmentArrays) {
+    if (segments && segments.length > 0) {
+      const lastEnd = Math.max(...segments.map((s) => s.endTime));
+      durations.push(lastEnd);
+    }
   }
 
   const maxDuration =

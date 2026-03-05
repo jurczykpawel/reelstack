@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import type { NextRequest } from 'next/server';
 
 const mockAuth = vi.fn();
 vi.mock('@/lib/auth', () => ({
@@ -8,7 +9,7 @@ vi.mock('@/lib/auth', () => ({
 const mockFindFirst = vi.fn();
 const mockUpdate = vi.fn();
 const mockCreate = vi.fn();
-vi.mock('@subtitle-burner/database', () => ({
+vi.mock('@reelstack/database', () => ({
   prisma: {
     apiKey: {
       findFirst: (...args: unknown[]) => mockFindFirst(...args),
@@ -36,7 +37,7 @@ describe('POST /api/v1/api-keys/[id]/rotate', () => {
 
   it('returns 401 when no session', async () => {
     mockAuth.mockResolvedValue(null);
-    const response = await POST(new Request('http://localhost'), makeParams('key-1'));
+    const response = await POST(new Request('http://localhost') as unknown as NextRequest, makeParams('key-1'));
     expect(response.status).toBe(401);
     const body = await response.json();
     expect(body.error.code).toBe('UNAUTHORIZED');
@@ -44,14 +45,14 @@ describe('POST /api/v1/api-keys/[id]/rotate', () => {
 
   it('returns 401 when session has no user id', async () => {
     mockAuth.mockResolvedValue({ user: {} });
-    const response = await POST(new Request('http://localhost'), makeParams('key-1'));
+    const response = await POST(new Request('http://localhost') as unknown as NextRequest, makeParams('key-1'));
     expect(response.status).toBe(401);
   });
 
   it('returns 404 when API key not found', async () => {
     mockAuth.mockResolvedValue({ user: { id: 'user-1' } });
     mockFindFirst.mockResolvedValue(null);
-    const response = await POST(new Request('http://localhost'), makeParams('nonexistent'));
+    const response = await POST(new Request('http://localhost') as unknown as NextRequest, makeParams('nonexistent'));
     expect(response.status).toBe(404);
     const body = await response.json();
     expect(body.error.code).toBe('NOT_FOUND');
@@ -68,24 +69,24 @@ describe('POST /api/v1/api-keys/[id]/rotate', () => {
     });
     mockUpdate.mockResolvedValue({});
     mockGenerateApiKey.mockReturnValue({
-      plaintext: 'sb_live_new_key',
-      prefix: 'sb_live_newp',
+      plaintext: 'rs_live_new_key',
+      prefix: 'rs_live_newp',
       hash: 'new_hash',
     });
     mockCreate.mockResolvedValue({
       id: 'key-new',
       name: 'My Key',
-      keyPrefix: 'sb_live_newp',
+      keyPrefix: 'rs_live_newp',
       scopes: ['*'],
       expiresAt: null,
       createdAt: new Date('2024-01-01'),
     });
 
-    const response = await POST(new Request('http://localhost'), makeParams('key-old'));
+    const response = await POST(new Request('http://localhost') as unknown as NextRequest, makeParams('key-old'));
     expect(response.status).toBe(200);
     const body = await response.json();
     expect(body.data.id).toBe('key-new');
-    expect(body.data.key).toBe('sb_live_new_key');
+    expect(body.data.key).toBe('rs_live_new_key');
     expect(body.data.rotatedFrom).toBe('key-old');
   });
 
@@ -100,20 +101,20 @@ describe('POST /api/v1/api-keys/[id]/rotate', () => {
     });
     mockUpdate.mockResolvedValue({});
     mockGenerateApiKey.mockReturnValue({
-      plaintext: 'sb_live_new_key',
-      prefix: 'sb_live_newp',
+      plaintext: 'rs_live_new_key',
+      prefix: 'rs_live_newp',
       hash: 'new_hash',
     });
     mockCreate.mockResolvedValue({
       id: 'key-new',
       name: 'My Key',
-      keyPrefix: 'sb_live_newp',
+      keyPrefix: 'rs_live_newp',
       scopes: ['*'],
       expiresAt: null,
       createdAt: new Date('2024-01-01'),
     });
 
-    await POST(new Request('http://localhost'), makeParams('key-old'));
+    await POST(new Request('http://localhost') as unknown as NextRequest, makeParams('key-old'));
 
     expect(mockUpdate).toHaveBeenCalledWith({
       where: { id: 'key-old' },

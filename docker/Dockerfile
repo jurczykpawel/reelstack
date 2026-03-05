@@ -6,7 +6,7 @@ RUN apt-get update && apt-get install -y ffmpeg && rm -rf /var/lib/apt/lists/*
 
 # Install dependencies
 FROM base AS deps
-COPY package.json bun.lock ./
+COPY package.json bun.lock bunfig.toml ./
 COPY apps/web/package.json apps/web/
 COPY packages/types/package.json packages/types/
 COPY packages/ffmpeg/package.json packages/ffmpeg/
@@ -15,10 +15,14 @@ COPY packages/queue/package.json packages/queue/
 COPY packages/core/package.json packages/core/
 COPY packages/storage/package.json packages/storage/
 COPY packages/transcription/package.json packages/transcription/
+COPY packages/remotion/package.json packages/remotion/
+COPY packages/tts/package.json packages/tts/
+COPY packages/publisher/package.json packages/publisher/
 RUN bun install --frozen-lockfile
 
 # Build
 FROM base AS builder
+ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN ./node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma
