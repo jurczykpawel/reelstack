@@ -17,10 +17,13 @@ const worker = new Worker(
       port: parseInt(url.port || '6379', 10),
       password: url.password || undefined,
     },
-    concurrency: 2,
+    // concurrency: 1 because Remotion bundle is CPU-bound (3+ min on 1 CPU).
+    // Two parallel jobs would starve each other and both time out.
+    // Bundle is cached after first run, so subsequent jobs are faster.
+    concurrency: 1,
     // Render pipeline can take 3-5min (TTS + Remotion bundle + render)
     // Default lockDuration is 30s - must be longer than the longest blocking operation
-    lockDuration: 300_000, // 5 minutes
+    lockDuration: 360_000, // 6 minutes
   },
 );
 

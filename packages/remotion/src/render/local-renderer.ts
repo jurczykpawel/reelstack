@@ -24,16 +24,22 @@ export class LocalRenderer implements RemotionRenderer {
       const { execSync } = await import('child_process');
       const { existsSync, rmSync } = await import('fs');
       const outDir = path.join(os.tmpdir(), 'remotion-bundle');
-      // Remove incomplete bundle dirs (e.g. from a previous timed-out run)
-      // Remotion refuses to bundle into a dir that exists but has no index.html
-      if (existsSync(outDir) && !existsSync(path.join(outDir, 'index.html'))) {
-        rmSync(outDir, { recursive: true, force: true });
+      const indexHtml = path.join(outDir, 'index.html');
+      if (existsSync(indexHtml)) {
+        // Reuse cached bundle from a previous run (index.html = complete bundle)
+        bundlePath = outDir;
+      } else {
+        // Remove incomplete bundle dirs (e.g. from a previous timed-out run)
+        // Remotion refuses to bundle into a dir that exists but has no index.html
+        if (existsSync(outDir)) {
+          rmSync(outDir, { recursive: true, force: true });
+        }
+        execSync(
+          `bunx remotion bundle src/index.ts --public-dir public --out-dir "${outDir}"`,
+          { cwd: REMOTION_PKG_DIR, stdio: 'pipe', timeout: 300_000 },
+        );
+        bundlePath = outDir;
       }
-      execSync(
-        `bunx remotion bundle src/index.ts --public-dir public --out-dir "${outDir}"`,
-        { cwd: REMOTION_PKG_DIR, stdio: 'pipe', timeout: 300_000 },
-      );
-      bundlePath = outDir;
     }
 
     const compositionId = options.compositionId ?? 'Reel';
