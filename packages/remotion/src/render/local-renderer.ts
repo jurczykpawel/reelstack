@@ -38,11 +38,25 @@ export class LocalRenderer implements RemotionRenderer {
       inputProps: props,
     });
 
-    const cpuCount = os.cpus().length;
-    const concurrency = options.concurrency
+    // Remotion uses min(nproc, os.availableParallelism()) as its max concurrency.
+    // nproc respects Docker CPU quota and may be lower than os.cpus().length.
+    // We must cap against the same value Remotion uses internally.
+    const { execSync: _execSync } = await import('child_process');
+    let remotionMaxCpus: number;
+    try {
+      remotionMaxCpus = parseInt(_execSync('nproc', { stdio: 'pipe' }).toString().trim(), 10);
+    } catch {
+      remotionMaxCpus = os.cpus().length;
+    }
+
+    const requestedConcurrency = options.concurrency
       ?? (process.env.REMOTION_CONCURRENCY
         ? parseInt(process.env.REMOTION_CONCURRENCY, 10)
-        : Math.max(1, Math.floor(cpuCount / 2)));
+        : Math.max(1, Math.floor(remotionMaxCpus / 2)));
+    // Cap at Remotion's max to avoid "Maximum for --concurrency" error
+    const concurrency = Math.min(requestedConcurrency, Math.max(1, remotionMaxCpus));
+
+    console.log(`[LocalRenderer] remotionMaxCpus=${remotionMaxCpus} requestedConcurrency=${requestedConcurrency} concurrency=${concurrency}`);
 
     const startMs = performance.now();
 
