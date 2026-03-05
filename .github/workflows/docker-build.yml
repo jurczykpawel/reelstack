@@ -31,8 +31,7 @@ jobs:
           file: docker/Dockerfile
           push: true
           tags: ghcr.io/${{ github.repository }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          no-cache: true
 
       - name: Build and push worker
         uses: docker/build-push-action@v6
