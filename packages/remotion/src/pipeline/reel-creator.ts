@@ -129,6 +129,14 @@ export async function createReel(
     const voiceoverPublicPath = path.join(REMOTION_PKG_DIR, 'public', 'voiceover.mp3');
     fs.copyFileSync(voiceoverPath, voiceoverPublicPath);
 
+    // Also copy to the cached bundle dir (if it already exists), because
+    // Remotion serves staticFile() from the bundle root, not the source public/.
+    const bundleDir = process.env.REMOTION_BUNDLE_PATH ?? path.join(os.tmpdir(), 'remotion-bundle');
+    const bundleVoiceoverPath = path.join(bundleDir, 'voiceover.mp3');
+    if (fs.existsSync(bundleDir)) {
+      fs.copyFileSync(voiceoverPath, bundleVoiceoverPath);
+    }
+
     const props: ReelProps = {
       layout: request.layout,
       primaryVideoUrl: request.primaryVideoUrl,
@@ -209,6 +217,9 @@ export async function createReel(
     // ── Cleanup ─────────────────────────────────────────────
     if (fs.existsSync(voiceoverPublicPath)) {
       fs.unlinkSync(voiceoverPublicPath);
+    }
+    if (fs.existsSync(bundleVoiceoverPath)) {
+      fs.unlinkSync(bundleVoiceoverPath);
     }
 
     const stats = fs.statSync(outputPath);
