@@ -196,7 +196,7 @@ export async function createReel(
     onStep?.('Rendering video...');
     const renderStart = performance.now();
 
-    const outputPath = request.outputPath ?? path.join(REMOTION_PKG_DIR, 'out', 'reel.mp4');
+    const outputPath = request.outputPath ?? path.join(os.tmpdir(), 'remotion-out', 'reel.mp4');
     const renderer = createRenderer();
     const renderResult = await renderer.render(props, { outputPath });
 
