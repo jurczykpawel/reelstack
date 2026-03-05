@@ -31,11 +31,15 @@ export class LocalRenderer implements RemotionRenderer {
     }
 
     const compositionId = options.compositionId ?? 'Reel';
+    // Store Chrome headless shell in /tmp to avoid permission issues with
+    // read-only node_modules in Docker containers running as non-root
+    const binariesDirectory = process.env.REMOTION_BINARIES_DIR ?? path.join(os.tmpdir(), 'remotion-binaries');
 
     const composition = await selectComposition({
       serveUrl: bundlePath,
       id: compositionId,
       inputProps: props,
+      binariesDirectory,
     });
 
     const cpuCount = os.cpus().length;
@@ -53,6 +57,7 @@ export class LocalRenderer implements RemotionRenderer {
       outputLocation: options.outputPath,
       inputProps: props,
       concurrency,
+      binariesDirectory,
       ...(options.crf !== undefined ? { crf: options.crf } : {}),
     });
 
