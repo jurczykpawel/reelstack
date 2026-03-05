@@ -25,8 +25,11 @@ FROM base AS builder
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN echo "=== Prisma binaries after bun install ===" && find /app/node_modules -name 'libquery_engine*' 2>/dev/null || echo "(none)"
 RUN ./node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma
+RUN echo "=== Prisma binaries after prisma generate ===" && find /app/node_modules -name 'libquery_engine*' 2>/dev/null || echo "(none)"
 RUN bun run build
+RUN echo "=== Prisma binaries in standalone ===" && find /app/apps/web/.next/standalone -name 'libquery_engine*' 2>/dev/null || echo "(none)"
 
 # Production
 FROM base AS runner
