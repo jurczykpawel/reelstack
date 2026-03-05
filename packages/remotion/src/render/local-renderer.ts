@@ -25,7 +25,7 @@ export class LocalRenderer implements RemotionRenderer {
       const outDir = path.join(os.tmpdir(), 'remotion-bundle');
       execSync(
         `bunx remotion bundle src/index.ts --public-dir public --out-dir "${outDir}"`,
-        { cwd: REMOTION_PKG_DIR, stdio: 'pipe', timeout: 120_000 },
+        { cwd: REMOTION_PKG_DIR, stdio: 'pipe', timeout: 300_000 },
       );
       bundlePath = outDir;
     }
