@@ -20,8 +20,9 @@ export class LocalRenderer implements RemotionRenderer {
 
     if (!bundlePath) {
       // Bundle via Remotion CLI (handles monorepo resolution correctly)
+      // Use /tmp to avoid permission issues with read-only package dirs in Docker
       const { execSync } = await import('child_process');
-      const outDir = path.join(REMOTION_PKG_DIR, '.remotion-bundle');
+      const outDir = path.join(os.tmpdir(), 'remotion-bundle');
       execSync(
         `bunx remotion bundle src/index.ts --public-dir public --out-dir "${outDir}"`,
         { cwd: REMOTION_PKG_DIR, stdio: 'pipe', timeout: 120_000 },
