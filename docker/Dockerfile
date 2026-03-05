@@ -38,6 +38,10 @@ COPY --from=builder /app/apps/web/.next/standalone ./
 COPY --from=builder /app/apps/web/.next/static ./apps/web/.next/static
 COPY --from=builder /app/apps/web/public ./apps/web/public
 
+# Prisma native binary is not included in Next.js standalone output - copy explicitly
+COPY --from=builder /app/node_modules/.bun/@prisma+client@6.3.1+63eb1ec23c1e0836/node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node \
+  /app/node_modules/.bun/@prisma+client@6.3.1+63eb1ec23c1e0836/node_modules/.prisma/client/libquery_engine-debian-openssl-3.0.x.so.node
+
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
