@@ -26,20 +26,15 @@ ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN ./node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma
-# Copy the Linux binary (from prisma generate output) INTO the bun store path so Next.js
-# file tracing picks up the Linux binary instead of the darwin one from bun.lock
-RUN LINUX_BIN=$(find /app/node_modules/.prisma/client -name 'libquery_engine-debian-openssl-3.0.x.so.node' 2>/dev/null | head -1) && \
-    BUN_PATH="/app/node_modules/.bun/@prisma+client@6.3.1+63eb1ec23c1e0836/node_modules/.prisma/client" && \
-    if [ -n "$LINUX_BIN" ] && [ -d "$BUN_PATH" ]; then \
-      cp "$LINUX_BIN" "$BUN_PATH/" && echo "Linux binary placed in bun store path"; \
-    else \
-      echo "WARNING: Linux binary or bun store path not found - linux_bin=$LINUX_BIN bun_path_exists=$(test -d $BUN_PATH && echo yes || echo no)"; \
-    fi
+# Debug: find all Prisma engine binaries after generate
+RUN echo "=== Prisma binaries after generate ===" && find /app -name 'libquery_engine*' 2>/dev/null && echo "==="
 # Remove darwin/mac binaries from ALL paths in monorepo (packages/*/node_modules/ included)
 RUN find /app -name 'libquery_engine-darwin*' -delete
 RUN bun run build
 # Remove any darwin binaries that Next.js file tracing may have copied into standalone
 RUN find /app/apps/web/.next/standalone -name 'libquery_engine-darwin*' -delete 2>/dev/null || true
+# Debug: what's in standalone after build
+RUN echo "=== Prisma binaries in standalone ===" && find /app/apps/web/.next/standalone -name 'libquery_engine*' 2>/dev/null && echo "==="
 
 # Production
 FROM base AS runner
