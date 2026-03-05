@@ -19,12 +19,14 @@ COPY packages/remotion/package.json packages/remotion/
 COPY packages/tts/package.json packages/tts/
 COPY packages/publisher/package.json packages/publisher/
 RUN bun install --frozen-lockfile
+RUN echo "=== Prisma binaries after bun install (deps stage) ===" && find /app/node_modules -name 'libquery_engine*' 2>/dev/null || echo "(none)"
 
 # Build
 FROM base AS builder
 ENV NODE_ENV=production
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+RUN echo "=== Project files that are node_modules ===" && ls /app/packages/database/ 2>/dev/null && ls /app/apps/web/ 2>/dev/null | grep node_modules || echo "(no nested node_modules)"
 RUN echo "=== Prisma binaries after bun install ===" && find /app/node_modules -name 'libquery_engine*' 2>/dev/null || echo "(none)"
 RUN ./node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma
 RUN echo "=== Prisma binaries after prisma generate ===" && find /app/node_modules -name 'libquery_engine*' 2>/dev/null || echo "(none)"
