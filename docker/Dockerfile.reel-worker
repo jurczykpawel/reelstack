@@ -41,8 +41,9 @@ COPY . .
 RUN ./node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma
 
 # Pre-bundle Remotion composition (saves 10-30s per render)
-RUN npx remotion bundle \
-    --entry-point packages/remotion/src/index.ts \
+RUN bunx remotion bundle \
+    packages/remotion/src/index.ts \
+    --public-dir packages/remotion/public \
     --out-dir /app/remotion-bundle \
     --log-level warn
 
