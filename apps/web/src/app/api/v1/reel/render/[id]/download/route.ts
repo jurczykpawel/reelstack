@@ -31,12 +31,15 @@ export const GET = withAuth(
     const key = `reels/${id}/output.mp4`;
     const buffer = await storage.download(key);
 
-    return new NextResponse(buffer as unknown as BodyInit, {
+    const response = new NextResponse(buffer as unknown as BodyInit, {
       headers: {
         'Content-Type': 'video/mp4',
         'Content-Disposition': `attachment; filename="reel-${id.slice(0, 8)}.mp4"`,
         'Content-Length': String(buffer.length),
       },
     });
+    response.headers.set('X-Content-Type-Options', 'nosniff');
+    response.headers.set('Cache-Control', 'private, no-store');
+    return response;
   },
 );

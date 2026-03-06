@@ -14,10 +14,36 @@ export const createApiKeySchema = z.object({
 // Templates
 // ==========================================
 
+/** Validates known SubtitleStyle fields while allowing extra keys via .passthrough() */
+const styleSchema = z.object({
+  fontFamily: z.string().optional(),
+  fontSize: z.number().optional(),
+  fontColor: z.string().max(20).optional(),
+  fontWeight: z.enum(['normal', 'bold']).optional(),
+  fontStyle: z.enum(['normal', 'italic']).optional(),
+  backgroundColor: z.string().max(20).optional(),
+  backgroundOpacity: z.number().min(0).max(1).optional(),
+  outlineColor: z.string().max(20).optional(),
+  outlineWidth: z.number().optional(),
+  shadowColor: z.string().max(20).optional(),
+  shadowBlur: z.number().optional(),
+  position: z.number().min(0).max(100).optional(),
+  alignment: z.enum(['left', 'center', 'right']).optional(),
+  lineHeight: z.number().optional(),
+  padding: z.number().optional(),
+  highlightColor: z.string().max(20).optional(),
+  upcomingColor: z.string().max(20).optional(),
+  highlightMode: z.enum(['text', 'pill']).optional(),
+  textTransform: z.enum(['none', 'uppercase']).optional(),
+  pillColor: z.string().max(20).optional(),
+  pillBorderRadius: z.number().optional(),
+  pillPadding: z.number().optional(),
+}).passthrough();
+
 export const createTemplateSchema = z.object({
   name: z.string().min(1).max(100),
   description: z.string().max(500).optional(),
-  style: z.record(z.unknown()),
+  style: styleSchema,
   category: z.enum(['minimal', 'cinematic', 'bold', 'modern', 'custom']).optional(),
   isPublic: z.boolean().optional(),
 });
@@ -25,7 +51,7 @@ export const createTemplateSchema = z.object({
 export const updateTemplateSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   description: z.string().max(500).optional(),
-  style: z.record(z.unknown()).optional(),
+  style: styleSchema.optional(),
   category: z.enum(['minimal', 'cinematic', 'bold', 'modern', 'custom']).optional(),
   isPublic: z.boolean().optional(),
 });

@@ -19,7 +19,12 @@ export type ApiErrorCode =
   | 'QUOTA_EXCEEDED'
   | 'CONFLICT'
   | 'INTERNAL_ERROR'
-  | 'SERVICE_UNAVAILABLE';
+  | 'SERVICE_UNAVAILABLE'
+  | 'STORAGE_ERROR'
+  | 'QUEUE_ERROR'
+  | 'RENDER_ERROR'
+  | 'TTS_ERROR'
+  | 'TRANSCRIPTION_ERROR';
 
 export interface ApiV1Error {
   error: {

@@ -2,7 +2,10 @@ import NextAuth from 'next-auth';
 import type { Provider } from 'next-auth/providers';
 import { PrismaAdapter } from '@auth/prisma-adapter';
 import { prisma } from '@reelstack/database';
+import { createLogger } from '@reelstack/logger';
 import { rateLimit } from '@/lib/api/rate-limit';
+
+const log = createLogger('auth');
 
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const Nodemailer = require('next-auth/providers/nodemailer').default;
@@ -55,12 +58,12 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async signIn({ user, account }) {
       // Rate-limit magic link requests: 5 per 10 minutes per email
       if (account?.provider === 'nodemailer' && user.email) {
-        const rl = rateLimit(
+        const rl = await rateLimit(
           `magic-link:${user.email}`,
           { maxRequests: 5, windowMs: 10 * 60 * 1000 },
         );
         if (!rl.success) {
-          console.warn(`[auth] Magic link rate limit exceeded for ${user.email}`);
+          log.warn({ email: user.email }, 'Magic link rate limit exceeded');
           return false;
         }
       }

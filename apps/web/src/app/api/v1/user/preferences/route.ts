@@ -7,7 +7,7 @@ import type { AuthContext } from '@/lib/api/v1/types';
 
 /** GET /api/v1/user/preferences - Get current user preferences */
 export const GET = withAuth(
-  { scope: API_SCOPES.FULL_ACCESS },
+  { scope: API_SCOPES.USER_READ },
   async (_req: NextRequest, ctx: AuthContext) => {
     const prefs = await getUserPreferences(ctx.user.id);
     return successResponse(prefs);
@@ -16,7 +16,7 @@ export const GET = withAuth(
 
 /** PATCH /api/v1/user/preferences - Partial update user preferences */
 export const PATCH = withAuth(
-  { scope: API_SCOPES.FULL_ACCESS },
+  { scope: API_SCOPES.USER_WRITE },
   async (req: NextRequest, ctx: AuthContext) => {
     const body = await req.json().catch(() => null);
     if (!body) {

@@ -4,6 +4,7 @@ import {
 } from '@reelstack/database';
 import { createPublisher } from '@reelstack/publisher';
 import type { Platform } from '@reelstack/publisher';
+import type { PublishStatus } from '@reelstack/types';
 
 export async function processReelPublishJob(
   jobId: string,
@@ -29,11 +30,11 @@ export async function processReelPublishJob(
     scheduleDate: publishConfig.scheduleDate,
   });
 
-  await updateReelJobStatus(jobId, {
-    publishStatus: {
-      publishId: result.publishId,
-      platforms: result.platforms,
-      publishedAt: new Date().toISOString(),
-    },
-  });
+  const publishStatus: PublishStatus = {
+    publishId: result.publishId,
+    platforms: result.platforms,
+    publishedAt: new Date().toISOString(),
+  };
+
+  await updateReelJobStatus(jobId, { publishStatus });
 }

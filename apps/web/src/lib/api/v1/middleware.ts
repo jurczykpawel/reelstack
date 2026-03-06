@@ -1,12 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import * as Sentry from '@sentry/nextjs';
 import { auth } from '@/lib/auth';
+import { httpRequestsTotal, httpRequestDuration } from '@/lib/metrics';
 import { prisma } from '@reelstack/database';
 import { getApiKeyByHash, touchApiKey } from '@reelstack/database';
+import { createLogger } from '@reelstack/logger';
 import type { ApiScope } from '@reelstack/types';
-import { API_SCOPES } from '@reelstack/types';
+import { API_SCOPES, AppError } from '@reelstack/types';
 import { extractApiKey, hashApiKey, verifyApiKeyHash } from './api-keys';
 import type { AuthContext, ApiV1Error, ApiV1Success, PaginatedResponse } from './types';
 import { rateLimit } from '../rate-limit';
+
+const log = createLogger('api-v1');
 
 // ==========================================
 // Authentication
@@ -36,30 +41,30 @@ async function authenticateApiKey(
   const record = await getApiKeyByHash(candidateHash);
 
   if (!record) {
-    console.warn(`[auth] API key auth failed (key not found): ip=${ip}`);
+    log.warn({ ip, reason: 'key not found' }, 'API key auth failed');
     return null;
   }
 
   // Verify hash with timing-safe comparison
   if (!verifyApiKeyHash(candidateHash, record.keyHash)) {
-    console.warn(`[auth] API key auth failed (hash mismatch): keyId=${record.id}, ip=${ip}`);
+    log.warn({ keyId: record.id, ip, reason: 'hash mismatch' }, 'API key auth failed');
     return null;
   }
 
   // Check active and not revoked
   if (!record.isActive || record.revokedAt) {
-    console.warn(`[auth] API key auth failed (revoked/inactive): keyId=${record.id}, ip=${ip}`);
+    log.warn({ keyId: record.id, ip, reason: 'revoked/inactive' }, 'API key auth failed');
     return null;
   }
 
   // Check expiration
   if (record.expiresAt && record.expiresAt < new Date()) {
-    console.warn(`[auth] API key auth failed (expired): keyId=${record.id}, ip=${ip}`);
+    log.warn({ keyId: record.id, ip, reason: 'expired' }, 'API key auth failed');
     return null;
   }
 
   // Touch usage stats (fire-and-forget)
-  touchApiKey(record.id, ip !== 'unknown' ? ip : undefined).catch(() => {});
+  touchApiKey(record.id, ip !== 'unknown' ? ip : undefined).catch(err => log.warn({ keyId: record.id, err }, 'Failed to touch API key'));
 
   const scopes = (Array.isArray(record.scopes) ? record.scopes : ['*']) as ApiScope[];
 
@@ -126,19 +131,28 @@ export function withAuth(
   handler: HandlerFn
 ): (req: NextRequest) => Promise<NextResponse> {
   return async (req: NextRequest) => {
+    const startTime = Date.now();
+    const route = req.nextUrl.pathname;
+
     // 1. Authenticate
     const ctx = await authenticate(req);
     if (!ctx) {
-      return errorResponse('UNAUTHORIZED', 'Invalid or missing authentication', 401);
+      const response = errorResponse('UNAUTHORIZED', 'Invalid or missing authentication', 401);
+      httpRequestsTotal.inc({ method: req.method, route, status: '401' });
+      httpRequestDuration.observe({ method: req.method, route }, (Date.now() - startTime) / 1000);
+      return response;
     }
 
     // 2. Check scope
     if (options.scope && !hasScope(ctx, options.scope)) {
-      return errorResponse(
+      const response = errorResponse(
         'FORBIDDEN',
         `Missing required scope: ${options.scope}`,
         403
       );
+      httpRequestsTotal.inc({ method: req.method, route, status: '403' });
+      httpRequestDuration.observe({ method: req.method, route }, (Date.now() - startTime) / 1000);
+      return response;
     }
 
     // 3. Rate limit
@@ -147,17 +161,38 @@ export function withAuth(
       maxRequests: ctx.apiKeyId ? 60 : 100,
       windowMs: 60_000,
     };
-    const rl = rateLimit(`v1:${rateLimitKey}`, rateLimitConfig);
+    const rl = await rateLimit(`v1:${rateLimitKey}`, rateLimitConfig);
     if (!rl.success) {
-      return errorResponse('RATE_LIMITED', 'Too many requests', 429);
+      const response = errorResponse('RATE_LIMITED', 'Too many requests', 429);
+      httpRequestsTotal.inc({ method: req.method, route, status: '429' });
+      httpRequestDuration.observe({ method: req.method, route }, (Date.now() - startTime) / 1000);
+      return response;
     }
 
     // 4. Execute handler
     try {
       const response = await handler(req, ctx);
+      const duration = (Date.now() - startTime) / 1000;
+      httpRequestsTotal.inc({ method: req.method, route, status: response.status.toString() });
+      httpRequestDuration.observe({ method: req.method, route }, duration);
       return addSecurityHeaders(response);
     } catch (err) {
-      console.error('[API v1] Unhandled error:', err);
+      const duration = (Date.now() - startTime) / 1000;
+
+      if (err instanceof AppError) {
+        httpRequestsTotal.inc({ method: req.method, route, status: err.statusCode.toString() });
+        httpRequestDuration.observe({ method: req.method, route }, duration);
+        return errorResponse(
+          err.code as ApiV1Error['error']['code'],
+          err.message,
+          err.statusCode,
+        );
+      }
+
+      httpRequestsTotal.inc({ method: req.method, route, status: '500' });
+      httpRequestDuration.observe({ method: req.method, route }, duration);
+      log.error({ err, path: req.nextUrl.pathname }, 'Unhandled error');
+      Sentry.captureException(err, { tags: { route: req.nextUrl.pathname } });
       return errorResponse('INTERNAL_ERROR', 'Internal server error', 500);
     }
   };

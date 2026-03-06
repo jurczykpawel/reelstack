@@ -74,7 +74,7 @@ export function useProjectSync(projectId: string) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ cues, style }),
-      }).catch(() => {});
+      }).catch(err => console.warn('[use-project-sync] auto-save failed:', err));
     }, 2000);
 
     return () => {

@@ -15,6 +15,9 @@ export class PostizPublisher implements Publisher {
   constructor(options?: { baseUrl?: string; apiKey?: string }) {
     this.baseUrl = options?.baseUrl ?? process.env.POSTIZ_API_URL ?? 'http://localhost:4200';
     this.apiKey = options?.apiKey ?? process.env.POSTIZ_API_KEY ?? '';
+    if (!this.apiKey) {
+      throw new Error('Postiz API key is required');
+    }
   }
 
   async publish(request: PublishRequest): Promise<PublishResult> {
@@ -54,6 +57,7 @@ export class PostizPublisher implements Publisher {
             scheduledDate: scheduleDate,
             type: request.scheduleDate ? 'schedule' : 'now',
           }),
+          signal: AbortSignal.timeout(30_000),
         });
 
         if (!response.ok) {
@@ -62,7 +66,12 @@ export class PostizPublisher implements Publisher {
           continue;
         }
 
-        const data = (await response.json()) as { id?: string };
+        let data: { id?: string };
+        try {
+          data = await response.json();
+        } catch {
+          throw new Error('Failed to parse response from Postiz');
+        }
         results.push({
           platform,
           status: request.scheduleDate ? 'scheduled' : 'published',
@@ -94,16 +103,22 @@ export class PostizPublisher implements Publisher {
     try {
       const response = await fetch(`${this.baseUrl}/api/integrations`, {
         headers: { Authorization: `Bearer ${this.apiKey}` },
+        signal: AbortSignal.timeout(10_000),
       });
 
       if (!response.ok) return [];
 
-      const data = (await response.json()) as Array<{
+      let data: Array<{
         id: string;
         providerIdentifier: string;
         name: string;
         disabled: boolean;
       }>;
+      try {
+        data = await response.json();
+      } catch {
+        throw new Error('Failed to parse response from Postiz');
+      }
 
       return data.map((i) => ({
         id: i.id,

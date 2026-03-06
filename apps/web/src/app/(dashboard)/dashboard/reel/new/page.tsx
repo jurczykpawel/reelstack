@@ -136,7 +136,7 @@ export default function ReelWizardPage() {
           ...(d.brandPreset?.backgroundColor && { backgroundColor: d.brandPreset.backgroundColor }),
         }));
       })
-      .catch(() => {});
+      .catch(err => console.warn('[reel-wizard] preferences fetch failed:', err));
   }, []);
 
   const update = useCallback(
@@ -200,10 +200,12 @@ export default function ReelWizardPage() {
       setJob({ id: data.jobId, status: 'QUEUED', progress: 0 });
 
       // Start polling
+      let pollFailures = 0;
       pollRef.current = setInterval(async () => {
         try {
           const statusRes = await fetch(`/api/v1/reel/render/${data.jobId}`);
           if (statusRes.ok) {
+            pollFailures = 0;
             const statusData = await statusRes.json();
             const j = statusData.data ?? statusData;
             setJob({
@@ -218,7 +220,12 @@ export default function ReelWizardPage() {
             }
           }
         } catch {
-          // Polling error - keep trying
+          pollFailures++;
+          if (pollFailures > 90) {
+            if (pollRef.current) clearInterval(pollRef.current);
+            setError('Lost connection to server. Please try again.');
+            setStep('settings');
+          }
         }
       }, 2000);
     } catch (err) {

@@ -52,7 +52,7 @@ export const POST = withAuth(
           scheduleDate: parsed.data.scheduleDate,
         }, 'reel-publish'),
         new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Queue timeout')), 5000),
+          setTimeout(() => reject(new Error('Queue timeout')), 15_000),
         ),
       ]);
     } catch {
