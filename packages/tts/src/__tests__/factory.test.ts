@@ -23,7 +23,7 @@ describe('createTTSProvider', () => {
   });
 
   it('throws for ElevenLabs without API key', () => {
-    expect(() => createTTSProvider({ provider: 'elevenlabs' })).toThrow('API key');
+    expect(() => createTTSProvider({ provider: 'elevenlabs' })).toThrow('ELEVENLABS_API_KEY');
   });
 
   it('returns OpenAITTSProvider with API key', () => {
@@ -33,7 +33,7 @@ describe('createTTSProvider', () => {
   });
 
   it('throws for OpenAI without API key', () => {
-    expect(() => createTTSProvider({ provider: 'openai' })).toThrow('API key');
+    expect(() => createTTSProvider({ provider: 'openai' })).toThrow('OPENAI_API_KEY');
   });
 
   it('throws for unknown provider', () => {

@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -23,6 +24,8 @@ export async function createReel(
 ): Promise<ReelCreationResult> {
   const steps: PipelineStep[] = [];
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reelstack-pipeline-'));
+  let voiceoverPublicPath: string | undefined;
+  let bundleVoiceoverPath: string | undefined;
 
   try {
     // ── Step 1: TTS ─────────────────────────────────────────
@@ -126,13 +129,14 @@ export async function createReel(
     onStep?.('Building composition...');
 
     // Copy voiceover to public/ so Remotion can access it via staticFile()
-    const voiceoverPublicPath = path.join(REMOTION_PKG_DIR, 'public', 'voiceover.mp3');
+    const voiceoverFilename = `voiceover-${randomUUID()}.mp3`;
+    voiceoverPublicPath = path.join(REMOTION_PKG_DIR, 'public', voiceoverFilename);
     fs.copyFileSync(voiceoverPath, voiceoverPublicPath);
 
     // Also copy to the cached bundle dir (if it already exists), because
     // Remotion serves staticFile() from the bundle root, not the source public/.
     const bundleDir = process.env.REMOTION_BUNDLE_PATH ?? path.join(os.tmpdir(), 'remotion-bundle');
-    const bundleVoiceoverPath = path.join(bundleDir, 'voiceover.mp3');
+    bundleVoiceoverPath = path.join(bundleDir, voiceoverFilename);
     if (fs.existsSync(bundleDir)) {
       fs.copyFileSync(voiceoverPath, bundleVoiceoverPath);
     }
@@ -141,7 +145,7 @@ export async function createReel(
       layout: request.layout,
       primaryVideoUrl: request.primaryVideoUrl,
       secondaryVideoUrl: request.secondaryVideoUrl,
-      voiceoverUrl: 'voiceover.mp3',
+      voiceoverUrl: voiceoverFilename,
       pipSegments: [],
       lowerThirds: [],
       ctaSegments: [],
@@ -214,14 +218,6 @@ export async function createReel(
       detail: `${outputPath} (${(renderResult.sizeBytes / 1024).toFixed(0)} KB)`,
     });
 
-    // ── Cleanup ─────────────────────────────────────────────
-    if (fs.existsSync(voiceoverPublicPath)) {
-      fs.unlinkSync(voiceoverPublicPath);
-    }
-    if (fs.existsSync(bundleVoiceoverPath)) {
-      fs.unlinkSync(bundleVoiceoverPath);
-    }
-
     const stats = fs.statSync(outputPath);
     const totalMs = steps.reduce((sum, s) => sum + s.durationMs, 0);
 
@@ -234,6 +230,12 @@ export async function createReel(
       steps,
     };
   } finally {
+    if (voiceoverPublicPath && fs.existsSync(voiceoverPublicPath)) {
+      fs.unlinkSync(voiceoverPublicPath);
+    }
+    if (bundleVoiceoverPath && fs.existsSync(bundleVoiceoverPath)) {
+      fs.unlinkSync(bundleVoiceoverPath);
+    }
     fs.rmSync(tmpDir, { recursive: true, force: true });
   }
 }

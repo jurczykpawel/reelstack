@@ -56,14 +56,25 @@ async function main() {
   // Load brand preset
   let brandPreset: any;
   if (args['brand']) {
-    brandPreset = JSON.parse(fs.readFileSync(args['brand'], 'utf-8'));
+    try {
+      brandPreset = JSON.parse(fs.readFileSync(args['brand'], 'utf-8'));
+    } catch {
+      console.error(`Failed to parse JSON from brand file: ${args['brand']}`);
+      process.exit(1);
+    }
   }
 
   // Load color preset
   let colorPreset: any;
   if (args['preset']) {
     const presetsPath = path.join(REMOTION_PKG_DIR, 'brands', 'caption-presets.json');
-    const presets = JSON.parse(fs.readFileSync(presetsPath, 'utf-8'));
+    let presets: any;
+    try {
+      presets = JSON.parse(fs.readFileSync(presetsPath, 'utf-8'));
+    } catch {
+      console.error(`Failed to parse JSON from presets file: ${presetsPath}`);
+      process.exit(1);
+    }
     colorPreset = presets[args['preset']];
     if (!colorPreset) {
       console.error(`Unknown preset "${args['preset']}". Available: ${Object.keys(presets).join(', ')}`);
@@ -80,7 +91,13 @@ async function main() {
     `ffprobe -v quiet -print_format json -show_format -show_streams "${inputVideo}"`,
     { encoding: 'utf-8' },
   );
-  const probe = JSON.parse(probeJson);
+  let probe: any;
+  try {
+    probe = JSON.parse(probeJson);
+  } catch {
+    console.error('Failed to parse JSON from ffprobe output');
+    process.exit(1);
+  }
   const videoStream = probe.streams.find((s: any) => s.codec_type === 'video');
   const videoDuration = parseFloat(probe.format.duration);
   const videoSize = parseInt(probe.format.size, 10);

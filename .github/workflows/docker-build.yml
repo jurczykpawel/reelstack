@@ -31,8 +31,11 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
-          tags: ghcr.io/${{ github.repository }}:latest
-          no-cache: true
+          tags: |
+            ghcr.io/${{ github.repository }}:latest
+            ghcr.io/${{ github.repository }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
 
       - name: Build and push worker
         uses: docker/build-push-action@v6
@@ -40,7 +43,9 @@ jobs:
           context: .
           file: docker/Dockerfile.worker
           push: true
-          tags: ghcr.io/${{ github.repository }}-worker:latest
+          tags: |
+            ghcr.io/${{ github.repository }}-worker:latest
+            ghcr.io/${{ github.repository }}-worker:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -50,6 +55,8 @@ jobs:
           context: .
           file: docker/Dockerfile.reel-worker
           push: true
-          tags: ghcr.io/${{ github.repository }}-reel-worker:latest
+          tags: |
+            ghcr.io/${{ github.repository }}-reel-worker:latest
+            ghcr.io/${{ github.repository }}-reel-worker:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

@@ -10,7 +10,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Bun as package manager
-RUN npm install -g bun@1.3
+RUN npm install -g bun@1.3.9
 
 # Chromium configuration for Remotion
 ENV CHROME_PATH=/usr/bin/chromium
@@ -51,7 +51,8 @@ COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/apps/web/src/lib/worker ./apps/web/src/lib/worker
 COPY --from=builder /app/apps/web/worker ./apps/web/worker
 COPY --from=builder /app/apps/web/package.json ./apps/web/
-COPY --from=builder /app/package.json ./
+COPY --from=builder /app/bun.lock ./bun.lock
+COPY --from=builder /app/package.json ./package.json
 
 USER worker
 CMD ["bun", "run", "--cwd", "apps/web", "reel-worker"]

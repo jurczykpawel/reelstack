@@ -1,4 +1,4 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
@@ -14,10 +14,7 @@ export function normalizeAudioForWhisper(audioBuffer: Buffer, inputFormat: strin
 
   try {
     fs.writeFileSync(inputPath, audioBuffer);
-    execSync(
-      `ffmpeg -y -i "${inputPath}" -ar 16000 -ac 1 -f wav "${outputPath}"`,
-      { stdio: 'pipe' },
-    );
+    execFileSync('ffmpeg', ['-y', '-i', inputPath, '-ar', '16000', '-ac', '1', '-f', 'wav', outputPath], { stdio: 'pipe' });
     return fs.readFileSync(outputPath);
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });
@@ -58,10 +55,7 @@ export function getAudioDuration(audioBuffer: Buffer, format: string): number {
 
   try {
     fs.writeFileSync(inputPath, audioBuffer);
-    const output = execSync(
-      `ffprobe -v quiet -show_entries format=duration -of csv=p=0 "${inputPath}"`,
-      { encoding: 'utf-8' },
-    );
+    const output = execFileSync('ffprobe', ['-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', inputPath], { encoding: 'utf-8' });
     return parseFloat(output.trim());
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true });

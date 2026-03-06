@@ -1,10 +1,10 @@
 repos:
   - repo: https://github.com/trufflesecurity/trufflehog
-    rev: v3.88.24
+    rev: v3.93.7
     hooks:
       - id: trufflehog
         name: TruffleHog secret scan
-        entry: trufflehog git file://. --since-commit HEAD --only-verified --fail
+        entry: trufflehog git file://. --since-commit HEAD --no-verification --fail
         language: golang
         pass_filenames: false
         stages: [pre-commit]

@@ -2,14 +2,16 @@ import { createStorage } from '@reelstack/storage';
 import {
   getReelJobInternal,
   updateReelJobStatus,
-  prisma,
 } from '@reelstack/database';
+import { createLogger } from '@reelstack/logger';
 import { generateASS } from '@reelstack/ffmpeg';
 import type { SubtitleCue, SubtitleStyle } from '@reelstack/types';
 import { spawn } from 'child_process';
 import { writeFile, readFile, unlink, mkdtemp } from 'fs/promises';
 import { tmpdir } from 'os';
 import { join } from 'path';
+
+const log = createLogger('render-worker');
 
 export async function processRenderJob(jobId: string): Promise<void> {
   const job = await getReelJobInternal(jobId);
@@ -59,7 +61,7 @@ export async function processRenderJob(jobId: string): Promise<void> {
 
     // Run FFmpeg
     const progress = await runFFmpeg(inputPath, assPath, outputPath, (p) => {
-      updateReelJobStatus(jobId, { progress: 10 + Math.round(p * 80) }).catch(() => {});
+      updateReelJobStatus(jobId, { progress: 10 + Math.round(p * 80) }).catch(err => log.warn({ jobId, err }, 'Progress update failed'));
     });
 
     if (!progress) {
@@ -120,9 +122,12 @@ function runFFmpeg(
 
     let duration = 0;
     let stderr = '';
+    const MAX_STDERR_LENGTH = 10_000;
 
     proc.stderr.on('data', (data: Buffer) => {
-      stderr += data.toString();
+      if (stderr.length < MAX_STDERR_LENGTH) {
+        stderr += data.toString();
+      }
       const match = stderr.match(/Duration: (\d+):(\d+):(\d+\.\d+)/);
       if (match && duration === 0) {
         duration = parseFloat(match[1]) * 3600 + parseFloat(match[2]) * 60 + parseFloat(match[3]);
@@ -143,9 +148,9 @@ function runFFmpeg(
       else reject(new Error(`FFmpeg exited with code ${code}`));
     });
 
-    proc.on('error', reject);
+    proc.on('error', (err) => {
+      proc.kill();
+      reject(err);
+    });
   });
 }
-
-// Suppress unused import warning - prisma kept for potential direct queries
-void prisma;

@@ -61,7 +61,12 @@ async function main() {
   let brandPreset: ReelCreationRequest['brandPreset'];
   if (args['brand']) {
     const brandJson = fs.readFileSync(args['brand'], 'utf-8');
-    brandPreset = JSON.parse(brandJson);
+    try {
+      brandPreset = JSON.parse(brandJson);
+    } catch {
+      console.error(`Failed to parse JSON from brand file: ${args['brand']}`);
+      process.exit(1);
+    }
   }
 
   const request: ReelCreationRequest = {

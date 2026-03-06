@@ -36,7 +36,9 @@ export async function extractAudioFromElement(
   onProgress?.('Extracting audio from video...');
 
   // If the element has a src that's a blob URL, fetch it
-  const response = await fetch(element.src);
+  const response = await fetch(element.src, {
+    signal: AbortSignal.timeout(30_000),
+  });
   const blob = await response.blob();
   return extractAudioFromFile(blob, onProgress);
 }

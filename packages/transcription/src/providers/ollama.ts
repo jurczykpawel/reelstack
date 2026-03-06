@@ -69,7 +69,7 @@ export class OllamaProvider implements TranscriptionProvider {
         images: [base64Audio], // Ollama uses images field for binary data
         stream: false,
       }),
-      signal: options?.signal,
+      signal: options?.signal ?? AbortSignal.timeout(120_000),
     });
 
     if (!response.ok) {

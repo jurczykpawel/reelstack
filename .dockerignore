@@ -3,7 +3,7 @@
 .pnpm-store/
 
 # Build artifacts
-.next/
+**/.next/
 dist/
 out/
 .turbo/
@@ -12,11 +12,10 @@ out/
 .git/
 .gitignore
 
-# Environment (secrets)
-.env
-.env.local
-.env.production
-.env.*.local
+# Environment (secrets) - catch all .env variants at every level
+**/.env
+**/.env.*
+!.env.example
 
 # IDE
 .idea/

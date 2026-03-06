@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
-const mockExecSync = vi.fn();
+const mockExecFileSync = vi.fn();
 const mockRenderMedia = vi.fn();
 const mockSelectComposition = vi.fn();
 const mockMkdirSync = vi.fn();
@@ -9,7 +9,7 @@ const mockExistsSync = vi.fn();
 const mockRmSync = vi.fn();
 
 vi.mock('child_process', () => ({
-  execSync: (...args: unknown[]) => mockExecSync(...args),
+  execFileSync: (...args: unknown[]) => mockExecFileSync(...args),
 }));
 
 vi.mock('@remotion/renderer', () => ({
@@ -69,8 +69,9 @@ describe('LocalRenderer', () => {
     const renderer = new LocalRenderer();
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4' });
 
-    expect(mockExecSync).not.toHaveBeenCalledWith(
-      expect.stringContaining('bunx remotion bundle'),
+    expect(mockExecFileSync).not.toHaveBeenCalledWith(
+      'bunx',
+      expect.arrayContaining(['remotion', 'bundle']),
       expect.anything(),
     );
     expect(mockSelectComposition).toHaveBeenCalledWith(
@@ -83,8 +84,9 @@ describe('LocalRenderer', () => {
     const renderer = new LocalRenderer();
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4' });
 
-    expect(mockExecSync).toHaveBeenCalledWith(
-      expect.stringContaining('bunx remotion bundle'),
+    expect(mockExecFileSync).toHaveBeenCalledWith(
+      'bunx',
+      expect.arrayContaining(['remotion', 'bundle']),
       expect.objectContaining({ cwd: expect.any(String) }),
     );
   });

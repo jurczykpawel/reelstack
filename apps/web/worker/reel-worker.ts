@@ -1,6 +1,17 @@
+import * as Sentry from '@sentry/node';
+
+Sentry.init({
+  dsn: process.env.SENTRY_DSN,
+  enabled: !!process.env.SENTRY_DSN,
+  tracesSampleRate: 0.1,
+});
+
 import { Worker } from 'bullmq';
+import { createLogger } from '@reelstack/logger';
 import { processReelPipelineJob } from '../src/lib/worker/reel-pipeline-worker';
 import { processReelPublishJob } from '../src/lib/worker/reel-publish-worker';
+
+const log = createLogger('reel-worker');
 
 const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 const url = new URL(redisUrl);
@@ -15,42 +26,55 @@ const connection = {
 const renderWorker = new Worker(
   'reel-render',
   async (job) => {
-    console.info(`[reel-worker] Processing reel-render job: ${job.id}`);
+    log.info({ jobId: job.id, queue: 'reel-render' }, 'Processing reel-render job');
     await processReelPipelineJob(job.data.jobId);
-    console.info(`[reel-worker] Completed reel-render job: ${job.id}`);
+    log.info({ jobId: job.id, queue: 'reel-render' }, 'Completed reel-render job');
   },
-  { connection, concurrency: 1 },
+  {
+    connection,
+    concurrency: 1,
+    // Render pipeline can take 3-5min (TTS + Remotion bundle + render)
+    // Default lockDuration is 30s - must be longer than the longest blocking operation
+    lockDuration: 360_000, // 6 minutes
+  },
 );
 
 // Reel publish worker - concurrency 5 (lightweight HTTP calls)
 const publishWorker = new Worker(
   'reel-publish',
   async (job) => {
-    console.info(`[reel-worker] Processing reel-publish job: ${job.id}`);
+    log.info({ jobId: job.id, queue: 'reel-publish' }, 'Processing reel-publish job');
     await processReelPublishJob(job.data.jobId, job.data);
-    console.info(`[reel-worker] Completed reel-publish job: ${job.id}`);
+    log.info({ jobId: job.id, queue: 'reel-publish' }, 'Completed reel-publish job');
   },
-  { connection, concurrency: 5 },
+  {
+    connection,
+    concurrency: 5,
+    // Publish jobs make network calls that could be slow
+    lockDuration: 60_000, // 1 minute
+  },
 );
 
 renderWorker.on('failed', (job, err) => {
-  console.error(`[reel-worker] Render job ${job?.id} failed:`, err.message);
+  log.error({ jobId: job?.id, queue: 'reel-render', err: err.message }, 'Render job failed');
+  Sentry.captureException(err, { tags: { worker: 'reel-render', jobId: job?.id } });
 });
 
 publishWorker.on('failed', (job, err) => {
-  console.error(`[reel-worker] Publish job ${job?.id} failed:`, err.message);
+  log.error({ jobId: job?.id, queue: 'reel-publish', err: err.message }, 'Publish job failed');
+  Sentry.captureException(err, { tags: { worker: 'reel-publish', jobId: job?.id } });
 });
 
 renderWorker.on('ready', () => {
-  console.info('[reel-worker] BullMQ reel-render worker ready');
+  log.info({ queue: 'reel-render' }, 'BullMQ reel-render worker ready');
 });
 
 publishWorker.on('ready', () => {
-  console.info('[reel-worker] BullMQ reel-publish worker ready');
+  log.info({ queue: 'reel-publish' }, 'BullMQ reel-publish worker ready');
 });
 
 async function shutdown() {
-  console.info('[reel-worker] Shutting down...');
+  log.info('Shutting down...');
   await Promise.all([renderWorker.close(), publishWorker.close()]);
   process.exit(0);
 }

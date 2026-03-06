@@ -1,4 +1,5 @@
 import type { RemotionRenderer, RenderOptions, RenderResult } from './types';
+import type { AwsRegion } from '@remotion/lambda/client';
 
 /**
  * Renders video using AWS Lambda via @remotion/lambda.
@@ -12,12 +13,12 @@ import type { RemotionRenderer, RenderOptions, RenderResult } from './types';
  *   AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY - if not using default credentials
  */
 export class LambdaRenderer implements RemotionRenderer {
-  private region: string;
+  private region: AwsRegion;
   private functionName: string;
   private serveUrl: string;
 
   constructor() {
-    this.region = process.env.AWS_REGION ?? '';
+    this.region = (process.env.AWS_REGION ?? '') as AwsRegion;
     this.functionName = process.env.REMOTION_LAMBDA_FUNCTION_NAME ?? '';
     this.serveUrl = process.env.REMOTION_LAMBDA_SERVE_URL ?? '';
 
@@ -40,7 +41,7 @@ export class LambdaRenderer implements RemotionRenderer {
 
     // Start render on Lambda
     const { renderId, bucketName } = await renderMediaOnLambda({
-      region: this.region as any,
+      region: this.region,
       functionName: this.functionName,
       serveUrl: this.serveUrl,
       composition: compositionId,
@@ -50,13 +51,19 @@ export class LambdaRenderer implements RemotionRenderer {
 
     // Poll for completion
     let outputUrl: string | null = null;
+    const MAX_POLL_ATTEMPTS = 600; // 30 min at 3s intervals
+    let attempts = 0;
 
     while (true) {
+      if (++attempts > MAX_POLL_ATTEMPTS) {
+        throw new Error(`Lambda render timed out after ${MAX_POLL_ATTEMPTS * 3}s`);
+      }
+
       const progress = await getRenderProgress({
         renderId,
         bucketName,
         functionName: this.functionName,
-        region: this.region as any,
+        region: this.region,
       });
 
       if (progress.fatalErrorEncountered) {
@@ -82,7 +89,9 @@ export class LambdaRenderer implements RemotionRenderer {
 
     mkdirSync(path.dirname(options.outputPath), { recursive: true });
 
-    const response = await fetch(outputUrl);
+    const response = await fetch(outputUrl, {
+      signal: AbortSignal.timeout(120_000),
+    });
     if (!response.ok) {
       throw new Error(`Failed to download render from S3: ${response.status}`);
     }

@@ -1,4 +1,5 @@
 import type { TTSProvider, TTSResult, TTSSynthesizeOptions, Voice } from '../types';
+import { TTSError } from '@reelstack/types';
 
 const API_BASE = 'https://api.openai.com/v1';
 
@@ -36,11 +37,12 @@ export class OpenAITTSProvider implements TTSProvider {
         speed,
         response_format: 'mp3',
       }),
+      signal: AbortSignal.timeout(60_000),
     });
 
     if (!response.ok) {
       const error = await response.text();
-      throw new Error(`OpenAI TTS API error (${response.status}): ${error}`);
+      throw new TTSError(`OpenAI TTS synthesis failed: ${error}`, { status: response.status });
     }
 
     const arrayBuffer = await response.arrayBuffer();

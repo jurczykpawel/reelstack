@@ -12,6 +12,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@reelstack/types": "workspace:*",
     "msedge-tts": "^2.0.4"
   },
   "devDependencies": {

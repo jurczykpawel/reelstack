@@ -126,6 +126,14 @@ describe('whisper.cpp token merging', () => {
 describe('transcribeAudio fallback', () => {
   beforeEach(() => {
     vi.unstubAllEnvs();
+    // Prevent whisper-cli from running on this machine
+    vi.mock('child_process', async (importOriginal) => {
+      const orig = await importOriginal<typeof import('child_process')>();
+      return {
+        ...orig,
+        execFileSync: vi.fn(() => { throw new Error('not found'); }),
+      };
+    });
   });
 
   it('uses synthetic timing when no API key but text provided', async () => {

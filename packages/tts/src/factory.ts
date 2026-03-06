@@ -1,4 +1,5 @@
 import type { TTSConfig, TTSProvider } from './types';
+import { TTSError } from '@reelstack/types';
 import { EdgeTTSProvider } from './providers/edge-tts';
 import { ElevenLabsProvider } from './providers/elevenlabs';
 import { OpenAITTSProvider } from './providers/openai-tts';
@@ -14,17 +15,17 @@ export function createTTSProvider(config?: TTSConfig): TTSProvider {
 
   switch (config.provider) {
     case 'elevenlabs':
-      if (!config.apiKey) throw new Error('ElevenLabs requires an API key');
+      if (!config.apiKey) throw new TTSError('ElevenLabs requires ELEVENLABS_API_KEY environment variable');
       return new ElevenLabsProvider(config.apiKey);
 
     case 'openai':
-      if (!config.apiKey) throw new Error('OpenAI TTS requires an API key');
+      if (!config.apiKey) throw new TTSError('OpenAI TTS requires OPENAI_API_KEY environment variable');
       return new OpenAITTSProvider(config.apiKey);
 
     case 'edge-tts':
       return new EdgeTTSProvider(config.defaultLanguage);
 
     default:
-      throw new Error(`Unknown TTS provider: ${(config as TTSConfig).provider}`);
+      throw new TTSError(`Unknown TTS provider: ${(config as TTSConfig).provider}`);
   }
 }

@@ -76,7 +76,7 @@ export class OpenRouterProvider implements TranscriptionProvider {
       method: 'POST',
       headers: { Authorization: `Bearer ${this.apiKey}` },
       body: formData,
-      signal: options?.signal,
+      signal: options?.signal ?? AbortSignal.timeout(120_000),
     });
 
     if (!response.ok) {
@@ -84,7 +84,12 @@ export class OpenRouterProvider implements TranscriptionProvider {
       throw new Error(`OpenRouter transcription failed: ${response.status} - ${text}`);
     }
 
-    const data: OpenAITranscriptionResponse = await response.json();
+    let data: OpenAITranscriptionResponse;
+    try {
+      data = await response.json();
+    } catch {
+      throw new Error('Failed to parse response from OpenRouter');
+    }
 
     options?.onProgress?.({
       status: 'completed',

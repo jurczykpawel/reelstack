@@ -1,5 +1,6 @@
 import { Queue } from 'bullmq';
 import type { QueueAdapter, JobStatus, QueueName } from '@reelstack/types';
+import { QueueError } from '@reelstack/types';
 
 export class BullMQQueueAdapter implements QueueAdapter {
   private queues: Map<string, Queue> = new Map();
@@ -11,7 +12,7 @@ export class BullMQQueueAdapter implements QueueAdapter {
 
     this.connectionConfig = {
       host: url.hostname,
-      port: parseInt(url.port || '6379', 10),
+      port: parseInt(url.port || '6379', 10) || 6379,
       password: url.password || undefined,
     };
   }
@@ -27,11 +28,24 @@ export class BullMQQueueAdapter implements QueueAdapter {
 
   async enqueue(jobId: string, payload: Record<string, unknown>, queueName?: QueueName): Promise<void> {
     const queue = this.getQueue(queueName);
-    await queue.add(queueName ?? 'render', payload, {
-      jobId,
-      removeOnComplete: 100,
-      removeOnFail: 100,
-    });
+    try {
+      await queue.add(queueName ?? 'render', payload, {
+        jobId,
+        removeOnComplete: 100,
+        removeOnFail: 200,
+        attempts: 3,
+        backoff: {
+          type: 'exponential',
+          delay: 5000,
+        },
+      });
+    } catch (err) {
+      throw new QueueError('Failed to enqueue job', {
+        queueName: queueName ?? 'render',
+        jobId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   }
 
   async getStatus(jobId: string, queueName?: QueueName): Promise<JobStatus> {
@@ -53,5 +67,11 @@ export class BullMQQueueAdapter implements QueueAdapter {
       default:
         return 'queued';
     }
+  }
+
+  async close(): Promise<void> {
+    const closePromises = Array.from(this.queues.values()).map(q => q.close());
+    await Promise.all(closePromises);
+    this.queues.clear();
   }
 }

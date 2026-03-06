@@ -1,5 +1,7 @@
 import type { MediaAsset } from './types';
+import { createLogger } from '@reelstack/logger';
 
+const log = createLogger('media-library');
 const PEXELS_API = 'https://api.pexels.com';
 
 /**
@@ -21,9 +23,13 @@ export async function searchPexelsVideos(
 
   const response = await fetch(`${PEXELS_API}/videos/search?${params}`, {
     headers: { Authorization: apiKey },
+    signal: AbortSignal.timeout(10_000),
   });
 
-  if (!response.ok) return [];
+  if (!response.ok) {
+    log.warn({ status: response.status, query }, 'Pexels video search failed');
+    return [];
+  }
 
   const data = (await response.json()) as PexelsVideoResponse;
 
@@ -61,9 +67,13 @@ export async function searchPexelsImages(
 
   const response = await fetch(`${PEXELS_API}/v1/search?${params}`, {
     headers: { Authorization: apiKey },
+    signal: AbortSignal.timeout(10_000),
   });
 
-  if (!response.ok) return [];
+  if (!response.ok) {
+    log.warn({ status: response.status, query }, 'Pexels image search failed');
+    return [];
+  }
 
   const data = (await response.json()) as PexelsPhotoResponse;
 

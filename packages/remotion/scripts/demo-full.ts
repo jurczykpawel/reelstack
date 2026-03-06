@@ -46,7 +46,13 @@ async function main() {
   let colorPreset: any;
   if (args['preset']) {
     const presetsPath = path.join(REMOTION_PKG_DIR, 'brands', 'caption-presets.json');
-    const presets = JSON.parse(fs.readFileSync(presetsPath, 'utf-8'));
+    let presets: any;
+    try {
+      presets = JSON.parse(fs.readFileSync(presetsPath, 'utf-8'));
+    } catch {
+      console.error(`Failed to parse JSON from presets file: ${presetsPath}`);
+      process.exit(1);
+    }
     colorPreset = presets[args['preset']];
     if (!colorPreset) {
       console.error(`Unknown preset "${args['preset']}". Available: ${Object.keys(presets).join(', ')}`);
@@ -58,7 +64,14 @@ async function main() {
     `ffprobe -v quiet -print_format json -show_format "${inputVideo}"`,
     { encoding: 'utf-8' },
   );
-  const videoDuration = parseFloat(JSON.parse(probeJson).format.duration);
+  let probeData: any;
+  try {
+    probeData = JSON.parse(probeJson);
+  } catch {
+    console.error('Failed to parse JSON from ffprobe output');
+    process.exit(1);
+  }
+  const videoDuration = parseFloat(probeData.format.duration);
 
   console.log('ReelStack FULL DEMO');
   console.log('═'.repeat(50));

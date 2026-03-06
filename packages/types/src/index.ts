@@ -116,6 +116,23 @@ export interface RenderOptions {
 
 export type JobStatus = 'queued' | 'processing' | 'completed' | 'failed';
 
+/**
+ * Valid JobStatus transitions (uppercase, matching DB enum).
+ * Any transition not listed here is invalid and will be rejected.
+ */
+export const JOB_STATUS_TRANSITIONS: Record<string, string[]> = {
+  QUEUED: ['PROCESSING', 'FAILED'],
+  PROCESSING: ['COMPLETED', 'FAILED'],
+  COMPLETED: [],
+  FAILED: ['QUEUED'],
+};
+
+export function isValidStatusTransition(from: string, to: string): boolean {
+  const allowed = JOB_STATUS_TRANSITIONS[from];
+  if (!allowed) return false;
+  return allowed.includes(to);
+}
+
 export interface RenderJob {
   readonly id: string;
   readonly videoId: string;
@@ -156,6 +173,8 @@ export const API_SCOPES = {
   REEL_WRITE: 'reel:write',
   PUBLISH_READ: 'publish:read',
   PUBLISH_WRITE: 'publish:write',
+  USER_READ: 'user:read',
+  USER_WRITE: 'user:write',
   FULL_ACCESS: '*',
 } as const;
 
@@ -323,6 +342,12 @@ export interface HighlightSegment {
   readonly glow?: boolean;
 }
 
+export interface PublishStatus {
+  publishId: string;
+  platforms: string[];
+  publishedAt: string;
+}
+
 export interface ReelJob {
   readonly id: string;
   readonly userId: string;
@@ -334,7 +359,7 @@ export interface ReelJob {
   readonly error?: string;
   readonly apiKeyId?: string;
   readonly projectId?: string;
-  readonly publishStatus?: Record<string, unknown>;
+  readonly publishStatus?: PublishStatus;
   readonly createdAt: string;
   readonly startedAt?: string;
   readonly completedAt?: string;
@@ -397,4 +422,76 @@ export interface ReelConfig {
   // Visual
   readonly showProgressBar?: boolean;
   readonly backgroundColor?: string;
+}
+
+// ==========================================
+// Error Classes
+// ==========================================
+
+export class AppError extends Error {
+  constructor(
+    message: string,
+    public readonly code: string,
+    public readonly statusCode: number = 500,
+    public readonly context?: Record<string, unknown>,
+  ) {
+    super(message);
+    this.name = 'AppError';
+  }
+}
+
+export class StorageError extends AppError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'STORAGE_ERROR', 500, context);
+    this.name = 'StorageError';
+  }
+}
+
+export class QueueError extends AppError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'QUEUE_ERROR', 503, context);
+    this.name = 'QueueError';
+  }
+}
+
+export class RenderError extends AppError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'RENDER_ERROR', 500, context);
+    this.name = 'RenderError';
+  }
+}
+
+export class TTSError extends AppError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'TTS_ERROR', 500, context);
+    this.name = 'TTSError';
+  }
+}
+
+export class TranscriptionError extends AppError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'TRANSCRIPTION_ERROR', 500, context);
+    this.name = 'TranscriptionError';
+  }
+}
+
+export class ValidationError extends AppError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'VALIDATION_ERROR', 400, context);
+    this.name = 'ValidationError';
+  }
+}
+
+export class NotFoundError extends AppError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'NOT_FOUND', 404, context);
+    this.name = 'NotFoundError';
+  }
+}
+
+export class QuotaExceededError extends AppError {
+  constructor(message: string, context?: Record<string, unknown>) {
+    super(message, 'QUOTA_EXCEEDED', 429, context);
+    this.name = 'QuotaExceededError';
+  }
 }

@@ -1,8 +1,11 @@
 import path from 'path';
 import os from 'os';
 import type { RemotionRenderer, RenderOptions, RenderResult } from './types';
+import { createLogger } from '@reelstack/logger';
 
 import { fileURLToPath } from 'url';
+
+const log = createLogger('local-renderer');
 
 const __dirname = import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
 const REMOTION_PKG_DIR = path.resolve(__dirname, '../..');
@@ -21,7 +24,7 @@ export class LocalRenderer implements RemotionRenderer {
     if (!bundlePath) {
       // Bundle via Remotion CLI (handles monorepo resolution correctly)
       // Use /tmp to avoid permission issues with read-only package dirs in Docker
-      const { execSync } = await import('child_process');
+      const { execFileSync } = await import('child_process');
       const { existsSync, rmSync } = await import('fs');
       const outDir = path.join(os.tmpdir(), 'remotion-bundle');
       const indexHtml = path.join(outDir, 'index.html');
@@ -34,16 +37,17 @@ export class LocalRenderer implements RemotionRenderer {
         if (existsSync(outDir)) {
           rmSync(outDir, { recursive: true, force: true });
         }
-        execSync(
-          `bunx remotion bundle src/index.ts --public-dir public --out-dir "${outDir}"`,
-          { cwd: REMOTION_PKG_DIR, stdio: 'pipe', timeout: 300_000 },
-        );
+        execFileSync('bunx', [
+          'remotion', 'bundle', 'src/index.ts',
+          '--public-dir', 'public',
+          '--out-dir', outDir,
+        ], { cwd: REMOTION_PKG_DIR, stdio: 'pipe', timeout: 300_000 });
         bundlePath = outDir;
       }
     }
 
     const compositionId = options.compositionId ?? 'Reel';
-    console.log(`[LocalRenderer] before selectComposition cwd=${process.cwd()}`);
+    log.debug({ cwd: process.cwd() }, 'Before selectComposition');
 
     const composition = await selectComposition({
       serveUrl: bundlePath,
@@ -54,10 +58,10 @@ export class LocalRenderer implements RemotionRenderer {
     // Remotion uses min(nproc, os.availableParallelism()) as its max concurrency.
     // nproc respects Docker CPU quota and may be lower than os.cpus().length.
     // We must cap against the same value Remotion uses internally.
-    const { execSync: _execSync } = await import('child_process');
+    const { execFileSync: _execFileSync } = await import('child_process');
     let remotionMaxCpus: number;
     try {
-      remotionMaxCpus = parseInt(_execSync('nproc', { stdio: 'pipe' }).toString().trim(), 10);
+      remotionMaxCpus = parseInt(_execFileSync('nproc', [], { stdio: 'pipe' }).toString().trim(), 10);
     } catch {
       remotionMaxCpus = os.cpus().length;
     }
@@ -69,8 +73,7 @@ export class LocalRenderer implements RemotionRenderer {
     // Cap at Remotion's max to avoid "Maximum for --concurrency" error
     const concurrency = Math.min(requestedConcurrency, Math.max(1, remotionMaxCpus));
 
-    console.log(`[LocalRenderer] remotionMaxCpus=${remotionMaxCpus} requestedConcurrency=${requestedConcurrency} concurrency=${concurrency}`);
-    console.log(`[LocalRenderer] cwd=${process.cwd()} bundlePath=${bundlePath}`);
+    log.info({ remotionMaxCpus, requestedConcurrency, concurrency, cwd: process.cwd(), bundlePath }, 'Render config');
 
     const startMs = performance.now();
 
@@ -85,7 +88,7 @@ export class LocalRenderer implements RemotionRenderer {
       ...(options.crf !== undefined ? { crf: options.crf } : {}),
     });
     } catch (e) {
-      console.error('[LocalRenderer] renderMedia error:', (e as Error).stack ?? (e as Error).message);
+      log.error({ err: e }, 'renderMedia error');
       throw e;
     }
 

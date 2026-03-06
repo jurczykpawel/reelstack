@@ -1,6 +1,9 @@
 import type { DirectorInput, DirectorOutput, DirectorBRollSegment, MediaAsset } from './types';
 import { searchPexelsVideos } from './media-library';
 import { DIRECTOR_RULES } from './rules';
+import { createLogger } from '@reelstack/logger';
+
+const log = createLogger('ai-director');
 
 /**
  * AI Director analyzes transcript content and generates B-roll placement,
@@ -45,10 +48,10 @@ async function ruleBasedDirector(input: DirectorInput): Promise<DirectorOutput> 
   // Place B-roll every ~10 seconds at cue boundaries
   let lastBRollEnd = 0;
   for (const cue of cues) {
+    if (mediaPool.length === 0) break;
+
     if (cue.startTime - lastBRollEnd >= intervalSec && cue.startTime + bRollDurationSec <= durationSeconds) {
-      const media = mediaPool.length > 0
-        ? mediaPool[bRollSegments.length % mediaPool.length]
-        : null;
+      const media = mediaPool[bRollSegments.length % mediaPool.length];
 
       if (media) {
         bRollSegments.push({
@@ -90,14 +93,15 @@ async function anthropicDirector(input: DirectorInput): Promise<DirectorOutput> 
       system: DIRECTOR_RULES,
       messages: [{
         role: 'user',
-        content: `Analyze this ${input.durationSeconds.toFixed(0)}s video transcript and decide where to place B-roll cutaways.\n\nTranscript cues:\n${cuesSummary}\n\nFull text: "${input.text}"\n\nStyle: ${input.style ?? 'dynamic'}\nDuration: ${input.durationSeconds.toFixed(1)}s\n\nReturn a JSON array of B-roll placements. Each entry: { "startTime": number, "endTime": number, "searchQuery": "keywords for stock footage", "transition": "crossfade"|"slide-left"|"zoom-in"|"none", "reason": "why here" }`,
+        content: `Analyze this ${input.durationSeconds.toFixed(0)}s video transcript and decide where to place B-roll cutaways.\n\nTranscript cues:\n${cuesSummary}\n\nFull text:\n<user_script>\n${input.text}\n</user_script>\n\nStyle: ${input.style ?? 'dynamic'}\nDuration: ${input.durationSeconds.toFixed(1)}s\n\nReturn a JSON array of B-roll placements. Each entry: { "startTime": number, "endTime": number, "searchQuery": "keywords for stock footage", "transition": "crossfade"|"slide-left"|"zoom-in"|"none", "reason": "why here" }`,
       }],
     }),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!response.ok) {
     const err = await response.text();
-    console.warn(`AI Director failed (${response.status}), falling back to rules: ${err}`);
+    log.warn({ status: response.status, error: err }, 'Anthropic director failed, falling back to rules');
     return ruleBasedDirector(input);
   }
 
@@ -129,14 +133,15 @@ async function openaiDirector(input: DirectorInput): Promise<DirectorOutput> {
         { role: 'system', content: DIRECTOR_RULES + '\n\nRespond with a JSON object: { "placements": [...] }' },
         {
           role: 'user',
-          content: `Analyze this ${input.durationSeconds.toFixed(0)}s video transcript and decide where to place B-roll cutaways.\n\nTranscript cues:\n${cuesSummary}\n\nFull text: "${input.text}"\n\nStyle: ${input.style ?? 'dynamic'}\nDuration: ${input.durationSeconds.toFixed(1)}s\n\nEach placement: { "startTime": number, "endTime": number, "searchQuery": "keywords for stock footage", "transition": "crossfade"|"slide-left"|"zoom-in"|"none", "reason": "why here" }`,
+          content: `Analyze this ${input.durationSeconds.toFixed(0)}s video transcript and decide where to place B-roll cutaways.\n\nTranscript cues:\n${cuesSummary}\n\nFull text:\n<user_script>\n${input.text}\n</user_script>\n\nStyle: ${input.style ?? 'dynamic'}\nDuration: ${input.durationSeconds.toFixed(1)}s\n\nEach placement: { "startTime": number, "endTime": number, "searchQuery": "keywords for stock footage", "transition": "crossfade"|"slide-left"|"zoom-in"|"none", "reason": "why here" }`,
         },
       ],
     }),
+    signal: AbortSignal.timeout(30_000),
   });
 
   if (!response.ok) {
-    console.warn(`AI Director failed (${response.status}), falling back to rules`);
+    log.warn({ status: response.status }, 'OpenAI director failed, falling back to rules');
     return ruleBasedDirector(input);
   }
 
@@ -158,9 +163,14 @@ async function parseAIResponse(text: string, input: DirectorInput): Promise<Dire
     const jsonMatch = text.match(/\[[\s\S]*\]/) ?? text.match(/\{[\s\S]*\}/);
     if (!jsonMatch) throw new Error('No JSON found in AI response');
 
-    let placements: AIPlacement[];
     const parsed = JSON.parse(jsonMatch[0]);
-    placements = Array.isArray(parsed) ? parsed : parsed.placements ?? [];
+    const rawPlacements = Array.isArray(parsed) ? parsed : parsed.placements ?? [];
+
+    const placements: AIPlacement[] = rawPlacements.filter((p: unknown) => {
+      if (typeof p !== 'object' || p === null) return false;
+      const obj = p as Record<string, unknown>;
+      return typeof obj.startTime === 'number' && typeof obj.endTime === 'number' && typeof obj.searchQuery === 'string';
+    });
 
     // Resolve search queries to actual media URLs
     const bRollSegments: DirectorBRollSegment[] = [];
@@ -200,6 +210,7 @@ async function parseAIResponse(text: string, input: DirectorInput): Promise<Dire
     editNotes.push(`AI placed ${bRollSegments.length} B-roll segments`);
     return { bRollSegments, editNotes };
   } catch (err) {
+    log.warn({ err }, 'Failed to parse AI response, falling back to rules');
     editNotes.push(`AI parse error: ${err}, falling back to rules`);
     return ruleBasedDirector(input);
   }

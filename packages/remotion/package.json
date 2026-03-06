@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@reelstack/core": "workspace:*",
+    "@reelstack/logger": "workspace:*",
     "@reelstack/transcription": "workspace:*",
     "@reelstack/tts": "workspace:*",
     "@reelstack/types": "workspace:*",
@@ -41,7 +42,7 @@
     "@types/react": "19.2.14",
     "@types/react-dom": "19.2.3",
     "tsx": "^4.19.0",
-    "typescript": "^5.7.3",
+    "typescript": "^5.9.3",
     "vitest": "^3.0.0"
   }
 }

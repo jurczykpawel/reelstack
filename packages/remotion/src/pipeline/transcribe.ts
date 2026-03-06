@@ -1,8 +1,11 @@
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import type { TranscriptionWord } from '@reelstack/transcription';
+import { createLogger } from '@reelstack/logger';
+
+const log = createLogger('transcribe');
 
 interface TranscribeOptions {
   apiKey?: string;
@@ -12,6 +15,13 @@ interface TranscribeOptions {
   /** Audio duration in seconds — required for synthetic timing */
   durationSeconds?: number;
 }
+
+const ALLOWED_LANGS = [
+  'pl', 'en', 'es', 'de', 'fr', 'it', 'pt', 'nl', 'ru', 'uk', 'cs', 'sk',
+  'ja', 'ko', 'zh', 'ar', 'hi', 'sv', 'da', 'no', 'fi', 'hu', 'ro', 'bg',
+  'hr', 'sr', 'sl', 'et', 'lv', 'lt', 'tr', 'vi', 'th', 'id', 'ms', 'he',
+  'el', 'ka', 'auto',
+];
 
 const WHISPER_CPP_MODEL_DIRS = [
   path.join(os.homedir(), '.local/share/whisper-cpp'),
@@ -52,6 +62,7 @@ export async function transcribeAudio(
   }
 
   // 3. Synthetic timing from known text
+  log.warn('No API key or whisper-cli available, using synthetic timing');
   if (options?.text && options?.durationSeconds) {
     return syntheticTranscribe(options.text, options.durationSeconds);
   }
@@ -79,7 +90,7 @@ function findWhisperModel(): string | null {
 
 function isWhisperCppAvailable(): boolean {
   try {
-    execSync('which whisper-cli', { stdio: 'pipe' });
+    execFileSync('which', ['whisper-cli'], { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -106,18 +117,16 @@ function transcribeViaWhisperCpp(
   try {
     fs.writeFileSync(wavPath, wavBuffer);
 
-    const lang = language?.split('-')[0] ?? 'pl';
-    const cmd = [
-      'whisper-cli',
-      `-m "${modelPath}"`,
-      `-f "${wavPath}"`,
-      `-l ${lang}`,
+    const rawLang = language?.split('-')[0] ?? 'pl';
+    const lang = ALLOWED_LANGS.includes(rawLang) ? rawLang : 'pl';
+    execFileSync('whisper-cli', [
+      '-m', modelPath,
+      '-f', wavPath,
+      '-l', lang,
       '--output-json-full',
-      `-of "${path.join(tmpDir, 'audio')}"`,
+      '-of', path.join(tmpDir, 'audio'),
       '--no-prints',
-    ].join(' ');
-
-    execSync(cmd, { stdio: 'pipe', timeout: 120_000 });
+    ], { stdio: 'pipe', timeout: 120_000 });
 
     if (!fs.existsSync(jsonPath)) return null;
 
@@ -266,6 +275,7 @@ async function transcribeViaApi(
     method: 'POST',
     headers: { Authorization: `Bearer ${apiKey}` },
     body: formData,
+    signal: AbortSignal.timeout(120_000),
   });
 
   if (!response.ok) {

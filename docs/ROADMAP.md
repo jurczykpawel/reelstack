@@ -104,7 +104,7 @@ Containerization, renderer abstraction, reel worker.
 ### Renderer Abstraction
 - `packages/remotion/src/render/` - pluggable renderer interface
 - `LocalRenderer` - programmatic `@remotion/renderer` with pre-bundle support (`REMOTION_BUNDLE_PATH`)
-- `LambdaRenderer` - stub (interface ready, implementation future)
+- `LambdaRenderer` - AWS Lambda via `@remotion/lambda` (opt-in via `REMOTION_RENDERER=lambda`)
 - Factory: `createRenderer()` based on `REMOTION_RENDERER` env
 - Replaced `execSync('bunx remotion render ...')` with programmatic API
 
@@ -143,11 +143,80 @@ Planned scope (when needed):
 - Token balance display and purchase flow
 - Template gallery for reel styles
 
+## Faza 7: Hardening & Observability
+
+**Status: planned**
+
+From architecture audit (2026-03-06). Priority order.
+
+### P0 - Before scaling (immediate)
+
+- [x] Structured logging: Pino via `@reelstack/logger` (all production server code, JSON in prod, pretty in dev)
+- [x] Error tracking: Sentry integration (capture exceptions with jobId, step, userId tags)
+- [x] Health check expansion: `/api/health` verifies DB, Redis, MinIO connectivity
+- [x] Storage lifecycle: `scripts/cleanup-storage.ts` (--days 30, --dry-run)
+- [x] Automated DB backups: `scripts/backup-db.sh` (pg_dump + gzip, 30-day retention)
+
+### P1 - Month 1
+
+- [x] Custom error classes: `AppError` hierarchy (StorageError, QueueError, RenderError, TTSError, etc.)
+- [x] Error mapping middleware: AppError → structured HTTP error codes in withAuth()
+- [x] Test coverage: +93 tests (template engine, storage adapters, queue, publisher)
+- [x] Monitoring: Prometheus metrics endpoint `/api/metrics` (HTTP requests, render duration per step, queue depth)
+- [x] Redis-backed rate limiter (ioredis with memory fallback)
+
+### P2 - Month 3+ (at scale)
+
+- [x] Multi-worker deployment: docs/MULTI_WORKER.md + docker-compose --scale support
+- [x] Lambda renderer: already implemented, activate via `REMOTION_RENDERER=lambda`
+- [x] Read replica: `prismaRead` client (DATABASE_READ_URL), analytics/listing queries routed through it
+- [x] State machine validation: enforce valid JobStatus transitions (QUEUED→PROCESSING→COMPLETED/FAILED)
+- [x] Audit log: AuditLog model + logging on API key ops, tier upgrades, token additions
+
+### Security audit fixes applied (2026-03-06)
+
+61 fixes across 2 audit rounds:
+- All external fetch() calls have AbortSignal.timeout()
+- execSync → execFileSync with array args (no shell injection)
+- Atomic DB operations (token balance, preferences merge)
+- Storage path traversal validation
+- TruffleHog secret scanning (pre-commit + CI)
+- API key routes wrapped with withAuth + rate limiting
+- Worker: lockDuration, retry/backoff, graceful shutdown
+- Docker: image versioning, Redis password, resource limits, security headers
+- Full report: see memory/reelstack-audit.md
+
+## Faza 8: Quick Wins
+
+**Status: done**
+
+High-impact features with minimal implementation effort.
+
+### Webhook Callbacks
+- `callbackUrl` field on reel jobs - POST result when job completes/fails
+- HMAC-SHA256 signed payloads (`X-ReelStack-Signature` header)
+- SSRF protection: blocks private IPs, localhost, non-HTTPS in production
+- `callbackSent` flag prevents duplicate deliveries
+- Fire-and-forget with 10s timeout
+
+### Batch Reel API
+- `POST /api/v1/reel/batch` - up to 20 reels per request
+- Per-reel credit consumption (partial success supported)
+- Shared or per-reel `callbackUrl`
+- `parentJobId` links batch jobs together
+
+### Multi-Language Reels
+- `POST /api/v1/reel/multi-lang` - same script in up to 10 languages
+- Auto-translation via Claude (Haiku) or GPT-4o-mini
+- Per-language TTS with correct BCP-47 locale mapping
+- 30 supported languages
+- Each language = separate reel job with own credit
+
+### Tests
+- 204 tests after this phase (+20 new: SSRF validation, batch schema, multi-lang schema)
+
 ## Future Ideas (unplanned)
 
-- Remotion Lambda renderer (AWS Lambda for serverless rendering)
-- Multi-language subtitle tracks
-- Batch reel rendering via API
 - Custom font uploads
 - GPU-accelerated server rendering
 - Plugin system for custom animation styles
@@ -159,8 +228,9 @@ Planned scope (when needed):
 
 | Metric | Value |
 |--------|-------|
-| Tests | 537 |
+| Tests | 179+ (unit, vitest) + e2e (playwright) |
 | Packages | 10 (core, ffmpeg, database, queue, storage, transcription, types, remotion, tts, publisher) |
 | API endpoints | 21 (v1 public) + 6 (reel) + 1 (webhook) |
 | Docker images | 3 (web, worker, reel-worker) |
 | Deployment modes | VPS (Docker Compose) / Cloud (Vercel + Inngest) |
+| Security audit fixes | 61 (2026-03-06) |

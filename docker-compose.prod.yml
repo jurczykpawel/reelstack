@@ -28,6 +28,12 @@ services:
       minio:
         condition: service_healthy
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:3000/api/health"]
       interval: 30s
@@ -47,6 +53,12 @@ services:
       minio:
         condition: service_healthy
     restart: always
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 512M
     healthcheck:
       test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q 'bun' || exit 1"]
       interval: 30s
@@ -99,6 +111,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    command: redis-server --requirepass ${REDIS_PASSWORD:-reelstack-dev}
     volumes:
       - redis_data:/data
     healthcheck:

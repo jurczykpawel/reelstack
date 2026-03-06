@@ -73,7 +73,7 @@ export class CloudflareWhisperProvider implements TranscriptionProvider {
       method: 'POST',
       headers: { Authorization: `Bearer ${this.apiToken}` },
       body: formData,
-      signal: options?.signal,
+      signal: options?.signal ?? AbortSignal.timeout(120_000),
     });
 
     if (!response.ok) {
