@@ -33,24 +33,16 @@ COPY packages/tts/package.json packages/tts/
 COPY packages/publisher/package.json packages/publisher/
 RUN bun install --frozen-lockfile
 
-# Build: generate Prisma client + pre-bundle Remotion composition
+# Build: generate Prisma client
 FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 RUN ./node_modules/.bin/prisma generate --schema=packages/database/prisma/schema.prisma
 
-# Pre-bundle Remotion composition (saves 10-30s per render)
-RUN ./node_modules/.bin/remotion bundle \
-    packages/remotion/src/index.ts \
-    --public-dir packages/remotion/public \
-    --out-dir /app/remotion-bundle \
-    --log-level warn
-
 # Production
 FROM base AS runner
 ENV NODE_ENV=production
-ENV REMOTION_BUNDLE_PATH=/app/remotion-bundle
 
 RUN addgroup --system --gid 1001 worker && adduser --system --uid 1001 worker
 
@@ -60,7 +52,6 @@ COPY --from=builder /app/apps/web/src/lib/worker ./apps/web/src/lib/worker
 COPY --from=builder /app/apps/web/worker ./apps/web/worker
 COPY --from=builder /app/apps/web/package.json ./apps/web/
 COPY --from=builder /app/package.json ./
-COPY --from=builder /app/remotion-bundle ./remotion-bundle
 
 USER worker
 CMD ["bun", "run", "--cwd", "apps/web", "reel-worker"]
