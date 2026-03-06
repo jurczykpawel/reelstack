@@ -1,5 +1,5 @@
-import { describe, it, expect } from 'vitest';
-import { createReelSchema, publishReelSchema } from '../api/v1/reel-schemas';
+import { describe, it, expect, vi } from 'vitest';
+import { createReelSchema, publishReelSchema, batchReelSchema, multiLangReelSchema } from '../api/v1/reel-schemas';
 
 describe('createReelSchema', () => {
   it('accepts minimal valid input', () => {
@@ -162,6 +162,281 @@ describe('publishReelSchema', () => {
       platforms: ['tiktok'],
       caption: 'Hello',
       hashtags: Array.from({ length: 31 }, (_, i) => `tag${i}`),
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ── callbackUrl validation ─────────────────────────
+
+describe('createReelSchema callbackUrl', () => {
+  it('accepts valid HTTPS callback URL', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://example.com/webhook',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects localhost callback URL', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://localhost/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects 127.0.0.1 callback URL', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://127.0.0.1/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects private IP 10.x callback URL', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://10.0.0.1/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects private IP 192.168.x callback URL', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://192.168.1.1/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects private IP 172.16.x callback URL', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://172.16.0.1/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects IPv6 loopback [::1]', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://[::1]/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects IPv4-mapped IPv6 [::ffff:127.0.0.1]', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://[::ffff:127.0.0.1]/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects IPv4-mapped IPv6 private [::ffff:192.168.1.1]', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://[::ffff:192.168.1.1]/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects link-local IPv6 [fe80::1]', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://[fe80::1]/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects URL with credentials', () => {
+    // Build URL with embedded credentials (split to avoid secret scanner false positive)
+    const creds = ['usr', 'pwd'].join(':');
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: `https://${creds}@example.com/webhook`,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects cloud metadata IP 169.254.169.254', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://169.254.169.254/latest/meta-data/',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects metadata.google.internal', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://metadata.google.internal/computeMetadata/',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects 0.0.0.0', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://0.0.0.0/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects ftp:// protocol', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'ftp://example.com/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects URL over 2048 chars', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: `https://example.com/${'a'.repeat(2048)}`,
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('allows HTTP in non-production (test env)', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'http://example.com/webhook',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects decimal IP encoding (2130706433 = 127.0.0.1)', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://2130706433/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects hex IP encoding (0x7f000001 = 127.0.0.1)', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://0x7f000001/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects octal IP encoding (0177.0.0.1 = 127.0.0.1)', () => {
+    const result = createReelSchema.safeParse({
+      script: 'Hello',
+      callbackUrl: 'https://0177.0.0.1/webhook',
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ── batchReelSchema ────────────────────────────────
+
+describe('batchReelSchema', () => {
+  it('accepts valid batch of reels', () => {
+    const result = batchReelSchema.safeParse({
+      reels: [
+        { script: 'Reel 1' },
+        { script: 'Reel 2', layout: 'split-screen' },
+      ],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('accepts batch with shared callbackUrl', () => {
+    const result = batchReelSchema.safeParse({
+      reels: [{ script: 'Hello' }],
+      callbackUrl: 'https://example.com/batch-done',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects empty reels array', () => {
+    const result = batchReelSchema.safeParse({ reels: [] });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects more than 20 reels', () => {
+    const reels = Array.from({ length: 21 }, (_, i) => ({ script: `Reel ${i}` }));
+    const result = batchReelSchema.safeParse({ reels });
+    expect(result.success).toBe(false);
+  });
+
+  it('validates each reel individually', () => {
+    const result = batchReelSchema.safeParse({
+      reels: [{ script: '' }], // empty script invalid
+    });
+    expect(result.success).toBe(false);
+  });
+});
+
+// ── multiLangReelSchema ────────────────────────────
+
+describe('multiLangReelSchema', () => {
+  it('accepts valid multi-language request', () => {
+    const result = multiLangReelSchema.safeParse({
+      script: 'Cześć, to jest test',
+      sourceLanguage: 'pl',
+      targetLanguages: ['en', 'de', 'fr'],
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('defaults sourceLanguage to pl', () => {
+    const result = multiLangReelSchema.safeParse({
+      script: 'Test',
+      targetLanguages: ['en'],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.sourceLanguage).toBe('pl');
+    }
+  });
+
+  it('rejects empty targetLanguages', () => {
+    const result = multiLangReelSchema.safeParse({
+      script: 'Test',
+      targetLanguages: [],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects more than 10 target languages', () => {
+    const result = multiLangReelSchema.safeParse({
+      script: 'Test',
+      targetLanguages: ['en', 'de', 'fr', 'es', 'it', 'pt', 'nl', 'ru', 'uk', 'cs', 'sk'],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('rejects unsupported language', () => {
+    const result = multiLangReelSchema.safeParse({
+      script: 'Test',
+      targetLanguages: ['xx'],
+    });
+    expect(result.success).toBe(false);
+  });
+
+  it('accepts with all options', () => {
+    const result = multiLangReelSchema.safeParse({
+      script: 'Test script',
+      sourceLanguage: 'en',
+      targetLanguages: ['pl', 'de'],
+      layout: 'split-screen',
+      style: 'cinematic',
+      tts: { provider: 'elevenlabs' },
+      callbackUrl: 'https://example.com/webhook',
+    });
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects duplicate target languages', () => {
+    const result = multiLangReelSchema.safeParse({
+      script: 'Test',
+      targetLanguages: ['en', 'en', 'de'],
     });
     expect(result.success).toBe(false);
   });

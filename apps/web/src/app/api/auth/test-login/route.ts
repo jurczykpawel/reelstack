@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { prisma } from '@reelstack/database';
 import { encode } from 'next-auth/jwt';
+import { createLogger } from '@reelstack/logger';
+
+const log = createLogger('test-login');
 
 /**
  * POST /api/auth/test-login
@@ -8,10 +11,11 @@ import { encode } from 'next-auth/jwt';
  * Only available when NODE_ENV !== 'production'.
  */
 export async function POST(req: NextRequest) {
-  const env = process.env.NODE_ENV as string;
-  if (env === 'production') {
+  if (process.env.NODE_ENV === 'production' || process.env.ALLOW_TEST_LOGIN !== 'true') {
     return NextResponse.json({ error: 'Not available' }, { status: 404 });
   }
+
+  const env = process.env.NODE_ENV as string;
 
   try {
     const { email } = await req.json();
@@ -56,7 +60,7 @@ export async function POST(req: NextRequest) {
 
     return response;
   } catch (error) {
-    console.error('[test-login] Error:', error);
+    log.error({ err: error }, 'Test login error');
     return NextResponse.json(
       { error: 'Internal error' },
       { status: 500 }

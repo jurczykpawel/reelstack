@@ -15,6 +15,7 @@ vi.mock('@reelstack/database', () => ({
   updateUserTier: (...args: unknown[]) => mockUpdateUserTier(...args),
   linkSellfCustomer: (...args: unknown[]) => mockLinkSellfCustomer(...args),
   getUserBySellfCustomerId: (...args: unknown[]) => mockGetUserBySellfCustomerId(...args),
+  createAuditLog: vi.fn().mockResolvedValue({}),
   prisma: {
     webhookEvent: {
       create: (...args: unknown[]) => mockWebhookEventCreate(...args),

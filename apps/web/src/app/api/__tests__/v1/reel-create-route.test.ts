@@ -40,7 +40,7 @@ vi.mock('@/lib/api/v1/middleware', () => {
 });
 
 vi.mock('@/lib/api/validation', () => ({
-  getTierLimits: () => Promise.resolve({ maxFileSize: 100 * 1024 * 1024, maxDuration: 120, rendersPerMonth: 3 }),
+  getTierLimits: () => Promise.resolve({ maxFileSize: 100 * 1024 * 1024, maxDuration: 120, creditsPerMonth: 30 }),
 }));
 
 vi.mock('@/lib/api/rate-limit', () => ({
@@ -48,10 +48,14 @@ vi.mock('@/lib/api/rate-limit', () => ({
 }));
 
 const mockCreateReelJob = vi.fn();
-const mockConsumeTokenOrCredit = vi.fn();
+const mockConsumeCredits = vi.fn();
+const mockGetCreditCost = vi.fn();
+const mockUpdateReelJobStatus = vi.fn();
 vi.mock('@reelstack/database', () => ({
   createReelJob: (...args: unknown[]) => mockCreateReelJob(...args),
-  consumeTokenOrCredit: (...args: unknown[]) => mockConsumeTokenOrCredit(...args),
+  consumeCredits: (...args: unknown[]) => mockConsumeCredits(...args),
+  getCreditCost: (...args: unknown[]) => mockGetCreditCost(...args),
+  updateReelJobStatus: (...args: unknown[]) => mockUpdateReelJobStatus(...args),
 }));
 
 const mockEnqueue = vi.fn();
@@ -73,7 +77,11 @@ function makeRequest(body: unknown): NextRequest {
 }
 
 describe('POST /api/v1/reel/create', () => {
-  beforeEach(() => vi.clearAllMocks());
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockGetCreditCost.mockResolvedValue(10);
+    mockUpdateReelJobStatus.mockResolvedValue({});
+  });
 
   it('returns 401 when not authenticated', async () => {
     mockAuthenticate.mockResolvedValue(null);
@@ -102,7 +110,7 @@ describe('POST /api/v1/reel/create', () => {
 
   it('returns 429 when credits and tokens exhausted', async () => {
     mockAuthenticate.mockResolvedValue(mockAuthCtx);
-    mockConsumeTokenOrCredit.mockResolvedValue({ consumed: false, source: null });
+    mockConsumeCredits.mockResolvedValue({ consumed: false, source: null });
     const response = await POST(makeRequest({ script: 'Hello world' }));
     expect(response.status).toBe(429);
     const body = await response.json();
@@ -111,7 +119,7 @@ describe('POST /api/v1/reel/create', () => {
 
   it('creates reel job and returns 201 with tier credit', async () => {
     mockAuthenticate.mockResolvedValue(mockAuthCtx);
-    mockConsumeTokenOrCredit.mockResolvedValue({ consumed: true, source: 'tier' });
+    mockConsumeCredits.mockResolvedValue({ consumed: true, source: 'tier' });
     mockCreateReelJob.mockResolvedValue({ id: 'reel-1' });
     mockEnqueue.mockResolvedValue(undefined);
 
@@ -126,7 +134,7 @@ describe('POST /api/v1/reel/create', () => {
 
   it('returns creditSource token when token consumed', async () => {
     mockAuthenticate.mockResolvedValue(mockAuthCtx);
-    mockConsumeTokenOrCredit.mockResolvedValue({ consumed: true, source: 'token' });
+    mockConsumeCredits.mockResolvedValue({ consumed: true, source: 'token' });
     mockCreateReelJob.mockResolvedValue({ id: 'reel-2' });
     mockEnqueue.mockResolvedValue(undefined);
 
@@ -138,7 +146,7 @@ describe('POST /api/v1/reel/create', () => {
 
   it('enqueues to reel-render queue', async () => {
     mockAuthenticate.mockResolvedValue(mockAuthCtx);
-    mockConsumeTokenOrCredit.mockResolvedValue({ consumed: true, source: 'tier' });
+    mockConsumeCredits.mockResolvedValue({ consumed: true, source: 'tier' });
     mockCreateReelJob.mockResolvedValue({ id: 'reel-3' });
     mockEnqueue.mockResolvedValue(undefined);
 
@@ -148,7 +156,7 @@ describe('POST /api/v1/reel/create', () => {
 
   it('returns 503 when queue unavailable', async () => {
     mockAuthenticate.mockResolvedValue(mockAuthCtx);
-    mockConsumeTokenOrCredit.mockResolvedValue({ consumed: true, source: 'tier' });
+    mockConsumeCredits.mockResolvedValue({ consumed: true, source: 'tier' });
     mockCreateReelJob.mockResolvedValue({ id: 'reel-4' });
     mockEnqueue.mockRejectedValue(new Error('queue down'));
 
@@ -158,7 +166,7 @@ describe('POST /api/v1/reel/create', () => {
 
   it('passes config to createReelJob', async () => {
     mockAuthenticate.mockResolvedValue(mockAuthCtx);
-    mockConsumeTokenOrCredit.mockResolvedValue({ consumed: true, source: 'tier' });
+    mockConsumeCredits.mockResolvedValue({ consumed: true, source: 'tier' });
     mockCreateReelJob.mockResolvedValue({ id: 'reel-5' });
     mockEnqueue.mockResolvedValue(undefined);
 

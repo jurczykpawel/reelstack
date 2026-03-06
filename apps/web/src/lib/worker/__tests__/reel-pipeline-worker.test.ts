@@ -2,10 +2,14 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 const mockGetReelJobInternal = vi.fn();
 const mockUpdateReelJobStatus = vi.fn();
+const mockMarkCallbackSent = vi.fn();
+const mockResetCallbackSent = vi.fn();
 
 vi.mock('@reelstack/database', () => ({
   getReelJobInternal: (...args: unknown[]) => mockGetReelJobInternal(...args),
   updateReelJobStatus: (...args: unknown[]) => mockUpdateReelJobStatus(...args),
+  markCallbackSent: (...args: unknown[]) => mockMarkCallbackSent(...args),
+  resetCallbackSent: (...args: unknown[]) => mockResetCallbackSent(...args),
 }));
 
 const mockCreateReel = vi.fn();
@@ -49,6 +53,8 @@ describe('processReelPipelineJob', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockUpdateReelJobStatus.mockResolvedValue({});
+    mockMarkCallbackSent.mockResolvedValue(true);
+    mockResetCallbackSent.mockResolvedValue(undefined);
     mockReadFile.mockResolvedValue(Buffer.from('fake-mp4'));
     mockUpload.mockResolvedValue(undefined);
     mockGetSignedUrl.mockResolvedValue('https://storage.example.com/signed-url');

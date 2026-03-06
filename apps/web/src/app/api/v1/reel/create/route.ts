@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { API_SCOPES } from '@reelstack/types';
-import { createReelJob, consumeTokenOrCredit } from '@reelstack/database';
+import { createReelJob, consumeCredits, getCreditCost, updateReelJobStatus } from '@reelstack/database';
 import { getTierLimits } from '@/lib/api/validation';
 import { createQueue } from '@reelstack/queue';
 import { withAuth, successResponse, errorResponse } from '@/lib/api/v1/middleware';
@@ -30,9 +30,10 @@ export const POST = withAuth(
       );
     }
 
-    // Check render credits (tier limit + token fallback)
+    // Check render credits (tier budget + token fallback)
     const limits = await getTierLimits(ctx.user.tier as import('@/lib/api/validation').TierName);
-    const { consumed, source } = await consumeTokenOrCredit(ctx.user.id, limits.rendersPerMonth);
+    const cost = await getCreditCost('video');
+    const { consumed, source } = await consumeCredits(ctx.user.id, limits.creditsPerMonth, cost);
     if (!consumed) {
       return errorResponse(
         'QUOTA_EXCEEDED',
@@ -54,18 +55,17 @@ export const POST = withAuth(
         brandPreset: parsed.data.brandPreset,
       },
       apiKeyId: ctx.apiKeyId ?? undefined,
+      creditCost: cost,
+      callbackUrl: parsed.data.callbackUrl,
     });
 
     // Enqueue pipeline job
     try {
       const queue = await createQueue();
-      await Promise.race([
-        queue.enqueue(job.id, { jobId: job.id }, 'reel-render'),
-        new Promise((_, reject) =>
-          setTimeout(() => reject(new Error('Queue timeout')), 5000),
-        ),
-      ]);
+      await queue.enqueue(job.id, { jobId: job.id }, 'reel-render');
     } catch {
+      // Mark job as FAILED so user sees it and credits aren't silently lost
+      await updateReelJobStatus(job.id, { status: 'FAILED', error: 'Queue unavailable' }).catch(() => {});
       return errorResponse('SERVICE_UNAVAILABLE', 'Reel render queue unavailable', 503);
     }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { z } from 'zod';
 import {
   getUserByEmail,
   addTokens,
@@ -7,8 +8,12 @@ import {
   linkSellfCustomer,
   getUserBySellfCustomerId,
   prisma,
+  createAuditLog,
 } from '@reelstack/database';
+import { createLogger } from '@reelstack/logger';
 import { rateLimit } from '@/lib/api/rate-limit';
+
+const log = createLogger('webhook-sellf');
 
 /**
  * POST /api/webhooks/sellf
@@ -56,34 +61,66 @@ interface NormalizedData {
   userId?: string;
 }
 
+/** Sellf webhook format: nested event + data */
+const sellfPayloadSchema = z.object({
+  event: z.string(),
+  data: z.object({
+    customer: z.object({
+      email: z.string().email(),
+      userId: z.string().optional(),
+    }).passthrough(),
+    product: z.object({
+      slug: z.string().optional(),
+      id: z.string().optional(),
+    }).passthrough(),
+    order: z.object({
+      sessionId: z.string().optional(),
+    }).passthrough().optional(),
+    reference: z.string().optional(),
+    userId: z.string().optional(),
+  }).passthrough(),
+});
+
+/** Direct webhook format: flat object */
+const directPayloadSchema = z.object({
+  email: z.string().email(),
+  product: z.string().min(1),
+  reference: z.string().optional(),
+  userId: z.string().optional(),
+});
+
 /**
  * Normalize incoming payload to flat format.
  * Sellf sends: { event, data: { customer: { email }, product: { slug, id }, order: { sessionId } } }
  * Direct sends: { email, product, reference }
+ *
+ * Returns null if payload doesn't match either format.
  */
-function normalizePayload(raw: Record<string, unknown>): NormalizedData {
+function normalizePayload(raw: Record<string, unknown>): NormalizedData | null {
   // Sellf format: nested event + data
   if ('event' in raw && 'data' in raw) {
-    const data = raw.data as Record<string, unknown>;
-    const customer = (data.customer ?? {}) as Record<string, string>;
-    const product = (data.product ?? {}) as Record<string, string>;
-    const order = (data.order ?? {}) as Record<string, string>;
+    const parsed = sellfPayloadSchema.safeParse(raw);
+    if (!parsed.success) return null;
 
+    const { data } = parsed.data;
     return {
-      email: customer.email ?? '',
-      product: product.slug ?? product.id ?? '',
-      reference: data.reference as string
-        ?? `${raw.event}:${order.sessionId ?? ''}`,
-      userId: (data.userId ?? customer.userId) as string | undefined,
+      email: data.customer.email,
+      product: data.product.slug ?? data.product.id ?? '',
+      reference: data.reference
+        ?? `${parsed.data.event}:${data.order?.sessionId ?? ''}`,
+      userId: data.userId ?? data.customer.userId,
     };
   }
 
   // Direct format: flat object
+  const parsed = directPayloadSchema.safeParse(raw);
+  if (!parsed.success) return null;
+
   return {
-    email: (raw.email as string) ?? '',
-    product: (raw.product as string) ?? '',
-    reference: (raw.reference as string) ?? '',
-    userId: raw.userId as string | undefined,
+    email: parsed.data.email,
+    product: parsed.data.product,
+    reference: parsed.data.reference ?? '',
+    userId: parsed.data.userId,
   };
 }
 
@@ -131,7 +168,7 @@ async function resolveUser(data: NormalizedData) {
 export async function POST(request: NextRequest) {
   // Rate limit by IP — 30 per minute (legitimate providers retry slowly)
   const ip = request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ?? 'unknown';
-  const rl = rateLimit(`webhook:${ip}`, { maxRequests: 30, windowMs: 60_000 });
+  const rl = await rateLimit(`webhook:${ip}`, { maxRequests: 30, windowMs: 60_000 });
   if (!rl.success) {
     return NextResponse.json(
       { error: { code: 'RATE_LIMITED', message: 'Too many requests' } },
@@ -166,18 +203,24 @@ export async function POST(request: NextRequest) {
 
   // Normalize payload (Sellf nested → flat)
   const data = normalizePayload(raw);
+  if (!data) {
+    return NextResponse.json(
+      { error: { code: 'VALIDATION_ERROR', message: 'Invalid webhook payload structure' } },
+      { status: 400 },
+    );
+  }
 
   // Resolve product action
   const action = getProductAction(data.product);
   if (!action) {
-    console.warn(`Webhook: unknown product "${data.product}"`);
+    log.warn({ product: data.product }, 'Unknown product');
     return NextResponse.json({ received: true, warning: 'Unknown product' });
   }
 
   // Find user
   const user = await resolveUser(data);
   if (!user) {
-    console.error(`Webhook: user not found for email "${data.email}"`);
+    log.error({ email: data.email }, 'User not found for provided email');
     return NextResponse.json(
       { error: { code: 'NOT_FOUND', message: 'User not found' } },
       { status: 404 },
@@ -186,7 +229,7 @@ export async function POST(request: NextRequest) {
 
   // Link Sellf customer on first purchase
   if (data.email) {
-    await linkSellfCustomer(user.id, data.email).catch(() => {});
+    await linkSellfCustomer(user.id, data.email).catch(err => log.warn({ userId: user.id, err }, 'Failed to link Sellf customer'));
   }
 
   // Idempotency — reject duplicate events
@@ -202,11 +245,25 @@ export async function POST(request: NextRequest) {
   }
 
   if (action.type === 'tier') {
+    const previousTier = user.tier;
     await updateUserTier(user.id, action.tier);
-    console.log(`Webhook: upgraded ${user.email} to ${action.tier}`);
+    log.info({ userId: user.id, tier: action.tier }, 'Upgraded user tier');
+
+    createAuditLog({
+      userId: user.id,
+      action: 'tier.upgrade',
+      target: action.tier,
+      metadata: { previousTier, product: data.product },
+    }).catch(() => {});
   } else {
     await addTokens(user.id, action.amount, 'purchase', reference);
-    console.log(`Webhook: added ${action.amount} tokens to ${user.email}`);
+    log.info({ userId: user.id, tokens: action.amount }, 'Added tokens to user');
+
+    createAuditLog({
+      userId: user.id,
+      action: 'tokens.add',
+      metadata: { amount: action.amount, product: data.product },
+    }).catch(() => {});
   }
 
   return NextResponse.json({
