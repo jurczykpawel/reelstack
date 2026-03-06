@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server';
 import { API_SCOPES } from '@reelstack/types';
-import { getMonthlyRenderCount, getTokenBalance } from '@reelstack/database';
+import { getMonthlyCreditsUsed, getTokenBalance } from '@reelstack/database';
 import { withAuth, successResponse } from '@/lib/api/v1/middleware';
 import { getTierLimits } from '@/lib/api/validation';
 import type { TierName } from '@/lib/api/validation';
@@ -11,16 +11,16 @@ export const GET = withAuth(
   { scope: API_SCOPES.REEL_READ },
   async (_req: NextRequest, ctx: AuthContext) => {
     const tier = (ctx.user.tier ?? 'FREE') as TierName;
-    const [rendersThisMonth, tokenBalance] = await Promise.all([
-      getMonthlyRenderCount(ctx.user.id),
+    const [creditsUsed, tokenBalance] = await Promise.all([
+      getMonthlyCreditsUsed(ctx.user.id),
       getTokenBalance(ctx.user.id),
     ]);
     const limits = await getTierLimits(tier);
 
     return successResponse({
       tier,
-      rendersThisMonth,
-      monthlyLimit: limits.rendersPerMonth,
+      creditsUsed,
+      creditsPerMonth: limits.creditsPerMonth,
       tokenBalance,
     });
   }

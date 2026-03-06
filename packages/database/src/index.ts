@@ -1,7 +1,9 @@
 import { PrismaClient } from '@prisma/client';
+import { isValidStatusTransition } from '@reelstack/types';
 
 const globalForPrisma = globalThis as unknown as {
   prisma: PrismaClient | undefined;
+  prismaRead: PrismaClient | undefined;
 };
 
 export const prisma =
@@ -11,6 +13,27 @@ export const prisma =
   });
 
 if (process.env.NODE_ENV !== 'production') globalForPrisma.prisma = prisma;
+
+/**
+ * Read replica client. Uses DATABASE_READ_URL when set,
+ * otherwise falls back to the primary client (same DB).
+ * Route analytics/listing queries through this for read scaling.
+ */
+export const prismaRead: PrismaClient = (() => {
+  if (globalForPrisma.prismaRead) return globalForPrisma.prismaRead;
+
+  if (process.env.DATABASE_READ_URL) {
+    const client = new PrismaClient({
+      datasourceUrl: process.env.DATABASE_READ_URL,
+      log: process.env.NODE_ENV === 'development' ? ['query'] : [],
+    });
+    if (process.env.NODE_ENV !== 'production') globalForPrisma.prismaRead = client;
+    return client;
+  }
+
+  // No read replica configured - use primary
+  return prisma;
+})();
 
 export function createDB(): PrismaClient {
   return prisma;
@@ -49,13 +72,13 @@ export async function updateUserPreferences(
   userId: string,
   data: Record<string, unknown>
 ): Promise<Record<string, unknown>> {
-  const existing = await getUserPreferences(userId);
-  const merged = { ...existing, ...data };
-  await prisma.user.update({
-    where: { id: userId },
-    data: { preferences: merged as Record<string, unknown> as Parameters<typeof prisma.user.update>[0]['data']['preferences'] },
-  });
-  return merged;
+  const user = await prisma.$queryRaw<Array<{ preferences: Record<string, unknown> }>>`
+    UPDATE "User"
+    SET preferences = COALESCE(preferences, '{}'::jsonb) || ${JSON.stringify(data)}::jsonb
+    WHERE id = ${userId}
+    RETURNING preferences
+  `;
+  return (user[0]?.preferences as Record<string, unknown>) ?? {};
 }
 
 export async function updateUserTier(userId: string, tier: 'FREE' | 'SOLO' | 'PRO' | 'AGENCY') {
@@ -80,13 +103,16 @@ export async function linkSellfCustomer(userId: string, sellfCustomerId: string)
 // Usage queries
 // ==========================================
 
-export async function getMonthlyRenderCount(userId: string): Promise<number> {
+/** Returns total credits used this month (SUM of creditCost). */
+export async function getMonthlyCreditsUsed(userId: string): Promise<number> {
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
-  return prisma.reelJob.count({
+  const result = await prismaRead.reelJob.aggregate({
     where: { userId, createdAt: { gte: startOfMonth } },
+    _sum: { creditCost: true },
   });
+  return result._sum.creditCost ?? 0;
 }
 
 // ==========================================
@@ -114,18 +140,18 @@ export async function createTemplate(data: {
 }
 
 export async function getTemplatesByUser(userId: string) {
-  return prisma.template.findMany({
+  return prismaRead.template.findMany({
     where: { userId },
     orderBy: { updatedAt: 'desc' },
   });
 }
 
 export async function getTemplateById(id: string, userId: string) {
-  return prisma.template.findFirst({ where: { id, userId } });
+  return prismaRead.template.findFirst({ where: { id, userId } });
 }
 
 export async function getPublicTemplates(cursor?: string, limit = 20) {
-  return prisma.template.findMany({
+  return prismaRead.template.findMany({
     where: { isPublic: true },
     orderBy: { usageCount: 'desc' },
     take: limit + 1,
@@ -188,7 +214,7 @@ export async function createApiKey(data: {
 }
 
 export async function getApiKeysByUser(userId: string) {
-  return prisma.apiKey.findMany({
+  return prismaRead.apiKey.findMany({
     where: { userId, revokedAt: null },
     orderBy: { createdAt: 'desc' },
     select: {
@@ -240,46 +266,89 @@ export async function touchApiKey(id: string, ip?: string) {
 // ==========================================
 
 /**
- * Consume a render credit: first checks tier monthly limit,
+ * Consume credits: first checks tier monthly budget (SUM-based),
  * then falls back to token balance. Returns true if consumed.
+ *
+ * Uses SELECT ... FOR UPDATE on the user row to prevent
+ * TOCTOU races where concurrent requests both see "under limit" and both proceed.
+ *
+ * @param cost - number of credits to consume (e.g. 10 for video, 15 for multi-lang, 1 for image)
  */
-export async function consumeTokenOrCredit(
+export async function consumeCredits(
   userId: string,
-  monthlyLimit: number
+  monthlyBudget: number,
+  cost: number,
 ): Promise<{ consumed: boolean; source: 'tier' | 'token' | null }> {
+  if (!Number.isFinite(cost) || cost <= 0) {
+    throw new Error(`Invalid credit cost: ${cost}`);
+  }
   const startOfMonth = new Date();
   startOfMonth.setDate(1);
   startOfMonth.setHours(0, 0, 0, 0);
 
-  try {
-    const result = await prisma.$transaction(async (tx) => {
-      const reelCount = await tx.reelJob.count({
-        where: { userId, createdAt: { gte: startOfMonth } },
-      });
+  return prisma.$transaction(async (tx) => {
+    // Lock user row to serialize concurrent credit checks
+    await tx.$executeRaw`SELECT 1 FROM "User" WHERE id = ${userId} FOR UPDATE`;
 
-      if (reelCount < monthlyLimit) {
-        return { consumed: true, source: 'tier' as const };
-      }
-
-      // Tier limit exhausted - try token balance
-      const user = await tx.user.findUniqueOrThrow({ where: { id: userId } });
-      if (user.tokenBalance > 0) {
-        await tx.user.update({
-          where: { id: userId },
-          data: { tokenBalance: { decrement: 1 } },
-        });
-        await tx.tokenTransaction.create({
-          data: { userId, amount: -1, reason: 'render' },
-        });
-        return { consumed: true, source: 'token' as const };
-      }
-
-      return { consumed: false, source: null };
+    // SUM-based: count total credits used this month, not number of jobs
+    const result = await tx.reelJob.aggregate({
+      where: { userId, createdAt: { gte: startOfMonth } },
+      _sum: { creditCost: true },
     });
-    return result;
-  } catch (err) {
-    throw err;
+    const usedCredits = result._sum.creditCost ?? 0;
+
+    if (usedCredits + cost <= monthlyBudget) {
+      return { consumed: true, source: 'tier' as const };
+    }
+
+    // Tier budget exhausted - try token balance (atomic update prevents going below 0)
+    const updated = await tx.$executeRaw`
+      UPDATE "User" SET "tokenBalance" = "tokenBalance" - ${cost} WHERE id = ${userId} AND "tokenBalance" >= ${cost}
+    `;
+    if (updated > 0) {
+      await tx.tokenTransaction.create({
+        data: { userId, amount: -cost, reason: 'render' },
+      });
+      return { consumed: true, source: 'token' as const };
+    }
+
+    return { consumed: false, source: null };
+  });
+}
+
+/**
+ * Get credit cost for a product action from DB, with fallback defaults.
+ * Cached in-memory for 60s.
+ */
+const _pricingCache = new Map<string, { cost: number; expiresAt: number }>();
+
+export async function getCreditCost(
+  action: string,
+  productSlug = 'reelstack',
+): Promise<number> {
+  const key = `${productSlug}:${action}`;
+  const cached = _pricingCache.get(key);
+  if (cached && Date.now() < cached.expiresAt) return cached.cost;
+
+  const DEFAULTS: Record<string, number> = {
+    video: 10,
+    video_multilang: 15,
+    image: 1,
+  };
+
+  try {
+    const row = await prisma.creditPricing.findUnique({
+      where: { productSlug_action: { productSlug, action } },
+    });
+    if (row && row.active && row.creditCost > 0) {
+      _pricingCache.set(key, { cost: row.creditCost, expiresAt: Date.now() + 60_000 });
+      return row.creditCost;
+    }
+  } catch {
+    // DB unavailable — fall through to defaults
   }
+
+  return DEFAULTS[action] ?? 10;
 }
 
 export async function addTokens(
@@ -288,6 +357,9 @@ export async function addTokens(
   reason: string,
   sellfOrderId?: string
 ) {
+  if (!Number.isFinite(amount) || amount <= 0) {
+    throw new Error(`Invalid token amount: ${amount}`);
+  }
   return prisma.$transaction(async (tx) => {
     await tx.user.update({
       where: { id: userId },
@@ -300,7 +372,7 @@ export async function addTokens(
 }
 
 export async function getTokenBalance(userId: string): Promise<number> {
-  const user = await prisma.user.findUnique({
+  const user = await prismaRead.user.findUnique({
     where: { id: userId },
     select: { tokenBalance: true },
   });
@@ -308,7 +380,7 @@ export async function getTokenBalance(userId: string): Promise<number> {
 }
 
 export async function getTokenTransactions(userId: string, limit = 50) {
-  return prisma.tokenTransaction.findMany({
+  return prismaRead.tokenTransaction.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
     take: limit,
@@ -324,6 +396,10 @@ export async function createReelJob(data: {
   script?: string;
   reelConfig?: object;
   apiKeyId?: string;
+  creditCost?: number;
+  callbackUrl?: string;
+  parentJobId?: string;
+  language?: string;
 }) {
   return prisma.reelJob.create({
     data: {
@@ -331,12 +407,16 @@ export async function createReelJob(data: {
       script: data.script,
       reelConfig: data.reelConfig as object | undefined,
       apiKeyId: data.apiKeyId,
+      creditCost: data.creditCost ?? 10,
+      callbackUrl: data.callbackUrl,
+      parentJobId: data.parentJobId,
+      language: data.language,
     },
   });
 }
 
 export async function getReelJob(id: string, userId: string) {
-  return prisma.reelJob.findFirst({ where: { id, userId } });
+  return prismaRead.reelJob.findFirst({ where: { id, userId } });
 }
 
 export async function getReelJobInternal(id: string) {
@@ -355,14 +435,48 @@ export async function updateReelJobStatus(
     completedAt?: Date;
   }
 ) {
+  if (updates.status) {
+    const current = await prisma.reelJob.findUnique({
+      where: { id },
+      select: { status: true },
+    });
+
+    if (current && !isValidStatusTransition(current.status, updates.status)) {
+      throw new Error(
+        `Invalid status transition: ${current.status} → ${updates.status} for job ${id}`
+      );
+    }
+  }
+
   return prisma.reelJob.update({ where: { id }, data: updates });
 }
 
-export async function getReelJobsByUser(userId: string, limit = 20) {
-  return prisma.reelJob.findMany({
+/**
+ * Atomically mark callback as sent. Returns true if this call actually flipped the flag.
+ * Uses conditional update to prevent duplicate deliveries in concurrent scenarios.
+ */
+export async function markCallbackSent(id: string): Promise<boolean> {
+  const updated = await prisma.$executeRaw`
+    UPDATE "ReelJob" SET "callbackSent" = true WHERE id = ${id} AND "callbackSent" = false
+  `;
+  return updated > 0;
+}
+
+/**
+ * Reset callbackSent flag so the callback can be retried (e.g. after delivery failure).
+ */
+export async function resetCallbackSent(id: string): Promise<void> {
+  await prisma.$executeRaw`
+    UPDATE "ReelJob" SET "callbackSent" = false WHERE id = ${id}
+  `;
+}
+
+export async function getReelJobsByUser(userId: string, limit = 20, cursor?: string) {
+  return prismaRead.reelJob.findMany({
     where: { userId },
     orderBy: { createdAt: 'desc' },
-    take: limit,
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
   });
 }
 
@@ -371,20 +485,20 @@ export async function getReelJobsByUser(userId: string, limit = 20) {
 // ==========================================
 
 const TIER_CONFIG_DEFAULTS = [
-  { tier: 'FREE',   rendersPerMonth: 3,   maxFileSizeMb: 100,    maxDurationSec: 120  },
-  { tier: 'SOLO',   rendersPerMonth: 30,  maxFileSizeMb: 500,    maxDurationSec: 300  },
-  { tier: 'PRO',    rendersPerMonth: 100, maxFileSizeMb: 2048,   maxDurationSec: 1800 },
-  { tier: 'AGENCY', rendersPerMonth: 500, maxFileSizeMb: 10240,  maxDurationSec: -1   },
+  { tier: 'FREE',   creditsPerMonth: 30,    maxFileSizeMb: 100,    maxDurationSec: 120  },
+  { tier: 'SOLO',   creditsPerMonth: 300,   maxFileSizeMb: 500,    maxDurationSec: 300  },
+  { tier: 'PRO',    creditsPerMonth: 1000,  maxFileSizeMb: 2048,   maxDurationSec: 1800 },
+  { tier: 'AGENCY', creditsPerMonth: 5000,  maxFileSizeMb: 10240,  maxDurationSec: -1   },
 ] as const;
 
 export async function getAllTierConfigs(productSlug = 'reelstack') {
-  return prisma.tierConfig.findMany({ where: { productSlug } });
+  return prismaRead.tierConfig.findMany({ where: { productSlug } });
 }
 
 export async function upsertTierConfig(
   tier: string,
   productSlug: string,
-  data: { rendersPerMonth: number; maxFileSizeMb: number; maxDurationSec: number; active?: boolean }
+  data: { creditsPerMonth: number; maxFileSizeMb: number; maxDurationSec: number; active?: boolean }
 ) {
   return prisma.tierConfig.upsert({
     where: { tier_productSlug: { tier, productSlug } },
@@ -402,6 +516,38 @@ export async function seedTierDefaults(productSlug = 'reelstack') {
       create: { ...row, productSlug },
     });
   }
+}
+
+// ==========================================
+// AuditLog queries
+// ==========================================
+
+export async function createAuditLog(data: {
+  userId?: string;
+  action: string;
+  target?: string;
+  metadata?: Record<string, unknown>;
+  ip?: string;
+}) {
+  return prisma.auditLog.create({ data });
+}
+
+export async function getAuditLogs(options: {
+  userId?: string;
+  action?: string;
+  limit?: number;
+  cursor?: string;
+}) {
+  const { userId, action, limit = 50, cursor } = options;
+  return prismaRead.auditLog.findMany({
+    where: {
+      ...(userId ? { userId } : {}),
+      ...(action ? { action } : {}),
+    },
+    orderBy: { createdAt: 'desc' },
+    take: limit + 1,
+    ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
+  });
 }
 
 export { PrismaClient };

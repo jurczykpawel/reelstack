@@ -1,6 +1,6 @@
 import { getAuthUser } from '@/lib/api/auth';
 import { apiError, apiSuccess } from '@/lib/api/errors';
-import { getMonthlyRenderCount, getTokenBalance } from '@reelstack/database';
+import { getMonthlyCreditsUsed, getTokenBalance } from '@reelstack/database';
 import { getTierLimits } from '@/lib/api/validation';
 import type { TierName } from '@/lib/api/validation';
 
@@ -9,8 +9,8 @@ export async function GET() {
   if (!auth) return apiError(401, 'Unauthorized');
 
   const tier = auth.dbUser.tier as TierName;
-  const [rendersThisMonth, tokenBalance] = await Promise.all([
-    getMonthlyRenderCount(auth.dbUser.id),
+  const [creditsUsed, tokenBalance] = await Promise.all([
+    getMonthlyCreditsUsed(auth.dbUser.id),
     getTokenBalance(auth.dbUser.id),
   ]);
   const limits = await getTierLimits(tier);
@@ -19,8 +19,8 @@ export async function GET() {
     id: auth.dbUser.id,
     email: auth.dbUser.email,
     tier,
-    rendersThisMonth,
-    monthlyLimit: limits.rendersPerMonth,
+    creditsUsed,
+    creditsPerMonth: limits.creditsPerMonth,
     tokenBalance,
     createdAt: auth.dbUser.createdAt,
   });

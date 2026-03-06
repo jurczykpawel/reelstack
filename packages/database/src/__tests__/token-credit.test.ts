@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 // Mock PrismaClient with token/reel models
 const mockReelJobCount = vi.fn();
+const mockReelJobAggregate = vi.fn();
 const mockReelJobCreate = vi.fn();
 const mockReelJobFindFirst = vi.fn();
 const mockReelJobFindUnique = vi.fn();
@@ -12,9 +13,10 @@ const mockUserFindUniqueOrThrow = vi.fn();
 const mockUserUpdate = vi.fn();
 const mockTokenTransactionCreate = vi.fn();
 const mockTokenTransactionFindMany = vi.fn();
+const mockExecuteRaw = vi.fn();
 
-vi.mock('@prisma/client', () => ({
-  PrismaClient: vi.fn().mockImplementation(() => ({
+vi.mock('@prisma/client', () => {
+  const mockInstance = {
     user: {
       findUnique: mockUserFindUnique,
       findUniqueOrThrow: mockUserFindUniqueOrThrow,
@@ -22,6 +24,7 @@ vi.mock('@prisma/client', () => ({
     },
     reelJob: {
       count: mockReelJobCount,
+      aggregate: mockReelJobAggregate,
       create: mockReelJobCreate,
       findFirst: mockReelJobFindFirst,
       findUnique: mockReelJobFindUnique,
@@ -34,19 +37,23 @@ vi.mock('@prisma/client', () => ({
     },
     $transaction: vi.fn().mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
       return fn({
-        reelJob: { count: mockReelJobCount },
+        reelJob: { aggregate: mockReelJobAggregate },
         user: {
           findUniqueOrThrow: mockUserFindUniqueOrThrow,
           update: mockUserUpdate,
         },
         tokenTransaction: { create: mockTokenTransactionCreate },
+        $executeRaw: mockExecuteRaw,
       });
     }),
-  })),
-}));
+  };
+  return {
+    PrismaClient: class { constructor() { return mockInstance; } },
+  };
+});
 
 const {
-  consumeTokenOrCredit,
+  consumeCredits,
   addTokens,
   getTokenBalance,
   getTokenTransactions,
@@ -58,47 +65,55 @@ const {
   getReelJobsByUser,
 } = await import('../index');
 
-describe('consumeTokenOrCredit', () => {
+describe('consumeCredits', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('consumes from tier when under monthly limit', async () => {
-    mockReelJobCount.mockResolvedValue(5);
+  it('consumes from tier when under monthly budget', async () => {
+    mockReelJobAggregate.mockResolvedValue({ _sum: { creditCost: 50 } });
+    // First executeRaw is FOR UPDATE lock
+    mockExecuteRaw.mockResolvedValueOnce(1);
 
-    const result = await consumeTokenOrCredit('user-1', 10);
+    const result = await consumeCredits('user-1', 100, 10);
     expect(result).toEqual({ consumed: true, source: 'tier' });
   });
 
-  it('falls back to tokens when tier limit exhausted', async () => {
-    mockReelJobCount.mockResolvedValue(10); // at limit
-    mockUserFindUniqueOrThrow.mockResolvedValue({ id: 'user-1', tokenBalance: 5 });
-    mockUserUpdate.mockResolvedValue({});
+  it('falls back to tokens when tier budget exhausted', async () => {
+    mockReelJobAggregate.mockResolvedValue({ _sum: { creditCost: 95 } });
+    // First executeRaw = FOR UPDATE lock, second = token deduction
+    mockExecuteRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(1);
     mockTokenTransactionCreate.mockResolvedValue({});
 
-    const result = await consumeTokenOrCredit('user-1', 10);
+    const result = await consumeCredits('user-1', 100, 10);
     expect(result).toEqual({ consumed: true, source: 'token' });
-    expect(mockUserUpdate).toHaveBeenCalledWith({
-      where: { id: 'user-1' },
-      data: { tokenBalance: { decrement: 1 } },
-    });
     expect(mockTokenTransactionCreate).toHaveBeenCalledWith({
-      data: { userId: 'user-1', amount: -1, reason: 'render' },
+      data: { userId: 'user-1', amount: -10, reason: 'render' },
     });
   });
 
   it('returns consumed false when both tier and tokens exhausted', async () => {
-    mockReelJobCount.mockResolvedValue(10);
-    mockUserFindUniqueOrThrow.mockResolvedValue({ id: 'user-1', tokenBalance: 0 });
+    mockReelJobAggregate.mockResolvedValue({ _sum: { creditCost: 95 } });
+    // First executeRaw = FOR UPDATE lock, second = token deduction fails
+    mockExecuteRaw.mockResolvedValueOnce(1).mockResolvedValueOnce(0);
 
-    const result = await consumeTokenOrCredit('user-1', 10);
+    const result = await consumeCredits('user-1', 100, 10);
     expect(result).toEqual({ consumed: false, source: null });
   });
 
-  it('counts reelJobs towards monthly total', async () => {
-    mockReelJobCount.mockResolvedValue(9); // under limit of 10
+  it('uses SUM of creditCost for monthly budget check', async () => {
+    mockReelJobAggregate.mockResolvedValue({ _sum: { creditCost: 90 } });
+    mockExecuteRaw.mockResolvedValueOnce(1);
 
-    const result = await consumeTokenOrCredit('user-1', 10);
+    const result = await consumeCredits('user-1', 100, 10);
     expect(result).toEqual({ consumed: true, source: 'tier' });
-    expect(mockReelJobCount).toHaveBeenCalled();
+    expect(mockReelJobAggregate).toHaveBeenCalled();
+  });
+
+  it('handles null sum (no jobs yet)', async () => {
+    mockReelJobAggregate.mockResolvedValue({ _sum: { creditCost: null } });
+    mockExecuteRaw.mockResolvedValueOnce(1);
+
+    const result = await consumeCredits('user-1', 100, 10);
+    expect(result).toEqual({ consumed: true, source: 'tier' });
   });
 });
 
@@ -185,14 +200,16 @@ describe('ReelJob CRUD', () => {
       script: 'Hello world',
       reelConfig: { layout: 'fullscreen' },
       apiKeyId: 'key-1',
+      creditCost: 10,
     });
     expect(mockReelJobCreate).toHaveBeenCalledWith({
-      data: {
+      data: expect.objectContaining({
         userId: 'user-1',
         script: 'Hello world',
         reelConfig: { layout: 'fullscreen' },
         apiKeyId: 'key-1',
-      },
+        creditCost: 10,
+      }),
     });
   });
 
@@ -211,11 +228,70 @@ describe('ReelJob CRUD', () => {
   });
 
   it('updateReelJobStatus updates subset of fields', async () => {
+    mockReelJobFindUnique.mockResolvedValue({ status: 'PROCESSING' });
+    mockReelJobUpdate.mockResolvedValue({ id: 'reel-1', status: 'COMPLETED' });
+    await updateReelJobStatus('reel-1', { status: 'COMPLETED', progress: 100 });
+    expect(mockReelJobFindUnique).toHaveBeenCalledWith({
+      where: { id: 'reel-1' },
+      select: { status: true },
+    });
+    expect(mockReelJobUpdate).toHaveBeenCalledWith({
+      where: { id: 'reel-1' },
+      data: { status: 'COMPLETED', progress: 100 },
+    });
+  });
+
+  it('valid transition QUEUED → PROCESSING succeeds', async () => {
+    mockReelJobFindUnique.mockResolvedValue({ status: 'QUEUED' });
+    mockReelJobUpdate.mockResolvedValue({ id: 'reel-1', status: 'PROCESSING' });
+    await updateReelJobStatus('reel-1', { status: 'PROCESSING' });
+    expect(mockReelJobUpdate).toHaveBeenCalledWith({
+      where: { id: 'reel-1' },
+      data: { status: 'PROCESSING' },
+    });
+  });
+
+  it('valid transition PROCESSING → COMPLETED succeeds', async () => {
+    mockReelJobFindUnique.mockResolvedValue({ status: 'PROCESSING' });
     mockReelJobUpdate.mockResolvedValue({ id: 'reel-1', status: 'COMPLETED' });
     await updateReelJobStatus('reel-1', { status: 'COMPLETED', progress: 100 });
     expect(mockReelJobUpdate).toHaveBeenCalledWith({
       where: { id: 'reel-1' },
       data: { status: 'COMPLETED', progress: 100 },
+    });
+  });
+
+  it('invalid transition COMPLETED → QUEUED throws', async () => {
+    mockReelJobFindUnique.mockResolvedValue({ status: 'COMPLETED' });
+    await expect(
+      updateReelJobStatus('reel-1', { status: 'QUEUED' })
+    ).rejects.toThrow('Invalid status transition: COMPLETED → QUEUED for job reel-1');
+  });
+
+  it('invalid transition COMPLETED → PROCESSING throws', async () => {
+    mockReelJobFindUnique.mockResolvedValue({ status: 'COMPLETED' });
+    await expect(
+      updateReelJobStatus('reel-1', { status: 'PROCESSING' })
+    ).rejects.toThrow('Invalid status transition: COMPLETED → PROCESSING for job reel-1');
+  });
+
+  it('valid retry FAILED → QUEUED succeeds', async () => {
+    mockReelJobFindUnique.mockResolvedValue({ status: 'FAILED' });
+    mockReelJobUpdate.mockResolvedValue({ id: 'reel-1', status: 'QUEUED' });
+    await updateReelJobStatus('reel-1', { status: 'QUEUED' });
+    expect(mockReelJobUpdate).toHaveBeenCalledWith({
+      where: { id: 'reel-1' },
+      data: { status: 'QUEUED' },
+    });
+  });
+
+  it('update without status change skips validation', async () => {
+    mockReelJobUpdate.mockResolvedValue({ id: 'reel-1', progress: 50 });
+    await updateReelJobStatus('reel-1', { progress: 50 });
+    expect(mockReelJobFindUnique).not.toHaveBeenCalled();
+    expect(mockReelJobUpdate).toHaveBeenCalledWith({
+      where: { id: 'reel-1' },
+      data: { progress: 50 },
     });
   });
 
@@ -225,7 +301,7 @@ describe('ReelJob CRUD', () => {
     expect(mockReelJobFindMany).toHaveBeenCalledWith({
       where: { userId: 'user-1' },
       orderBy: { createdAt: 'desc' },
-      take: 5,
+      take: 6,
     });
   });
 });

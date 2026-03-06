@@ -5,18 +5,18 @@ vi.mock('@/lib/api/auth', () => ({
   getAuthUser: () => mockGetAuthUser(),
 }));
 
-const mockGetMonthlyRenderCount = vi.fn();
+const mockGetMonthlyCreditsUsed = vi.fn();
 const mockGetTokenBalance = vi.fn();
 vi.mock('@reelstack/database', () => ({
-  getMonthlyRenderCount: (...args: unknown[]) => mockGetMonthlyRenderCount(...args),
+  getMonthlyCreditsUsed: (...args: unknown[]) => mockGetMonthlyCreditsUsed(...args),
   getTokenBalance: (...args: unknown[]) => mockGetTokenBalance(...args),
 }));
 
 vi.mock('@/lib/api/validation', () => ({
   getTierLimits: (tier: string) => {
-    const limits: Record<string, { maxFileSize: number; maxDuration: number; rendersPerMonth: number }> = {
-      FREE: { maxFileSize: 100, maxDuration: 120, rendersPerMonth: 3 },
-      PRO: { maxFileSize: 2000, maxDuration: 1800, rendersPerMonth: 100 },
+    const limits: Record<string, { maxFileSize: number; maxDuration: number; creditsPerMonth: number }> = {
+      FREE: { maxFileSize: 100, maxDuration: 120, creditsPerMonth: 30 },
+      PRO: { maxFileSize: 2000, maxDuration: 1800, creditsPerMonth: 1000 },
     };
     return Promise.resolve(limits[tier] ?? limits.FREE);
   },
@@ -43,7 +43,7 @@ describe('GET /api/user', () => {
       createdAt: new Date('2024-01-01'),
     };
     mockGetAuthUser.mockResolvedValue({ dbUser });
-    mockGetMonthlyRenderCount.mockResolvedValue(2);
+    mockGetMonthlyCreditsUsed.mockResolvedValue(20);
     mockGetTokenBalance.mockResolvedValue(10);
 
     const response = await GET();
@@ -52,8 +52,8 @@ describe('GET /api/user', () => {
     expect(body.id).toBe('user-1');
     expect(body.email).toBe('test@test.com');
     expect(body.tier).toBe('FREE');
-    expect(body.rendersThisMonth).toBe(2);
-    expect(body.monthlyLimit).toBe(3);
+    expect(body.creditsUsed).toBe(20);
+    expect(body.creditsPerMonth).toBe(30);
     expect(body.tokenBalance).toBe(10);
   });
 });

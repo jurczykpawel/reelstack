@@ -4,26 +4,29 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 const mockUserFindUnique = vi.fn();
 const mockUserFindFirst = vi.fn();
 const mockUserUpsert = vi.fn();
-const mockReelJobCount = vi.fn();
+const mockReelJobAggregate = vi.fn();
 
-vi.mock('@prisma/client', () => ({
-  PrismaClient: vi.fn().mockImplementation(() => ({
+vi.mock('@prisma/client', () => {
+  const mockInstance = {
     user: {
       findUnique: mockUserFindUnique,
       findFirst: mockUserFindFirst,
       upsert: mockUserUpsert,
     },
     reelJob: {
-      count: mockReelJobCount,
+      aggregate: mockReelJobAggregate,
     },
-  })),
-}));
+  };
+  return {
+    PrismaClient: class { constructor() { return mockInstance; } },
+  };
+});
 
 const {
   getUserByEmail,
   getUserById,
   upsertUser,
-  getMonthlyRenderCount,
+  getMonthlyCreditsUsed,
 } = await import('../index');
 
 describe('User helpers', () => {
@@ -53,17 +56,16 @@ describe('User helpers', () => {
   });
 });
 
-describe('getMonthlyRenderCount', () => {
+describe('getMonthlyCreditsUsed', () => {
   beforeEach(() => vi.clearAllMocks());
 
-  it('counts reelJobs from start of current month', async () => {
-    mockReelJobCount.mockResolvedValue(7);
-    const count = await getMonthlyRenderCount('user-1');
-    expect(count).toBe(7);
-    const callArgs = mockReelJobCount.mock.calls[0][0];
+  it('sums creditCost from start of current month', async () => {
+    mockReelJobAggregate.mockResolvedValue({ _sum: { creditCost: 70 } });
+    const count = await getMonthlyCreditsUsed('user-1');
+    expect(count).toBe(70);
+    const callArgs = mockReelJobAggregate.mock.calls[0][0];
     expect(callArgs.where.userId).toBe('user-1');
     expect(callArgs.where.createdAt.gte).toBeInstanceOf(Date);
-    // Should be first day of month
     const gte = callArgs.where.createdAt.gte as Date;
     expect(gte.getDate()).toBe(1);
     expect(gte.getHours()).toBe(0);

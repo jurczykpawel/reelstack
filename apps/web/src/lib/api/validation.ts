@@ -42,18 +42,19 @@ export type TierName = 'FREE' | 'SOLO' | 'PRO' | 'AGENCY';
 export interface TierLimits {
   maxFileSize: number;
   maxDuration: number;
-  rendersPerMonth: number;
+  creditsPerMonth: number;
 }
 
 /** Hardcoded fallback — used when DB is unavailable or TierConfig row is missing. */
 const TIER_DEFAULTS: Record<TierName, TierLimits> = {
-  FREE:   { maxFileSize: 100 * 1024 * 1024,        maxDuration: 120,      rendersPerMonth: 3   },
-  SOLO:   { maxFileSize: 500 * 1024 * 1024,        maxDuration: 300,      rendersPerMonth: 30  },
-  PRO:    { maxFileSize: 2 * 1024 * 1024 * 1024,   maxDuration: 1800,     rendersPerMonth: 100 },
-  AGENCY: { maxFileSize: 10 * 1024 * 1024 * 1024,  maxDuration: Infinity, rendersPerMonth: 500 },
+  FREE:   { maxFileSize: 100 * 1024 * 1024,        maxDuration: 120,      creditsPerMonth: 30    },
+  SOLO:   { maxFileSize: 500 * 1024 * 1024,        maxDuration: 300,      creditsPerMonth: 300   },
+  PRO:    { maxFileSize: 2 * 1024 * 1024 * 1024,   maxDuration: 1800,     creditsPerMonth: 1000  },
+  AGENCY: { maxFileSize: 10 * 1024 * 1024 * 1024,  maxDuration: Infinity, creditsPerMonth: 5000  },
 };
 
 // ── In-memory cache (60s TTL per tier+product key) ──────────
+// Cache is bounded: one entry per (tier, productSlug) pair. With 4 tiers × ~2 products = max ~8 entries.
 const CACHE_TTL_MS = 60_000;
 const _cache = new Map<string, { limits: TierLimits; expiresAt: number }>();
 
@@ -78,7 +79,7 @@ export async function getTierLimits(
       const limits: TierLimits = {
         maxFileSize: config.maxFileSizeMb * 1024 * 1024,
         maxDuration: config.maxDurationSec === -1 ? Infinity : config.maxDurationSec,
-        rendersPerMonth: config.rendersPerMonth,
+        creditsPerMonth: config.creditsPerMonth,
       };
       _cache.set(cacheKey, { limits, expiresAt: Date.now() + CACHE_TTL_MS });
       return limits;

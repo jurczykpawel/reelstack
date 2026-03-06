@@ -16,7 +16,7 @@ await seedTierDefaults(productSlug);
 const rows = await prisma.tierConfig.findMany({ where: { productSlug } });
 console.table(rows.map((r) => ({
   tier: r.tier,
-  rendersPerMonth: r.rendersPerMonth,
+  creditsPerMonth: r.creditsPerMonth,
   maxFileSizeMb: r.maxFileSizeMb,
   maxDurationSec: r.maxDurationSec === -1 ? '∞' : r.maxDurationSec,
   active: r.active,
