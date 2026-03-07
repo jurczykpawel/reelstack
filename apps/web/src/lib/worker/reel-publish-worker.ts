@@ -32,7 +32,7 @@ export async function processReelPublishJob(
 
   const publishStatus: PublishStatus = {
     publishId: result.publishId,
-    platforms: result.platforms,
+    platforms: result.platforms.map((p) => p.platform),
     publishedAt: new Date().toISOString(),
   };
 
