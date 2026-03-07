@@ -432,6 +432,7 @@ async function runTTSPipeline(
 function resolveRemotionDir(): string {
   // In the monorepo, the agent package lives at packages/agent/
   // and the remotion package at packages/remotion/
-  // import.meta.dirname points to packages/agent/src/orchestrator/
-  return path.resolve(import.meta.dirname, '..', '..', '..', '..', 'remotion');
+  // import.meta.dirname points to packages/agent/src/orchestrator/ (4 levels deep in monorepo)
+  // 3x .. => packages/, then remotion => packages/remotion/
+  return path.resolve(import.meta.dirname, '..', '..', '..', 'remotion');
 }
