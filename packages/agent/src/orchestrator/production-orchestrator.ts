@@ -133,8 +133,6 @@ export async function produce(request: ProductionRequest): Promise<ProductionRes
 
   // Cleanup
   try {
-    if (fs.existsSync(voiceoverPublicPath)) fs.unlinkSync(voiceoverPublicPath);
-    if (bundleVoiceoverPath && fs.existsSync(bundleVoiceoverPath)) fs.unlinkSync(bundleVoiceoverPath);
     fs.rmSync(tmpDir, { recursive: true, force: true });
   } catch {
     // cleanup errors are non-fatal
@@ -298,8 +296,6 @@ export async function produceComposition(request: ComposeRequest): Promise<Produ
 
   // Cleanup
   try {
-    if (fs.existsSync(voiceoverPublicPath)) fs.unlinkSync(voiceoverPublicPath);
-    if (bundleVoiceoverPath && fs.existsSync(bundleVoiceoverPath)) fs.unlinkSync(bundleVoiceoverPath);
     fs.rmSync(tmpDir, { recursive: true, force: true });
   } catch { /* cleanup non-fatal */ }
 
@@ -410,12 +406,4 @@ async function runTTSPipeline(
     })),
     steps,
   };
-}
-
-function resolveRemotionDir(): string {
-  // In the monorepo, the agent package lives at packages/agent/
-  // and the remotion package at packages/remotion/
-  // import.meta.dirname points to packages/agent/src/orchestrator/ (4 levels deep in monorepo)
-  // 3x .. => packages/, then remotion => packages/remotion/
-  return path.resolve(import.meta.dirname, '..', '..', '..', 'remotion');
 }
