@@ -529,7 +529,15 @@ export async function createAuditLog(data: {
   metadata?: Record<string, unknown>;
   ip?: string;
 }) {
-  return prisma.auditLog.create({ data });
+  return prisma.auditLog.create({
+    data: {
+      userId: data.userId,
+      action: data.action,
+      target: data.target,
+      metadata: data.metadata as object | undefined,
+      ip: data.ip,
+    },
+  });
 }
 
 export async function getAuditLogs(options: {
