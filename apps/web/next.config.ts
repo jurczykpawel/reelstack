@@ -7,6 +7,10 @@ const nextConfig: NextConfig = {
   // Monorepo root - ensures Prisma native binaries in root node_modules are traced
   outputFileTracingRoot: path.join(__dirname, '../../'),
   poweredByHeader: false,
+  // Override default serverExternalPackages to exclude ioredis.
+  // Bun's flat monorepo layout breaks Node resolution for ioredis subpath imports
+  // when treated as external. Bundling it with Next.js fixes the issue.
+  serverExternalPackages: ['@prisma/client', 'prisma', 'sharp', 'pino', 'pino-pretty'],
   experimental: {
     proxyClientMaxBodySize: '500mb',
   },
