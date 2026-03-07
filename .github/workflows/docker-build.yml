@@ -31,6 +31,7 @@ jobs:
           context: .
           file: docker/Dockerfile
           push: true
+          provenance: false
           tags: |
             ghcr.io/jurczykpawel/reelstack:latest
             ghcr.io/jurczykpawel/reelstack:${{ github.sha }}
@@ -43,6 +44,7 @@ jobs:
           context: .
           file: docker/Dockerfile.worker
           push: true
+          provenance: false
           tags: |
             ghcr.io/jurczykpawel/reelstack-worker:latest
             ghcr.io/jurczykpawel/reelstack-worker:${{ github.sha }}
@@ -55,6 +57,7 @@ jobs:
           context: .
           file: docker/Dockerfile.reel-worker
           push: true
+          provenance: false
           tags: |
             ghcr.io/jurczykpawel/reelstack-reel-worker:latest
             ghcr.io/jurczykpawel/reelstack-reel-worker:${{ github.sha }}
