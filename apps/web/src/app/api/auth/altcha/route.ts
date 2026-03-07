@@ -1,10 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createChallenge, verifySolution } from 'altcha-lib';
 
-const ALTCHA_HMAC_KEY = process.env.ALTCHA_HMAC_KEY ?? process.env.AUTH_SECRET;
-if (!ALTCHA_HMAC_KEY) {
+const _altchaKey = process.env.ALTCHA_HMAC_KEY ?? process.env.AUTH_SECRET;
+if (!_altchaKey) {
   throw new Error('ALTCHA_HMAC_KEY or AUTH_SECRET environment variable is required');
 }
+const ALTCHA_HMAC_KEY: string = _altchaKey;
 
 /** GET /api/auth/altcha — Generate a new proof-of-work challenge */
 export async function GET() {
