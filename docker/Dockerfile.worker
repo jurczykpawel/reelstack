@@ -42,7 +42,9 @@ RUN groupadd --system --gid 1001 worker && useradd --system --uid 1001 --gid 100
 COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/packages ./packages
 COPY --from=builder /app/apps/web/src/lib/worker ./apps/web/src/lib/worker
+COPY --from=builder /app/apps/web/src/lib/metrics.ts ./apps/web/src/lib/
 COPY --from=builder /app/apps/web/worker ./apps/web/worker
+COPY --from=builder /app/apps/web/tsconfig.json ./apps/web/
 COPY --from=builder /app/apps/web/node_modules ./apps/web/node_modules
 COPY --from=builder /app/apps/web/package.json ./apps/web/
 COPY --from=builder /app/package.json ./
