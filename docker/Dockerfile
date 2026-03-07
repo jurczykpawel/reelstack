@@ -18,6 +18,8 @@ COPY packages/transcription/package.json packages/transcription/
 COPY packages/remotion/package.json packages/remotion/
 COPY packages/tts/package.json packages/tts/
 COPY packages/publisher/package.json packages/publisher/
+COPY packages/logger/package.json packages/logger/
+COPY packages/agent/package.json packages/agent/
 RUN bun install --frozen-lockfile
 
 # Build
