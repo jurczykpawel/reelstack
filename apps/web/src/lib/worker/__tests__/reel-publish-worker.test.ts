@@ -66,9 +66,7 @@ describe('processReelPublishJob', () => {
     expect(mockUpdateReelJobStatus).toHaveBeenCalledWith('reel-1', {
       publishStatus: expect.objectContaining({
         publishId: 'pub-1',
-        platforms: expect.arrayContaining([
-          expect.objectContaining({ platform: 'tiktok' }),
-        ]),
+        platforms: expect.arrayContaining(['tiktok', 'instagram']),
         publishedAt: expect.any(String),
       }),
     });
