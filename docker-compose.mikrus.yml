@@ -1,8 +1,9 @@
 # ============================================================
 # Docker Compose — Mikrus (VPS + Lambda render)
 # ============================================================
-# Kontenery: nginx + web + worker + postgres + redis
+# Kontenery: nginx + web + worker + redis
 # Storage:   Cloudflare R2 (zewnętrzny S3-compatible)
+# Database:  Neon (zewnętrzny PostgreSQL — brak kontenera postgres)
 # Render:    AWS Lambda — brak kontenera reel-worker
 #
 # Deploy:
@@ -26,11 +27,9 @@ services:
     restart: always
 
   web:
-    image: ghcr.io/jurczykpawel/subtitle-burner:latest
+    image: ghcr.io/jurczykpawel/reelstack:latest
     env_file: .env
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     restart: always
@@ -47,11 +46,9 @@ services:
       retries: 3
 
   worker:
-    image: ghcr.io/jurczykpawel/subtitle-burner-worker:latest
+    image: ghcr.io/jurczykpawel/reelstack-worker:latest
     env_file: .env
     depends_on:
-      postgres:
-        condition: service_healthy
       redis:
         condition: service_healthy
     restart: always
@@ -67,20 +64,21 @@ services:
       timeout: 10s
       retries: 3
 
-  postgres:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: ${POSTGRES_DB}
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    restart: always
+  # Uncomment if using local PostgreSQL instead of external (Neon/Supabase)
+  # postgres:
+  #   image: postgres:16-alpine
+  #   environment:
+  #     POSTGRES_USER: ${POSTGRES_USER}
+  #     POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+  #     POSTGRES_DB: ${POSTGRES_DB}
+  #   volumes:
+  #     - postgres_data:/var/lib/postgresql/data
+  #   healthcheck:
+  #     test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER}"]
+  #     interval: 5s
+  #     timeout: 5s
+  #     retries: 5
+  #   restart: always
 
   redis:
     image: redis:7-alpine
@@ -95,5 +93,5 @@ services:
     restart: always
 
 volumes:
-  postgres_data:
+  # postgres_data:
   redis_data:

@@ -194,7 +194,7 @@ docker compose -f docker-compose.mikrus.yml up -d
 docker compose -f docker-compose.mikrus.yml logs -f worker
 ```
 
-nginx port: `3080`. CI pushes to `ghcr.io/jurczykpawel/subtitle-burner:latest` (web) + `subtitle-burner-worker:latest` (worker).
+nginx port: `3080`. CI pushes to `ghcr.io/jurczykpawel/reelstack:latest` (web) + `reelstack-worker:latest` (worker).
 
 ## Key Architectural Decisions
 
