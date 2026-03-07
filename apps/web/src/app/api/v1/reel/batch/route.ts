@@ -4,16 +4,16 @@ import { createReelJob, consumeCredits, getCreditCost, updateReelJobStatus } fro
 import { getTierLimits } from '@/lib/api/validation';
 import { createQueue } from '@reelstack/queue';
 import { withAuth, successResponse, errorResponse } from '@/lib/api/v1/middleware';
-import { batchReelSchema } from '@/lib/api/v1/reel-schemas';
+import { batchGenerateSchema } from '@/lib/api/v1/reel-schemas';
 import type { AuthContext } from '@/lib/api/v1/types';
 import { randomUUID } from 'crypto';
 
 /**
  * POST /api/v1/reel/batch
  *
- * Create up to 20 reel jobs in a single request.
+ * Generate up to 20 reels in a single request (same options as /generate).
  * Each reel consumes one render credit. Partial success is possible:
- * if credits run out mid-batch, already-created jobs proceed.
+ * if credits run out mid-batch, already-queued jobs proceed.
  */
 export const POST = withAuth(
   { scope: API_SCOPES.REEL_WRITE, rateLimit: { maxRequests: 2, windowMs: 60_000 } },
@@ -23,7 +23,7 @@ export const POST = withAuth(
       return errorResponse('VALIDATION_ERROR', 'Invalid JSON body', 400);
     }
 
-    const parsed = batchReelSchema.safeParse(body);
+    const parsed = batchGenerateSchema.safeParse(body);
     if (!parsed.success) {
       return errorResponse(
         'VALIDATION_ERROR',
@@ -35,7 +35,7 @@ export const POST = withAuth(
     const limits = await getTierLimits(ctx.user.tier as import('@/lib/api/validation').TierName);
     const cost = await getCreditCost('video');
     const batchId = randomUUID();
-    const results: Array<{ index: number; jobId: string; status: 'queued' } | { index: number; error: string }> = [];
+    const results: Array<{ index: number; jobId: string; mode: string; status: 'queued' } | { index: number; error: string }> = [];
 
     let queue: Awaited<ReturnType<typeof createQueue>> | null = null;
     try {
@@ -47,23 +47,27 @@ export const POST = withAuth(
     for (let i = 0; i < parsed.data.reels.length; i++) {
       const reel = parsed.data.reels[i];
 
-      // Check credits per reel
-      const { consumed, source: _source } = await consumeCredits(ctx.user.id, limits.creditsPerMonth, cost);
+      const { consumed } = await consumeCredits(ctx.user.id, limits.creditsPerMonth, cost);
       if (!consumed) {
         results.push({ index: i, error: 'Quota exceeded - no credits remaining' });
         continue;
       }
 
+      const mode = reel.assets ? 'compose' : 'generate';
+
       const job = await createReelJob({
         userId: ctx.user.id,
         script: reel.script,
         reelConfig: {
+          mode,
           layout: reel.layout,
           style: reel.style,
           tts: reel.tts,
-          primaryVideoUrl: reel.primaryVideoUrl,
-          secondaryVideoUrl: reel.secondaryVideoUrl,
+          whisper: reel.whisper,
           brandPreset: reel.brandPreset,
+          assets: reel.assets,
+          directorNotes: reel.directorNotes,
+          avatar: reel.avatar,
         },
         apiKeyId: ctx.apiKeyId ?? undefined,
         creditCost: cost,
@@ -73,10 +77,10 @@ export const POST = withAuth(
 
       try {
         await queue.enqueue(job.id, { jobId: job.id }, 'reel-render');
-        results.push({ index: i, jobId: job.id, status: 'queued' });
+        results.push({ index: i, jobId: job.id, mode, status: 'queued' });
       } catch {
         await updateReelJobStatus(job.id, { status: 'FAILED', error: 'Queue unavailable' }).catch(() => {});
-        results.push({ index: i, jobId: job.id, error: 'Queue unavailable' } as { index: number; error: string });
+        results.push({ index: i, error: 'Queue unavailable' });
       }
     }
 

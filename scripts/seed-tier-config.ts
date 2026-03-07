@@ -6,7 +6,7 @@
  *   bun run scripts/seed-tier-config.ts
  *   bun run scripts/seed-tier-config.ts social-media-gen
  */
-import { seedTierDefaults, prisma } from '@reelstack/database';
+import { seedTierDefaults, prisma } from '../packages/database/src/index';
 
 const productSlug = process.argv[2] ?? 'reelstack';
 

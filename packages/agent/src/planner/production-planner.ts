@@ -1,0 +1,682 @@
+import type { ToolManifest, ProductionPlan, ShotPlan, EffectPlan, UserAsset } from '../types';
+import { buildPlannerPrompt, buildComposerPrompt } from './prompt-builder';
+import { PlanningError } from '../errors';
+import { createLogger } from '@reelstack/logger';
+
+const log = createLogger('production-planner');
+
+export interface PlannerInput {
+  readonly script: string;
+  readonly durationEstimate: number;
+  readonly style: 'dynamic' | 'calm' | 'cinematic' | 'educational';
+  readonly toolManifest: ToolManifest;
+  /** Pre-set primary video (user recording) */
+  readonly primaryVideoUrl?: string;
+  readonly layout?: 'fullscreen' | 'split-screen' | 'picture-in-picture';
+}
+
+/**
+ * Detect which LLM provider to use based on available API keys.
+ * Priority: Anthropic > OpenRouter > OpenAI > rule-based
+ */
+function detectProvider(): 'anthropic' | 'openrouter' | 'openai' | null {
+  if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
+  if (process.env.OPENROUTER_API_KEY) return 'openrouter';
+  if (process.env.OPENAI_API_KEY) return 'openai';
+  return null;
+}
+
+/**
+ * Uses an LLM to generate a ProductionPlan from script + available tools.
+ * Falls back to a simple rule-based plan if no AI API key is configured.
+ *
+ * Provider priority: ANTHROPIC_API_KEY > OPENROUTER_API_KEY > OPENAI_API_KEY
+ * Model override: PLANNER_MODEL env var (provider-specific format)
+ *   - Anthropic:   claude-sonnet-4-6 (default)
+ *   - OpenRouter:  anthropic/claude-sonnet-4-6 (default) — any model from openrouter.ai/models
+ *   - OpenAI:      gpt-4o (default)
+ */
+export async function planProduction(input: PlannerInput): Promise<ProductionPlan> {
+  const provider = detectProvider();
+
+  if (!provider) {
+    log.info('No AI API key, using rule-based planner');
+    return ruleBasedPlan(input);
+  }
+
+  const systemPrompt = buildPlannerPrompt(input.toolManifest);
+  const userMessage = buildUserMessage(input);
+
+  try {
+    const raw = await callLLM(provider, systemPrompt, userMessage);
+    return parseResponse(raw, input);
+  } catch (err) {
+    log.warn({ err }, 'AI planner failed, falling back to rules');
+    return ruleBasedPlan(input);
+  }
+}
+
+export interface ComposerInput {
+  readonly script: string;
+  readonly durationEstimate: number;
+  readonly style: 'dynamic' | 'calm' | 'cinematic' | 'educational';
+  readonly assets: readonly UserAsset[];
+  readonly layout?: 'fullscreen' | 'split-screen' | 'picture-in-picture';
+  readonly directorNotes?: string;
+}
+
+/**
+ * Uses an LLM to compose a ProductionPlan from script + user-provided assets.
+ * No tool discovery needed — all materials are pre-existing.
+ */
+export async function planComposition(input: ComposerInput): Promise<ProductionPlan> {
+  const provider = detectProvider();
+
+  if (!provider) {
+    log.info('No AI API key, using rule-based composer');
+    return ruleBasedCompose(input);
+  }
+  const systemPrompt = buildComposerPrompt(input.assets);
+  const userMessage = buildComposerUserMessage(input);
+
+  try {
+    const raw = await callLLM(provider, systemPrompt, userMessage);
+
+    const plan = parseResponse(raw, {
+      script: input.script,
+      durationEstimate: input.durationEstimate,
+      style: input.style,
+      toolManifest: { tools: [], summary: '' },
+      layout: input.layout,
+    });
+
+    // Resolve asset IDs to actual URLs in the plan
+    return resolveAssetUrls(plan, input.assets);
+  } catch (err) {
+    log.warn({ err }, 'AI composer failed, falling back to rules');
+    return ruleBasedCompose(input);
+  }
+}
+
+function buildComposerUserMessage(input: ComposerInput): string {
+  const parts = [
+    `Compose a ${input.durationEstimate.toFixed(0)}s video from the provided materials.`,
+    `\nScript:\n<script>\n${input.script}\n</script>`,
+    `\nStyle: ${input.style}`,
+    `Duration estimate: ${input.durationEstimate.toFixed(1)}s`,
+    `\nAvailable materials: ${input.assets.map((a) => `"${a.id}" (${a.description})`).join(', ')}`,
+  ];
+
+  if (input.layout) {
+    parts.push(`\nRequested layout: ${input.layout}`);
+  }
+
+  if (input.directorNotes) {
+    parts.push(`\nDirector notes: ${input.directorNotes.substring(0, 2000)}`);
+  }
+
+  parts.push('\nReturn only the JSON production plan, no explanation outside the JSON.');
+  return parts.join('\n');
+}
+
+/**
+ * Resolve asset IDs in the plan to actual URLs.
+ * The LLM uses asset IDs (e.g. "dashboard-screenshot") in searchQuery fields.
+ * We need to map those to real URLs.
+ */
+function resolveAssetUrls(plan: ProductionPlan, assets: readonly UserAsset[]): ProductionPlan {
+  const assetMap = new Map(assets.map((a) => [a.id, a]));
+
+  // Resolve primarySource URL if it's an asset ID
+  let primarySource = plan.primarySource;
+  if (primarySource.type === 'user-recording') {
+    const asset = assetMap.get(primarySource.url);
+    if (asset) {
+      primarySource = { type: 'user-recording', url: asset.url };
+    }
+  }
+
+  // Resolve B-roll searchQuery (asset ID) to actual URL — the asset generator
+  // will skip these since they're user-upload type, but the assembler needs
+  // to find them by shot ID in the asset map. We'll handle this in produceComposition.
+  return { ...plan, primarySource };
+}
+
+/**
+ * Rule-based composition when no AI API key available.
+ * Interleaves primary asset with other materials.
+ */
+function ruleBasedCompose(input: ComposerInput): ProductionPlan {
+  const { script, durationEstimate, assets } = input;
+
+  const primary = assets.find((a) => a.isPrimary) ?? assets.find((a) => a.type === 'video');
+  const bRollAssets = assets.filter((a) => a !== primary);
+
+  const primarySource: ProductionPlan['primarySource'] = primary
+    ? { type: 'user-recording', url: primary.url }
+    : { type: 'none' };
+
+  const sentences = script.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const segmentDuration = durationEstimate / Math.max(sentences.length, 1);
+
+  const shots: ShotPlan[] = sentences.map((sentence, i) => {
+    const startTime = i * segmentDuration;
+    const endTime = Math.min((i + 1) * segmentDuration, durationEstimate);
+
+    // Alternate: primary → b-roll material → primary → b-roll...
+    if (i % 2 === 1 && bRollAssets.length > 0) {
+      const bRoll = bRollAssets[Math.floor((i / 2) % bRollAssets.length)];
+      return {
+        id: `shot-${i + 1}`,
+        startTime,
+        endTime,
+        scriptSegment: sentence.trim(),
+        visual: { type: 'b-roll' as const, searchQuery: bRoll.id, toolId: 'user-upload' },
+        transition: { type: 'crossfade', durationMs: 400 },
+        reason: `Show: ${bRoll.description}`,
+      };
+    }
+
+    return {
+      id: `shot-${i + 1}`,
+      startTime,
+      endTime,
+      scriptSegment: sentence.trim(),
+      visual: primary ? { type: 'primary' as const } : { type: 'text-card' as const, headline: sentence.trim().split(' ').slice(0, 5).join(' '), background: '#1a1a2e' },
+      transition: { type: 'crossfade', durationMs: 400 },
+      reason: `Rule-based: segment ${i + 1}`,
+    };
+  });
+
+  const effects: EffectPlan[] = [];
+  const style = input.style ?? 'educational';
+  if (style === 'dynamic' || style === 'cinematic') {
+    effects.push({
+      type: 'text-emphasis',
+      startTime: 0,
+      endTime: 1.5,
+      config: { text: sentences[0]?.trim().split(' ').slice(0, 3).join(' ').toUpperCase() ?? 'WATCH THIS', fontSize: 80, fontColor: '#FFD700', position: 'center', entrance: 'pop', exit: 'fade' },
+      reason: 'Hook emphasis',
+    });
+  }
+
+  return {
+    primarySource,
+    shots,
+    effects,
+    layout: input.layout ?? 'fullscreen',
+    reasoning: 'Rule-based composition (no AI API key configured)',
+  };
+}
+
+function buildUserMessage(input: PlannerInput): string {
+  const parts = [
+    `Create a production plan for this ${input.durationEstimate.toFixed(0)}s video.`,
+    `\nScript:\n<script>\n${input.script}\n</script>`,
+    `\nStyle: ${input.style}`,
+    `Duration estimate: ${input.durationEstimate.toFixed(1)}s`,
+  ];
+
+  if (input.primaryVideoUrl) {
+    parts.push(`\nUser provided their own video recording as primary source: "${input.primaryVideoUrl}"`);
+    parts.push('Do NOT generate an avatar. Use "user-recording" as primarySource.');
+  }
+
+  if (input.layout) {
+    parts.push(`\nRequested layout: ${input.layout}`);
+  }
+
+  parts.push('\nReturn only the JSON production plan, no explanation outside the JSON.');
+  return parts.join('\n');
+}
+
+async function callLLM(
+  provider: 'anthropic' | 'openrouter' | 'openai',
+  systemPrompt: string,
+  userMessage: string,
+): Promise<string> {
+  if (provider === 'anthropic') {
+    return callAnthropic(systemPrompt, userMessage);
+  }
+  return callOpenAICompatible(provider, systemPrompt, userMessage);
+}
+
+async function callAnthropic(systemPrompt: string, userMessage: string): Promise<string> {
+  const model = process.env.PLANNER_MODEL ?? 'claude-sonnet-4-6';
+
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': process.env.ANTHROPIC_API_KEY!,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify({
+      model,
+      max_tokens: 4096,
+      system: systemPrompt,
+      messages: [{ role: 'user', content: userMessage }],
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    log.warn({ status: res.status, model, errorPreview: err.substring(0, 200) }, 'Anthropic planner call failed');
+    throw new PlanningError(`Anthropic API error (${res.status})`);
+  }
+
+  const data = (await res.json()) as { content: Array<{ type: string; text?: string }> };
+  const textBlock = data.content.find((b) => b.type === 'text');
+  if (!textBlock?.text) throw new PlanningError('Empty response from Anthropic');
+  return textBlock.text;
+}
+
+/**
+ * OpenAI-compatible call — used for both OpenAI and OpenRouter.
+ * OpenRouter is a drop-in replacement: same API, different base URL and key.
+ *
+ * Default models:
+ *   OpenRouter: anthropic/claude-sonnet-4-6  (PLANNER_MODEL to override)
+ *   OpenAI:     gpt-4o                       (PLANNER_MODEL to override)
+ */
+async function callOpenAICompatible(
+  provider: 'openrouter' | 'openai',
+  systemPrompt: string,
+  userMessage: string,
+): Promise<string> {
+  const isOpenRouter = provider === 'openrouter';
+  const baseUrl = isOpenRouter
+    ? 'https://openrouter.ai/api/v1'
+    : 'https://api.openai.com/v1';
+  const apiKey = isOpenRouter
+    ? process.env.OPENROUTER_API_KEY!
+    : process.env.OPENAI_API_KEY!;
+  const defaultModel = isOpenRouter ? 'anthropic/claude-sonnet-4-6' : 'gpt-4o';
+  const model = process.env.PLANNER_MODEL ?? defaultModel;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    Authorization: `Bearer ${apiKey}`,
+  };
+  // OpenRouter requires site identification headers
+  if (isOpenRouter) {
+    headers['HTTP-Referer'] = 'https://github.com/jurczykpawel/subtitle-burner';
+    headers['X-Title'] = 'ReelStack';
+  }
+
+  const res = await fetch(`${baseUrl}/chat/completions`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({
+      model,
+      response_format: { type: 'json_object' },
+      messages: [
+        { role: 'system', content: systemPrompt },
+        { role: 'user', content: userMessage },
+      ],
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
+
+  if (!res.ok) {
+    const err = await res.text();
+    log.warn({ status: res.status, provider, model, errorPreview: err.substring(0, 200) }, 'LLM planner call failed');
+    throw new PlanningError(`${provider} API error (${res.status})`);
+  }
+
+  const data = (await res.json()) as { choices: Array<{ message: { content: string } }> };
+  const content = data.choices[0]?.message?.content;
+  if (!content) throw new PlanningError(`Empty response from ${provider}`);
+  return content;
+}
+
+function parseResponse(text: string, input: PlannerInput): ProductionPlan {
+  // Try direct JSON parse first, then extract from markdown
+  let parsed: Record<string, unknown>;
+  try {
+    parsed = JSON.parse(text);
+  } catch {
+    const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
+    if (!jsonMatch) throw new PlanningError('No JSON found in planner response');
+    parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+  }
+
+  if (!parsed || typeof parsed !== 'object') {
+    throw new PlanningError('Response is not a valid JSON object');
+  }
+
+  const primarySource = parsePrimarySource(parsed.primarySource, input);
+
+  // Validate shots with bounds checking
+  const MAX_SHOTS = 50;
+  const truncStr = (v: unknown, max: number) => typeof v === 'string' ? v.substring(0, max) : '';
+
+  const validShots = (parsed.shots as unknown[] ?? [])
+    .slice(0, MAX_SHOTS)
+    .filter((s: unknown): s is Record<string, unknown> => {
+      if (typeof s !== 'object' || s === null) return false;
+      const obj = s as Record<string, unknown>;
+      return typeof obj.startTime === 'number' && typeof obj.endTime === 'number'
+        && obj.startTime >= 0 && obj.endTime <= 3600 && obj.endTime > obj.startTime
+        && !!obj.visual;
+    });
+
+  const shots: ShotPlan[] = validShots.map((s, i) => {
+    const visual = s.visual as Record<string, unknown>;
+    return {
+      id: truncStr(s.id, 64) || `shot-${i + 1}`,
+      startTime: s.startTime as number,
+      endTime: s.endTime as number,
+      scriptSegment: truncStr(s.scriptSegment, 1000),
+      visual: sanitizeVisual(visual),
+      transition: sanitizeTransition(s.transition),
+      reason: truncStr(s.reason, 200),
+    };
+  });
+
+  // Validate effects with bounds checking
+  const MAX_EFFECTS = 30;
+  const validEffects = (parsed.effects as unknown[] ?? [])
+    .slice(0, MAX_EFFECTS)
+    .filter((e: unknown): e is Record<string, unknown> => {
+      if (typeof e !== 'object' || e === null) return false;
+      const obj = e as Record<string, unknown>;
+      return typeof obj.type === 'string' && typeof obj.startTime === 'number' && typeof obj.endTime === 'number'
+        && obj.startTime >= 0 && obj.endTime <= 3600;
+    });
+
+  const effects: EffectPlan[] = validEffects.map((e) => ({
+    type: (e.type as string).substring(0, 64),
+    startTime: e.startTime as number,
+    endTime: e.endTime as number,
+    config: sanitizeConfig(e.config),
+    reason: typeof e.reason === 'string' ? e.reason.substring(0, 200) : '',
+  }));
+
+  const VALID_LAYOUTS = ['fullscreen', 'split-screen', 'picture-in-picture'] as const;
+  const rawLayout = parsed.layout as string | undefined;
+  const layout = rawLayout && (VALID_LAYOUTS as readonly string[]).includes(rawLayout)
+    ? (rawLayout as ProductionPlan['layout'])
+    : (input.layout ?? 'fullscreen');
+
+  return {
+    primarySource,
+    shots,
+    effects,
+    layout,
+    captionStyle: sanitizeCaptionStyle(parsed.captionStyle),
+    reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning : '',
+  };
+}
+
+function parsePrimarySource(
+  raw: unknown,
+  input: PlannerInput,
+): ProductionPlan['primarySource'] {
+  // If user provided video, force user-recording regardless of LLM output
+  if (input.primaryVideoUrl) {
+    if (!isPublicUrl(input.primaryVideoUrl)) {
+      log.warn({ url: input.primaryVideoUrl }, 'Blocked non-public primaryVideoUrl');
+      return { type: 'none' };
+    }
+    return { type: 'user-recording', url: input.primaryVideoUrl };
+  }
+
+  if (!raw || typeof raw !== 'object') return { type: 'none' };
+  const obj = raw as Record<string, unknown>;
+
+  const ALLOWED_PRIMARY_TOOLS = ['heygen', 'veo3', 'kling', 'seedance'];
+  const truncStr = (v: unknown, max: number) => typeof v === 'string' ? v.substring(0, max) : '';
+
+  switch (obj.type) {
+    case 'avatar': {
+      const toolId = ALLOWED_PRIMARY_TOOLS.includes(obj.toolId as string) ? (obj.toolId as string) : 'heygen';
+      return {
+        type: 'avatar',
+        toolId,
+        script: truncStr(obj.script, 5000) || input.script.substring(0, 5000),
+        voice: typeof obj.voice === 'string' ? obj.voice.substring(0, 100) : undefined,
+        avatarId: typeof obj.avatarId === 'string' ? obj.avatarId.substring(0, 100) : undefined,
+      };
+    }
+    case 'user-recording': {
+      const url = typeof obj.url === 'string' ? obj.url : '';
+      if (!url || !isPublicUrl(url)) {
+        log.warn({ url }, 'Blocked non-public LLM-returned user-recording URL');
+        return { type: 'none' };
+      }
+      return { type: 'user-recording', url };
+    }
+    case 'ai-video': {
+      const toolId = ALLOWED_PRIMARY_TOOLS.includes(obj.toolId as string) ? (obj.toolId as string) : 'veo3';
+      return {
+        type: 'ai-video',
+        toolId,
+        prompt: truncStr(obj.prompt, 500),
+      };
+    }
+    default:
+      return { type: 'none' };
+  }
+}
+
+/**
+ * Simple rule-based planner when no AI API is available.
+ */
+function ruleBasedPlan(input: PlannerInput): ProductionPlan {
+  const { script, durationEstimate, style, primaryVideoUrl } = input;
+
+  const primarySource: ProductionPlan['primarySource'] = primaryVideoUrl && isPublicUrl(primaryVideoUrl)
+    ? { type: 'user-recording', url: primaryVideoUrl }
+    : { type: 'none' };
+
+  // Split script into roughly equal segments
+  const sentences = script.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const segmentDuration = durationEstimate / Math.max(sentences.length, 1);
+
+  const shots: ShotPlan[] = sentences.map((sentence, i) => {
+    const startTime = i * segmentDuration;
+    const endTime = Math.min((i + 1) * segmentDuration, durationEstimate);
+    const isOdd = i % 2 === 1;
+
+    // Alternate between primary and b-roll
+    const visual: ShotPlan['visual'] = primarySource.type === 'none'
+      ? (isOdd
+        ? { type: 'b-roll', searchQuery: extractKeywords(sentence), toolId: 'pexels' }
+        : { type: 'text-card', headline: sentence.trim().split(' ').slice(0, 5).join(' '), background: '#1a1a2e' })
+      : (isOdd
+        ? { type: 'b-roll', searchQuery: extractKeywords(sentence), toolId: 'pexels' }
+        : { type: 'primary' });
+
+    return {
+      id: `shot-${i + 1}`,
+      startTime,
+      endTime,
+      scriptSegment: sentence.trim(),
+      visual,
+      transition: { type: 'crossfade', durationMs: 400 },
+      reason: `Rule-based: segment ${i + 1}`,
+    };
+  });
+
+  // Basic effects based on style
+  const effects: EffectPlan[] = [];
+
+  if (style === 'dynamic' || style === 'cinematic') {
+    // Hook text
+    effects.push({
+      type: 'text-emphasis',
+      startTime: 0,
+      endTime: 1.5,
+      config: { text: sentences[0]?.trim().split(' ').slice(0, 3).join(' ').toUpperCase() ?? 'WATCH THIS', fontSize: 80, fontColor: '#FFD700', position: 'center', entrance: 'pop', exit: 'fade' },
+      reason: 'Hook emphasis',
+    });
+  }
+
+  if (style === 'dynamic' && durationEstimate > 10) {
+    effects.push({
+      type: 'emoji-popup',
+      startTime: durationEstimate * 0.4,
+      endTime: durationEstimate * 0.4 + 1.5,
+      config: { emoji: '\uD83D\uDD25', position: { x: 80, y: 20 }, size: 90, entrance: 'bounce', exit: 'fade' },
+      reason: 'Mid-video engagement',
+    });
+  }
+
+  return {
+    primarySource,
+    shots,
+    effects,
+    layout: input.layout ?? (primarySource.type === 'none' ? 'fullscreen' : 'fullscreen'),
+    reasoning: 'Rule-based plan (no AI API key configured)',
+  };
+}
+
+function extractKeywords(text: string): string {
+  const stopWords = new Set(['the', 'a', 'an', 'is', 'are', 'was', 'were', 'to', 'of', 'in', 'for', 'on', 'with', 'at', 'by', 'and', 'or', 'but', 'not', 'no', 'this', 'that', 'it', 'we', 'you', 'i', 'my', 'your', 'jak', 'to', 'jest', 'nie', 'na', 'z', 'do', 'w', 'i', 'o', 'a', 'ze', 'co', 'sie']);
+  const words = text.toLowerCase().replace(/[^a-z\s]/g, '').split(/\s+/).filter((w) => w.length > 2 && !stopWords.has(w));
+  return words.slice(0, 3).join(' ') || 'abstract technology';
+}
+
+const VALID_TRANSITIONS = ['crossfade', 'slide-left', 'slide-right', 'zoom-in', 'wipe', 'none', 'cut', 'fade'];
+
+function sanitizeTransition(raw: unknown): ShotPlan['transition'] {
+  const fallback = { type: 'crossfade', durationMs: 400 };
+  if (!raw || typeof raw !== 'object') return fallback;
+  const obj = raw as Record<string, unknown>;
+  const type = typeof obj.type === 'string' && VALID_TRANSITIONS.includes(obj.type) ? obj.type : 'crossfade';
+  const durationMs = typeof obj.durationMs === 'number' ? Math.max(0, Math.min(obj.durationMs, 5000)) : 400;
+  return { type, durationMs };
+}
+
+const ALLOWED_CAPTION_KEYS = new Set([
+  'fontFamily', 'fontSize', 'fontColor', 'fontWeight', 'fontStyle',
+  'backgroundColor', 'backgroundOpacity', 'outlineColor', 'outlineWidth',
+  'shadowColor', 'shadowBlur', 'position', 'alignment', 'lineHeight',
+  'padding', 'highlightColor', 'upcomingColor', 'highlightMode', 'textTransform',
+]);
+
+/** Sanitize effect config — flatten to max 2 levels deep, only allow primitives and simple objects */
+function sanitizeConfig(raw: unknown): Record<string, unknown> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {};
+  const obj = raw as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  const MAX_KEYS = 20;
+  let count = 0;
+  for (const key of Object.keys(obj)) {
+    if (count >= MAX_KEYS) break;
+    const val = obj[key];
+    if (typeof val === 'string') {
+      result[key] = sanitizeCssValue(val);
+    } else if (typeof val === 'number' || typeof val === 'boolean') {
+      result[key] = val;
+    } else if (val && typeof val === 'object' && !Array.isArray(val)) {
+      // Allow one level of nesting (e.g., position: {x, y})
+      const nested: Record<string, unknown> = {};
+      for (const [nk, nv] of Object.entries(val as Record<string, unknown>)) {
+        if (typeof nv === 'string' || typeof nv === 'number' || typeof nv === 'boolean') {
+          nested[nk] = typeof nv === 'string' ? nv.substring(0, 100) : nv;
+        }
+      }
+      result[key] = nested;
+    } else if (Array.isArray(val)) {
+      // Allow arrays of primitives/simple objects (e.g., counter segments)
+      result[key] = val.slice(0, 20).filter((v) =>
+        typeof v === 'string' || typeof v === 'number' || typeof v === 'boolean' ||
+        (v && typeof v === 'object' && !Array.isArray(v)),
+      );
+    }
+    count++;
+  }
+  return result;
+}
+
+/** Strip CSS injection vectors from string values */
+function sanitizeCssValue(val: string): string {
+  // Remove dangerous CSS patterns: url(), expression(), -moz-binding, behavior, @import, data:, backslash escapes
+  const stripped = val
+    .replace(/url\s*\(/gi, '')
+    .replace(/expression\s*\(/gi, '')
+    .replace(/-moz-binding/gi, '')
+    .replace(/behavior\s*:/gi, '')
+    .replace(/@import/gi, '')
+    .replace(/data\s*:/gi, '')
+    .replace(/javascript\s*:/gi, '')
+    .replace(/\\[0-9a-f]/gi, '') // unicode escapes
+    .replace(/[{}]/g, ''); // block breakout
+  return stripped.substring(0, 100);
+}
+
+function sanitizeCaptionStyle(raw: unknown): Record<string, unknown> | undefined {
+  if (!raw || typeof raw !== 'object') return undefined;
+  const obj = raw as Record<string, unknown>;
+  const result: Record<string, unknown> = {};
+  for (const key of Object.keys(obj)) {
+    if (!ALLOWED_CAPTION_KEYS.has(key)) continue;
+    const val = obj[key];
+    // Only allow primitives (string, number, boolean)
+    if (typeof val === 'string') {
+      result[key] = sanitizeCssValue(val);
+    } else if (typeof val === 'number' || typeof val === 'boolean') {
+      result[key] = val;
+    }
+  }
+  return Object.keys(result).length > 0 ? result : undefined;
+}
+
+/** Sanitize visual from LLM output - truncate strings, validate tool IDs */
+function sanitizeVisual(v: Record<string, unknown>): ShotPlan['visual'] {
+  const ALLOWED_TOOLS = ['pexels', 'heygen', 'veo3', 'kling', 'seedance', 'nanobanana', 'user-upload'];
+  const truncStr = (val: unknown, max: number) => typeof val === 'string' ? val.substring(0, max) : '';
+
+  switch (v.type) {
+    case 'primary':
+      return { type: 'primary' };
+    case 'b-roll': {
+      const toolId = ALLOWED_TOOLS.includes(v.toolId as string) ? (v.toolId as string) : 'pexels';
+      return { type: 'b-roll', searchQuery: truncStr(v.searchQuery, 100), toolId };
+    }
+    case 'ai-video': {
+      const toolId = ALLOWED_TOOLS.includes(v.toolId as string) ? (v.toolId as string) : 'veo3';
+      return { type: 'ai-video', prompt: truncStr(v.prompt, 500), toolId };
+    }
+    case 'ai-image': {
+      const toolId = ALLOWED_TOOLS.includes(v.toolId as string) ? (v.toolId as string) : 'nanobanana';
+      return { type: 'ai-image', prompt: truncStr(v.prompt, 500), toolId };
+    }
+    case 'text-card': {
+      // Validate background is a safe CSS color (hex, rgb, named) — no url(), expression(), etc.
+      const bg = truncStr(v.background, 20);
+      const safeBg = /^(#[0-9a-fA-F]{3,8}|[a-zA-Z]+|rgb\(\d+,\s*\d+,\s*\d+\))$/.test(bg) ? bg : '#1a1a2e';
+      return { type: 'text-card', headline: truncStr(v.headline, 200), background: safeBg };
+    }
+    default:
+      return { type: 'primary' };
+  }
+}
+
+/** Validate URL is public HTTPS (not internal/private) */
+export function isPublicUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    // Only allow http(s) — reject javascript:, data:, blob:, file:, ftp:, etc.
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    // Reject credentials in URL
+    if (parsed.username || parsed.password) return false;
+    const host = parsed.hostname.toLowerCase();
+    // Reject loopback and special addresses
+    if (host === 'localhost' || host === '::1' || host === '0.0.0.0' || host === '[::]') return false;
+    // Reject private IPv4 ranges
+    if (host.startsWith('127.') || host.startsWith('10.') || host.startsWith('169.254.')) return false;
+    if (host.startsWith('172.') && parseInt(host.split('.')[1]) >= 16 && parseInt(host.split('.')[1]) <= 31) return false;
+    if (host.startsWith('192.168.') || host.startsWith('0.')) return false;
+    // Reject IPv6 private/link-local (fe80::, fc00::, fd00::, ff00::)
+    if (/^\[?f[cde]|^\[?fe80|^\[?ff/i.test(host)) return false;
+    // Reject cloud metadata endpoints
+    if (host === 'metadata.google.internal' || host === '169.254.169.254') return false;
+    return true;
+  } catch {
+    return false;
+  }
+}

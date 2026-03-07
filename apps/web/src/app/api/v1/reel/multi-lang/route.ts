@@ -114,8 +114,6 @@ export const POST = withAuth(
             voice: parsed.data.tts?.voice,
             language: ttsLanguage,
           },
-          primaryVideoUrl: parsed.data.primaryVideoUrl,
-          secondaryVideoUrl: parsed.data.secondaryVideoUrl,
           brandPreset: parsed.data.brandPreset,
         },
         apiKeyId: ctx.apiKeyId ?? undefined,

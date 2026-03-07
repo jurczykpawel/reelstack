@@ -23,9 +23,19 @@ export interface MediaAsset {
   readonly durationSeconds?: number;
 }
 
+export interface DirectorEffectPlacement {
+  readonly type: string;
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly config: Record<string, unknown>;
+  readonly reason: string;
+}
+
 export interface DirectorOutput {
   /** B-roll segments with transitions, placed on timeline */
   readonly bRollSegments: DirectorBRollSegment[];
+  /** Visual effect placements (emoji, text emphasis, glitch, etc.) */
+  readonly effects: DirectorEffectPlacement[];
   /** Caption style overrides based on content tone */
   readonly captionStyle?: Record<string, unknown>;
   /** AI's reasoning for each decision */

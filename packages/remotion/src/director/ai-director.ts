@@ -1,4 +1,4 @@
-import type { DirectorInput, DirectorOutput, DirectorBRollSegment, MediaAsset } from './types';
+import type { DirectorInput, DirectorOutput, DirectorBRollSegment, DirectorEffectPlacement, MediaAsset } from './types';
 import { searchPexelsVideos } from './media-library';
 import { DIRECTOR_RULES } from './rules';
 import { createLogger } from '@reelstack/logger';
@@ -69,7 +69,57 @@ async function ruleBasedDirector(input: DirectorInput): Promise<DirectorOutput> 
 
   editNotes.push(`Placed ${bRollSegments.length} B-roll segments at ~${intervalSec}s intervals`);
 
-  return { bRollSegments, editNotes };
+  // Rule-based effects: add text emphasis on first cue, emoji mid-way
+  const effects: DirectorEffectPlacement[] = [];
+  const style = input.style ?? 'dynamic';
+
+  if (style === 'dynamic' || style === 'cinematic') {
+    // Text emphasis on hook (first cue)
+    if (cues.length > 0) {
+      const firstCue = cues[0];
+      effects.push({
+        type: 'text-emphasis',
+        startTime: firstCue.startTime,
+        endTime: firstCue.startTime + 1,
+        config: { text: firstCue.text.split(' ').slice(0, 3).join(' ').toUpperCase(), position: 'center' },
+        reason: 'Hook emphasis',
+      });
+    }
+
+    // Emoji at midpoint
+    if (durationSeconds > 8) {
+      const midCue = cues[Math.floor(cues.length / 2)];
+      if (midCue) {
+        effects.push({
+          type: 'emoji-popup',
+          startTime: midCue.startTime,
+          endTime: midCue.startTime + 1,
+          config: { emoji: '\uD83D\uDD25', position: { x: 75, y: 25 } },
+          reason: 'Mid-video engagement',
+        });
+      }
+    }
+  }
+
+  if (style === 'dynamic') {
+    // Screen shake on emphasis moments
+    if (durationSeconds > 15 && cues.length > 5) {
+      const emphasisCue = cues[Math.floor(cues.length * 0.7)];
+      if (emphasisCue) {
+        effects.push({
+          type: 'screen-shake',
+          startTime: emphasisCue.startTime,
+          endTime: emphasisCue.startTime + 0.4,
+          config: { intensity: 6 },
+          reason: 'Emphasis shake',
+        });
+      }
+    }
+  }
+
+  editNotes.push(`Placed ${effects.length} effects (rule-based, ${style} style)`);
+
+  return { bRollSegments, effects, editNotes };
 }
 
 /**
@@ -93,7 +143,7 @@ async function anthropicDirector(input: DirectorInput): Promise<DirectorOutput> 
       system: DIRECTOR_RULES,
       messages: [{
         role: 'user',
-        content: `Analyze this ${input.durationSeconds.toFixed(0)}s video transcript and decide where to place B-roll cutaways.\n\nTranscript cues:\n${cuesSummary}\n\nFull text:\n<user_script>\n${input.text}\n</user_script>\n\nStyle: ${input.style ?? 'dynamic'}\nDuration: ${input.durationSeconds.toFixed(1)}s\n\nReturn a JSON array of B-roll placements. Each entry: { "startTime": number, "endTime": number, "searchQuery": "keywords for stock footage", "transition": "crossfade"|"slide-left"|"zoom-in"|"none", "reason": "why here" }`,
+        content: `Analyze this ${input.durationSeconds.toFixed(0)}s video transcript and decide where to place B-roll cutaways AND visual effects.\n\nTranscript cues:\n${cuesSummary}\n\nFull text:\n<user_script>\n${input.text}\n</user_script>\n\nStyle: ${input.style ?? 'dynamic'}\nDuration: ${input.durationSeconds.toFixed(1)}s\n\nReturn a JSON object with "placements" (B-roll) and "effects" (visual effects) arrays as described in your instructions.`,
       }],
     }),
     signal: AbortSignal.timeout(30_000),
@@ -130,10 +180,10 @@ async function openaiDirector(input: DirectorInput): Promise<DirectorOutput> {
       model: 'gpt-4o-mini',
       response_format: { type: 'json_object' },
       messages: [
-        { role: 'system', content: DIRECTOR_RULES + '\n\nRespond with a JSON object: { "placements": [...] }' },
+        { role: 'system', content: DIRECTOR_RULES + '\n\nRespond with a JSON object: { "placements": [...], "effects": [...] }' },
         {
           role: 'user',
-          content: `Analyze this ${input.durationSeconds.toFixed(0)}s video transcript and decide where to place B-roll cutaways.\n\nTranscript cues:\n${cuesSummary}\n\nFull text:\n<user_script>\n${input.text}\n</user_script>\n\nStyle: ${input.style ?? 'dynamic'}\nDuration: ${input.durationSeconds.toFixed(1)}s\n\nEach placement: { "startTime": number, "endTime": number, "searchQuery": "keywords for stock footage", "transition": "crossfade"|"slide-left"|"zoom-in"|"none", "reason": "why here" }`,
+          content: `Analyze this ${input.durationSeconds.toFixed(0)}s video transcript and decide where to place B-roll cutaways AND visual effects.\n\nTranscript cues:\n${cuesSummary}\n\nFull text:\n<user_script>\n${input.text}\n</user_script>\n\nStyle: ${input.style ?? 'dynamic'}\nDuration: ${input.durationSeconds.toFixed(1)}s\n\nReturn a JSON object with "placements" and "effects" arrays as described in your instructions.`,
         },
       ],
     }),
@@ -207,8 +257,25 @@ async function parseAIResponse(text: string, input: DirectorInput): Promise<Dire
       }
     }
 
-    editNotes.push(`AI placed ${bRollSegments.length} B-roll segments`);
-    return { bRollSegments, editNotes };
+    // Parse effects from AI response
+    const rawEffects: AIEffectPlacement[] = (Array.isArray(parsed) ? [] : parsed.effects ?? []).filter((e: unknown) => {
+      if (typeof e !== 'object' || e === null) return false;
+      const obj = e as Record<string, unknown>;
+      return typeof obj.type === 'string' && typeof obj.startTime === 'number' && typeof obj.endTime === 'number';
+    });
+
+    const effects: DirectorEffectPlacement[] = rawEffects
+      .filter((e) => e.startTime < input.durationSeconds && e.endTime > 0)
+      .map((e) => ({
+        type: e.type,
+        startTime: e.startTime,
+        endTime: Math.min(e.endTime, input.durationSeconds),
+        config: (e.config && typeof e.config === 'object') ? e.config as Record<string, unknown> : {},
+        reason: e.reason ?? e.type,
+      }));
+
+    editNotes.push(`AI placed ${bRollSegments.length} B-roll segments, ${effects.length} effects`);
+    return { bRollSegments, effects, editNotes };
   } catch (err) {
     log.warn({ err }, 'Failed to parse AI response, falling back to rules');
     editNotes.push(`AI parse error: ${err}, falling back to rules`);
@@ -221,5 +288,13 @@ interface AIPlacement {
   endTime: number;
   searchQuery: string;
   transition?: string;
+  reason?: string;
+}
+
+interface AIEffectPlacement {
+  type: string;
+  startTime: number;
+  endTime: number;
+  config?: Record<string, unknown>;
   reason?: string;
 }

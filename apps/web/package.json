@@ -21,6 +21,7 @@
     "@ffmpeg/ffmpeg": "^0.12.15",
     "@ffmpeg/util": "^0.12.2",
     "@huggingface/transformers": "^3.4.0",
+    "@reelstack/agent": "workspace:*",
     "@reelstack/core": "workspace:*",
     "@reelstack/logger": "workspace:*",
     "@reelstack/database": "workspace:*",

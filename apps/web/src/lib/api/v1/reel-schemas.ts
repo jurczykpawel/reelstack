@@ -69,17 +69,23 @@ function checkPrivateOctets(a: number, b: number): boolean {
   return false;
 }
 
+function isPublicHttpUrl(url: string): boolean {
+  try {
+    const parsed = new URL(url);
+    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+    if (parsed.username || parsed.password) return false;
+    if (isPrivateHost(parsed.hostname)) return false;
+    return true;
+  } catch { return false; }
+}
+
 const callbackUrlSchema = z.string().url().max(2048).refine(
   (url) => {
     try {
       const parsed = new URL(url);
-      // Only HTTP(S) protocols
       if (!['http:', 'https:'].includes(parsed.protocol)) return false;
-      // In production, require HTTPS
       if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') return false;
-      // Block URLs with credentials (user:pass@host)
       if (parsed.username || parsed.password) return false;
-      // Block private/internal hosts
       if (isPrivateHost(parsed.hostname)) return false;
       return true;
     } catch { return false; }
@@ -87,35 +93,115 @@ const callbackUrlSchema = z.string().url().max(2048).refine(
   { message: 'Callback URL must be a valid public HTTPS URL' },
 );
 
+const assetUrlSchema = z.string().url().max(2048).refine(
+  isPublicHttpUrl,
+  { message: 'Asset URL must be a valid public HTTP(S) URL' },
+);
+
+// ── Shared sub-schemas ────────────────────────────────────────
+
+const brandPresetSchema = z.object({
+  captionTemplate: z.string().optional(),
+  highlightColor: z.string().optional(),
+  backgroundColor: z.string().optional(),
+  defaultTransition: z.enum(['crossfade', 'slide-left', 'slide-right', 'zoom-in', 'wipe', 'none']).optional(),
+}).optional();
+
+const ttsSchema = z.object({
+  provider: z.enum(['edge-tts', 'elevenlabs', 'openai']).default('edge-tts'),
+  voice: z.string().optional(),
+  language: z.string().default('pl-PL'),
+}).optional();
+
+const whisperSchema = z.object({
+  provider: z.enum(['openrouter', 'cloudflare', 'ollama']).optional(),
+  apiKey: z.string().optional(),
+}).optional();
+
+const userAssetSchema = z.object({
+  /** Unique ID referenced by the LLM composer */
+  id: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, 'Asset ID must be alphanumeric'),
+  url: assetUrlSchema,
+  type: z.enum(['video', 'image']),
+  /** Human description for the LLM (e.g. "Talking head — mówię do kamery") */
+  description: z.string().min(1).max(500),
+  durationSeconds: z.number().positive().max(3600).optional(),
+  /** Mark as talking head / primary source */
+  isPrimary: z.boolean().optional(),
+});
+
+const cueSchema = z.object({
+  id: z.string(),
+  text: z.string(),
+  startTime: z.number().nonnegative(),
+  endTime: z.number().positive(),
+  words: z.array(z.object({
+    text: z.string(),
+    startTime: z.number().nonnegative(),
+    endTime: z.number().positive(),
+  })).optional(),
+});
+
 const SUPPORTED_LANGUAGES = [
   'pl', 'en', 'es', 'de', 'fr', 'it', 'pt', 'nl', 'ru', 'uk', 'cs', 'sk',
   'ja', 'ko', 'zh', 'ar', 'hi', 'sv', 'da', 'no', 'fi', 'hu', 'ro', 'bg',
   'hr', 'sr', 'sl', 'tr', 'vi', 'th',
 ] as const;
 
-export const createReelSchema = z.object({
-  script: z.string().min(1).max(10000),
-  layout: z.enum(['split-screen', 'fullscreen', 'picture-in-picture']).default('fullscreen'),
+// ── Primary schemas ───────────────────────────────────────────
+
+/**
+ * POST /api/v1/reel/generate
+ *
+ * Generate a new video reel.
+ * - Without `assets`: full auto mode (AI discovers tools, generates assets, renders)
+ * - With `assets`: compose mode (user provides materials, LLM arranges them)
+ */
+export const generateReelSchema = z.object({
+  script: z.string().min(1).max(50000),
   style: z.enum(['dynamic', 'calm', 'cinematic', 'educational']).optional(),
-  tts: z.object({
-    provider: z.enum(['edge-tts', 'elevenlabs', 'openai']).default('edge-tts'),
+  layout: z.enum(['fullscreen', 'split-screen', 'picture-in-picture']).default('fullscreen'),
+  tts: ttsSchema,
+  whisper: whisperSchema,
+  brandPreset: brandPresetSchema,
+  /** User-provided materials. When present, triggers compose mode. */
+  assets: z.array(userAssetSchema).min(1).max(20).optional(),
+  /** Extra instructions for the LLM composer (compose mode only) */
+  directorNotes: z.string().max(1000).optional(),
+  /** Avatar settings (full auto mode, when HeyGen is available) */
+  avatar: z.object({
+    avatarId: z.string().optional(),
     voice: z.string().optional(),
-    language: z.string().default('pl-PL'),
-  }).optional(),
-  primaryVideoUrl: z.string().url().optional(),
-  secondaryVideoUrl: z.string().url().optional(),
-  brandPreset: z.object({
-    captionTemplate: z.string().optional(),
-    highlightColor: z.string().optional(),
-    backgroundColor: z.string().optional(),
-    defaultTransition: z.enum(['crossfade', 'slide-left', 'slide-right', 'zoom-in', 'wipe', 'none']).optional(),
   }).optional(),
   callbackUrl: callbackUrlSchema.optional(),
 });
 
-/** Batch reel creation - up to 20 reels per request */
-export const batchReelSchema = z.object({
-  reels: z.array(createReelSchema).min(1).max(20),
+/**
+ * POST /api/v1/reel/captions
+ *
+ * Add captions to an existing video.
+ * - With `script`: TTS → transcribe → burn captions
+ * - With `cues`: burn pre-computed captions directly (no TTS)
+ */
+export const captionsReelSchema = z.object({
+  /** URL of the existing video to caption */
+  videoUrl: assetUrlSchema,
+  /** Script text — TTS will generate audio, Whisper will transcribe for captions */
+  script: z.string().min(1).max(50000).optional(),
+  /** Pre-computed subtitle cues — skip TTS and transcription entirely */
+  cues: z.array(cueSchema).min(1).max(500).optional(),
+  style: z.enum(['dynamic', 'calm', 'cinematic', 'educational']).optional(),
+  tts: ttsSchema,
+  brandPreset: brandPresetSchema,
+  callbackUrl: callbackUrlSchema.optional(),
+}).refine(
+  (data) => !!(data.script || data.cues),
+  { message: 'Provide either script (for TTS + transcription) or cues (pre-computed subtitles)' },
+);
+
+/** Batch reel generation - up to 20 reels per request */
+export const batchGenerateSchema = z.object({
+  reels: z.array(generateReelSchema).min(1).max(20),
   callbackUrl: callbackUrlSchema.optional(),
 });
 
@@ -131,14 +217,7 @@ export const multiLangReelSchema = z.object({
     provider: z.enum(['edge-tts', 'elevenlabs', 'openai']).default('edge-tts'),
     voice: z.string().optional(),
   }).optional(),
-  primaryVideoUrl: z.string().url().optional(),
-  secondaryVideoUrl: z.string().url().optional(),
-  brandPreset: z.object({
-    captionTemplate: z.string().optional(),
-    highlightColor: z.string().optional(),
-    backgroundColor: z.string().optional(),
-    defaultTransition: z.enum(['crossfade', 'slide-left', 'slide-right', 'zoom-in', 'wipe', 'none']).optional(),
-  }).optional(),
+  brandPreset: brandPresetSchema,
   callbackUrl: callbackUrlSchema.optional(),
 });
 

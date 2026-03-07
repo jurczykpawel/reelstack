@@ -63,20 +63,20 @@ vi.mock('@reelstack/queue', () => ({
   createQueue: () => Promise.resolve({ enqueue: mockEnqueue }),
 }));
 
-const { POST } = await import('../../v1/reel/create/route');
+const { POST } = await import('../../v1/reel/generate/route');
 
 const mockUser = { id: 'user-1', email: 'test@test.com', tier: 'FREE' };
 const mockAuthCtx = { user: mockUser, apiKeyId: 'key-1', scopes: ['*'] };
 
 function makeRequest(body: unknown): NextRequest {
-  return new Request('http://localhost/api/v1/reel/create', {
+  return new Request('http://localhost/api/v1/reel/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }) as unknown as NextRequest;
 }
 
-describe('POST /api/v1/reel/create', () => {
+describe('POST /api/v1/reel/generate', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockGetCreditCost.mockResolvedValue(10);
@@ -91,7 +91,7 @@ describe('POST /api/v1/reel/create', () => {
 
   it('returns 400 for invalid JSON', async () => {
     mockAuthenticate.mockResolvedValue(mockAuthCtx);
-    const req = new Request('http://localhost/api/v1/reel/create', {
+    const req = new Request('http://localhost/api/v1/reel/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: 'not json',
@@ -130,6 +130,38 @@ describe('POST /api/v1/reel/create', () => {
     expect(body.data.status).toBe('queued');
     expect(body.data.creditSource).toBe('tier');
     expect(body.data.pollUrl).toBe('/api/v1/reel/render/reel-1');
+  });
+
+  it('returns mode=generate for script-only request', async () => {
+    mockAuthenticate.mockResolvedValue(mockAuthCtx);
+    mockConsumeCredits.mockResolvedValue({ consumed: true, source: 'tier' });
+    mockCreateReelJob.mockResolvedValue({ id: 'reel-1' });
+    mockEnqueue.mockResolvedValue(undefined);
+
+    const response = await POST(makeRequest({ script: 'Hello world' }));
+    const body = await response.json();
+    expect(body.data.mode).toBe('generate');
+  });
+
+  it('returns mode=compose when assets provided', async () => {
+    mockAuthenticate.mockResolvedValue(mockAuthCtx);
+    mockConsumeCredits.mockResolvedValue({ consumed: true, source: 'tier' });
+    mockCreateReelJob.mockResolvedValue({ id: 'reel-2' });
+    mockEnqueue.mockResolvedValue(undefined);
+
+    const response = await POST(makeRequest({
+      script: 'Hello world',
+      assets: [{
+        id: 'v1',
+        url: 'https://example.com/video.mp4',
+        type: 'video',
+        description: 'Talking head',
+        isPrimary: true,
+      }],
+    }));
+    expect(response.status).toBe(201);
+    const body = await response.json();
+    expect(body.data.mode).toBe('compose');
   });
 
   it('returns creditSource token when token consumed', async () => {
@@ -180,7 +212,25 @@ describe('POST /api/v1/reel/create', () => {
       expect.objectContaining({
         userId: 'user-1',
         script: 'Hello world',
-        reelConfig: expect.objectContaining({ layout: 'split-screen', style: 'cinematic' }),
+        reelConfig: expect.objectContaining({ layout: 'split-screen', style: 'cinematic', mode: 'generate' }),
+      }),
+    );
+  });
+
+  it('stores mode=compose in reelConfig when assets provided', async () => {
+    mockAuthenticate.mockResolvedValue(mockAuthCtx);
+    mockConsumeCredits.mockResolvedValue({ consumed: true, source: 'tier' });
+    mockCreateReelJob.mockResolvedValue({ id: 'reel-6' });
+    mockEnqueue.mockResolvedValue(undefined);
+
+    await POST(makeRequest({
+      script: 'Hello world',
+      assets: [{ id: 'v1', url: 'https://example.com/v.mp4', type: 'video', description: 'Video' }],
+    }));
+
+    expect(mockCreateReelJob).toHaveBeenCalledWith(
+      expect.objectContaining({
+        reelConfig: expect.objectContaining({ mode: 'compose' }),
       }),
     );
   });

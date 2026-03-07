@@ -22,6 +22,7 @@ function makeProps(overrides: Record<string, unknown> = {}) {
       counters: [],
       zoomSegments: [],
       highlights: [],
+      effects: [],
       dynamicCaptionPosition: false,
       musicVolume: 0.3,
       showProgressBar: true,

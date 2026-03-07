@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { effectSegmentSchema } from '../effects/schemas';
 
 const textCardConfigSchema = z.object({
   headline: z.string(),
@@ -186,6 +187,9 @@ export const reelPropsSchema = z.object({
   cues: z.array(captionCueSchema).default([]),
   captionStyle: captionStyleSchema.optional(),
   dynamicCaptionPosition: z.boolean().default(false),
+
+  // Plugin effects
+  effects: z.array(effectSegmentSchema).default([]),
 
   // Visual
   showProgressBar: z.boolean().default(true),

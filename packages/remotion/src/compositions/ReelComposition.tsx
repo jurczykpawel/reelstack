@@ -14,6 +14,7 @@ import { CtaOverlay } from '../components/CtaOverlay';
 import { AnimatedCounter } from '../components/AnimatedCounter';
 import { ZoomEffect } from '../components/ZoomEffect';
 import { HighlightBox } from '../components/HighlightBox';
+import { getEffect } from '../effects';
 
 // Load brand fonts with Polish character support
 loadOutfit('normal', { weights: ['500', '600', '700'], subsets: ['latin', 'latin-ext'] });
@@ -88,6 +89,7 @@ export const ReelComposition: React.FC<ReelProps> = ({
   counters = [],
   zoomSegments = [],
   highlights = [],
+  effects = [],
   voiceoverUrl,
   musicUrl,
   musicVolume = 0.3,
@@ -283,6 +285,28 @@ export const ReelComposition: React.FC<ReelProps> = ({
       {ctaSegments.map((seg, i) => (
         <CtaOverlay key={`cta-${i}`} segment={seg} />
       ))}
+
+      {/* LAYER: Plugin effects (sorted by layer number) */}
+      {[...effects]
+        .sort((a, b) => (getEffect(a.type)?.layer ?? 50) - (getEffect(b.type)?.layer ?? 50))
+        .map((effect, i) => {
+          const plugin = getEffect(effect.type);
+          if (!plugin) return null;
+          const Component = plugin.component;
+          return <Component key={`fx-${effect.type}-${i}`} segment={effect as never} />;
+        })}
+
+      {/* LAYER: Effect SFX */}
+      {effects
+        .filter((e) => e.sfx?.url)
+        .map((e, i) => (
+          <Audio
+            key={`sfx-${i}`}
+            src={resolveMediaUrl(e.sfx!.url)}
+            volume={e.sfx!.volume ?? 0.8}
+            startFrom={Math.round(e.startTime * fps)}
+          />
+        ))}
 
       {/* LAYER 10: Progress bar */}
       {showProgressBar && <ProgressBar />}

@@ -7,7 +7,8 @@ import {
 } from '@reelstack/database';
 import { createLogger } from '@reelstack/logger';
 import { reelJobsTotal, reelRenderDuration } from '@/lib/metrics';
-import { createReel } from '@reelstack/remotion/pipeline';
+import { produce as agentProduce, produceComposition } from '@reelstack/agent';
+import type { UserAsset, ComposeRequest } from '@reelstack/agent';
 import { readFile, unlink } from 'fs/promises';
 import crypto from 'crypto';
 
@@ -68,6 +69,17 @@ async function deliverCallback(
   }
 }
 
+function makeProgressCallback(jobId: string, progressMap: Record<string, number>) {
+  return (step: string) => {
+    for (const [prefix, progress] of Object.entries(progressMap)) {
+      if (step.startsWith(prefix)) {
+        updateReelJobStatus(jobId, { progress }).catch(err => log.warn({ jobId, err }, 'Progress update failed'));
+        break;
+      }
+    }
+  };
+}
+
 export async function processReelPipelineJob(jobId: string): Promise<void> {
   const job = await getReelJobInternal(jobId);
   if (!job) throw new Error(`Reel job ${jobId} not found`);
@@ -82,60 +94,109 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
 
   try {
     const config = (job.reelConfig as Record<string, unknown>) ?? {};
+    const mode = (config.mode as string) ?? 'generate';
 
-    let lastStepStart: number | null = null;
-    let lastStepName: string | null = null;
+    let outputPath: string;
 
-    const result = await createReel(
-      {
+    if (mode === 'captions') {
+      // ── Captions-only path ───────────────────────────────────
+      log.info({ jobId, captionsMode: config.captionsMode }, 'Running captions pipeline');
+
+      const videoUrl = config.videoUrl as string;
+      const primaryAsset: UserAsset = {
+        id: 'primary',
+        url: videoUrl,
+        type: 'video',
+        description: 'Primary video to caption',
+        isPrimary: true,
+      };
+
+      const composeRequest: ComposeRequest = {
         script: job.script ?? '',
-        layout: (config.layout as 'split-screen' | 'fullscreen' | 'picture-in-picture') ?? 'fullscreen',
+        assets: [primaryAsset],
+        style: config.style as ComposeRequest['style'],
+        tts: config.tts as ComposeRequest['tts'],
+        brandPreset: config.brandPreset as ComposeRequest['brandPreset'],
+        existingCues: config.captionsMode === 'cues'
+          ? (config.cues as ComposeRequest['existingCues'])
+          : undefined,
+        onProgress: makeProgressCallback(jobId, {
+          'Transcribing audio...': 30,
+          'Assembling composition...': 60,
+          'Rendering video...': 70,
+        }),
+      };
+
+      const result = await produceComposition(composeRequest);
+      outputPath = result.outputPath;
+      log.info({ jobId }, 'Captions pipeline complete');
+
+    } else if (mode === 'compose') {
+      // ── Compose path (user assets + LLM arrangement) ─────────
+      log.info({ jobId }, 'Running compose pipeline');
+
+      const assets = (config.assets as UserAsset[]) ?? [];
+
+      const composeRequest: ComposeRequest = {
+        script: job.script ?? '',
+        assets,
+        style: config.style as ComposeRequest['style'],
+        layout: config.layout as ComposeRequest['layout'],
+        tts: config.tts as ComposeRequest['tts'],
+        whisper: config.whisper as ComposeRequest['whisper'],
+        brandPreset: config.brandPreset as ComposeRequest['brandPreset'],
+        directorNotes: config.directorNotes as string | undefined,
+        onProgress: makeProgressCallback(jobId, {
+          'Planning composition...': 10,
+          'Generating voiceover...': 25,
+          'Normalizing audio...': 35,
+          'Transcribing audio...': 45,
+          'Assembling composition...': 60,
+          'Rendering video...': 70,
+        }),
+      };
+
+      const result = await produceComposition(composeRequest);
+      outputPath = result.outputPath;
+      log.info({ jobId, steps: result.steps.length }, 'Compose pipeline complete');
+
+    } else {
+      // ── Full auto path (generate mode) ───────────────────────
+      log.info({ jobId }, 'Running full auto pipeline');
+
+      const agentResult = await agentProduce({
+        script: job.script ?? '',
+        layout: config.layout as 'fullscreen' | 'split-screen' | 'picture-in-picture' | undefined,
         style: config.style as 'dynamic' | 'calm' | 'cinematic' | 'educational' | undefined,
         tts: config.tts as { provider?: 'edge-tts' | 'elevenlabs' | 'openai'; voice?: string; language?: string } | undefined,
-        primaryVideoUrl: config.primaryVideoUrl as string | undefined,
-        secondaryVideoUrl: config.secondaryVideoUrl as string | undefined,
-        brandPreset: config.brandPreset as Record<string, string> | undefined,
-      },
-      (step) => {
-        // Map step names to progress percentages and metric labels
-        const stepInfo: Record<string, { progress: number; metric: string }> = {
-          'Generating voiceover...': { progress: 10, metric: 'tts' },
-          'Normalizing audio...': { progress: 20, metric: 'normalize' },
-          'Transcribing audio...': { progress: 30, metric: 'transcribe' },
-          'Grouping into subtitle cues...': { progress: 40, metric: 'subtitles' },
-          'AI Director analyzing content...': { progress: 50, metric: 'ai_director' },
-          'Building composition...': { progress: 60, metric: 'bundle' },
-          'Rendering video...': { progress: 70, metric: 'render' },
-        };
+        whisper: config.whisper as { provider?: 'openrouter' | 'cloudflare' | 'ollama'; apiKey?: string } | undefined,
+        brandPreset: config.brandPreset as Record<string, unknown> | undefined,
+        avatar: config.avatar as { avatarId?: string; voice?: string } | undefined,
+        onProgress: makeProgressCallback(jobId, {
+          'Discovering available tools...': 5,
+          'Planning production...': 10,
+          'Generating assets and voiceover...': 20,
+          'Generating voiceover...': 25,
+          'Normalizing audio...': 35,
+          'Transcribing audio...': 45,
+          'Assembling composition...': 60,
+          'Rendering video...': 70,
+        }),
+      });
 
-        // Record duration for the previous step
-        if (lastStepStart && lastStepName) {
-          reelRenderDuration.observe({ step: lastStepName }, (Date.now() - lastStepStart) / 1000);
-        }
-
-        const info = stepInfo[step];
-        if (info) {
-          lastStepStart = Date.now();
-          lastStepName = info.metric;
-          updateReelJobStatus(jobId, { progress: info.progress }).catch(err => log.warn({ jobId, err }, 'Progress update failed'));
-        }
-      },
-    );
-
-    // Record duration for the final step
-    if (lastStepStart && lastStepName) {
-      reelRenderDuration.observe({ step: lastStepName }, (Date.now() - lastStepStart) / 1000);
+      outputPath = agentResult.outputPath;
+      log.info({ jobId, steps: agentResult.steps.length, assets: agentResult.generatedAssets.length }, 'Auto pipeline complete');
     }
 
     // Upload rendered MP4 to storage
     const storage = await createStorage();
-    const outputBuffer = await readFile(result.outputPath);
+    const outputBuffer = await readFile(outputPath);
     const outputKey = `reels/${jobId}/output.mp4`;
     await storage.upload(outputBuffer, outputKey);
     const outputUrl = await storage.getSignedUrl(outputKey, 86400);
 
     // Clean up local file
-    await unlink(result.outputPath).catch(err => log.warn({ jobId, err }, 'Cleanup failed'));
+    await unlink(outputPath).catch(err => log.warn({ jobId, err }, 'Cleanup failed'));
 
     reelJobsTotal.inc({ status: 'completed' });
     reelRenderDuration.observe({ step: 'total' }, (Date.now() - pipelineStart) / 1000);
@@ -170,7 +231,6 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
       completedAt: new Date(),
     });
 
-    // Deliver failure webhook callback (fire-and-forget)
     // Send generic error to external callback - detailed error stays in DB + logs only
     if (job.callbackUrl) {
       deliverCallback(jobId, job.callbackUrl, {

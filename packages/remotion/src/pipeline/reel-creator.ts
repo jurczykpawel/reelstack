@@ -7,6 +7,7 @@ import type { TTSConfig } from '@reelstack/tts';
 import { groupWordsIntoCues } from '@reelstack/transcription';
 import type { ReelCreationRequest, ReelCreationResult, PipelineStep } from './types';
 import type { ReelProps } from '../schemas/reel-props';
+import { effectSegmentSchema } from '../effects/schemas';
 import { normalizeAudioForWhisper, getAudioDuration } from './audio-utils';
 import { transcribeAudio } from './transcribe';
 import { direct } from '../director';
@@ -152,6 +153,11 @@ export async function createReel(
       counters: [],
       zoomSegments: [],
       highlights: [],
+      effects: (directorOutput.effects ?? []).flatMap((e) => {
+        const raw = { type: e.type, startTime: e.startTime, endTime: e.endTime, ...e.config };
+        const parsed = effectSegmentSchema.safeParse(raw);
+        return parsed.success ? [parsed.data] : [];
+      }),
       dynamicCaptionPosition: false,
       bRollSegments: directorOutput.bRollSegments.map((seg) => {
         const transition = seg.transition ? {

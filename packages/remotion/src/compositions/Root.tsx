@@ -51,6 +51,28 @@ export const RemotionRoot: React.FC = () => {
           counters: [],
           zoomSegments: [],
           highlights: [],
+          effects: [
+            // 0-1s: Text emphasis on hook
+            { type: 'text-emphasis' as const, startTime: 0, endTime: 1.5, text: 'TO JEST HOOK', fontSize: 80, fontColor: '#FFD700', position: 'center' as const, entrance: 'pop' as const, exit: 'fade' as const },
+            // 2s: Emoji reaction
+            { type: 'emoji-popup' as const, startTime: 2, endTime: 3.5, emoji: '\uD83D\uDD25', position: { x: 80, y: 20 }, size: 100, rotation: -15, entrance: 'bounce' as const, exit: 'fade' as const },
+            // 4s: Screen shake on emphasis
+            { type: 'screen-shake' as const, startTime: 4, endTime: 4.5, intensity: 10, frequency: 3 },
+            // 4.1s: Color flash paired with shake
+            { type: 'color-flash' as const, startTime: 4.1, endTime: 4.5, color: '#FF4444', maxOpacity: 0.4 },
+            // 6-8s: Glitch transition
+            { type: 'glitch-transition' as const, startTime: 6, endTime: 6.6, rgbSplitAmount: 12, scanlineOpacity: 0.4, displacement: 20 },
+            // 7-9s: Circular counter
+            { type: 'circular-counter' as const, startTime: 7, endTime: 9.5, segments: [{ value: 40, holdFrames: 15 }, { value: 90 }], size: 180, fillColor: '#10B981', trackColor: '#1F2937', textColor: '#FFFFFF', fontSize: 44, strokeWidth: 12, position: 'top-right' as const, entrance: 'spring-scale' as const, exit: 'fade' as const },
+            // 8s: Another emoji
+            { type: 'emoji-popup' as const, startTime: 8, endTime: 9.5, emoji: '\uD83D\uDE80', position: { x: 20, y: 30 }, size: 90, rotation: 10, entrance: 'spring-scale' as const, exit: 'shrink' as const },
+            // 10-11.5s: Subscribe banner
+            { type: 'subscribe-banner' as const, startTime: 10, endTime: 12, channelName: '@ReelStack', backgroundColor: '#FF0000', textColor: '#FFFFFF', position: 'bottom' as const, entrance: 'slide-up' as const, exit: 'slide-down' as const },
+            // 12s: Text emphasis on CTA
+            { type: 'text-emphasis' as const, startTime: 12.5, endTime: 14, text: 'SUBSCRIBE!', fontSize: 96, fontColor: '#FFFFFF', backgroundColor: '#FF0000CC', position: 'center' as const, entrance: 'glitch' as const, exit: 'fade' as const },
+            // 14s: Final color flash
+            { type: 'color-flash' as const, startTime: 14, endTime: 14.5, color: '#FFFFFF', maxOpacity: 0.7 },
+          ],
           dynamicCaptionPosition: false,
           musicVolume: 0.3,
           showProgressBar: true,
