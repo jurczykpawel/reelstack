@@ -7,6 +7,7 @@ import type { TTSConfig } from '@reelstack/tts';
 import { groupWordsIntoCues } from '@reelstack/transcription';
 import { normalizeAudioForWhisper, getAudioDuration, transcribeAudio } from '@reelstack/remotion/pipeline';
 import { createRenderer } from '@reelstack/remotion/render';
+import { createStorage } from '@reelstack/storage';
 import { ToolRegistry } from '../registry/tool-registry';
 import { discoverTools } from '../registry/discovery';
 import { planProduction, planComposition } from '../planner/production-planner';
@@ -82,10 +83,6 @@ export async function produce(request: ProductionRequest): Promise<ProductionRes
 
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reelstack-agent-'));
 
-  // Resolve remotion package dir for voiceover file placement
-  // In the monorepo, @reelstack/remotion resolves to packages/remotion/
-  const remotionPkgDir = resolveRemotionDir();
-
   // Run asset generation and TTS pipeline in parallel
   const [assets, ttsResult] = await Promise.all([
     generateAssets(plan, registry, onProgress),
@@ -105,25 +102,18 @@ export async function produce(request: ProductionRequest): Promise<ProductionRes
   // ── 5. ASSEMBLE COMPOSITION ────────────────────────────────
   onProgress?.('Assembling composition...');
 
-  // Copy voiceover to public/ for Remotion
-  const voiceoverFilename = `voiceover-${randomUUID()}.mp3`;
-  const voiceoverPublicPath = path.join(remotionPkgDir, 'public', voiceoverFilename);
-  fs.copyFileSync(ttsResult.voiceoverPath, voiceoverPublicPath);
-
-  const bundleDir = process.env.REMOTION_BUNDLE_PATH ?? path.join(os.tmpdir(), 'remotion-bundle');
-  let bundleVoiceoverPath: string | undefined;
-  try {
-    bundleVoiceoverPath = path.join(bundleDir, voiceoverFilename);
-    fs.copyFileSync(ttsResult.voiceoverPath, bundleVoiceoverPath);
-  } catch {
-    bundleVoiceoverPath = undefined;
-  }
+  // Upload voiceover to object storage so Lambda (or any renderer) can fetch it by URL.
+  const voiceoverKey = `voiceovers/voiceover-${randomUUID()}.mp3`;
+  const storage = await createStorage();
+  await storage.upload(fs.readFileSync(ttsResult.voiceoverPath), voiceoverKey);
+  // Sign for 2 hours — more than enough for any render
+  const voiceoverUrl = await storage.getSignedUrl(voiceoverKey, 7200);
 
   const props = assembleComposition({
     plan: adjustedPlan,
     assets,
     cues: ttsResult.cues,
-    voiceoverFilename,
+    voiceoverFilename: voiceoverUrl,
     brandPreset: request.brandPreset,
   });
 
@@ -186,7 +176,6 @@ export async function produceComposition(request: ComposeRequest): Promise<Produ
   const steps: ProductionStep[] = [];
   const onProgress = request.onProgress;
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reelstack-compose-'));
-  const remotionPkgDir = resolveRemotionDir();
 
   // ── 1. TTS (or use existing) ────────────────────────────────
   let voiceoverPath: string;
@@ -280,24 +269,18 @@ export async function produceComposition(request: ComposeRequest): Promise<Produ
 
   // ── 5. ASSEMBLE ─────────────────────────────────────────────
   onProgress?.('Assembling composition...');
-  const voiceoverFilename = `voiceover-${randomUUID()}.mp3`;
-  const voiceoverPublicPath = path.join(remotionPkgDir, 'public', voiceoverFilename);
-  fs.copyFileSync(voiceoverPath, voiceoverPublicPath);
 
-  const bundleDir = process.env.REMOTION_BUNDLE_PATH ?? path.join(os.tmpdir(), 'remotion-bundle');
-  let bundleVoiceoverPath: string | undefined;
-  try {
-    bundleVoiceoverPath = path.join(bundleDir, voiceoverFilename);
-    fs.copyFileSync(voiceoverPath, bundleVoiceoverPath);
-  } catch {
-    bundleVoiceoverPath = undefined;
-  }
+  // Upload voiceover to object storage so Lambda (or any renderer) can fetch it by URL.
+  const voiceoverKey = `voiceovers/voiceover-${randomUUID()}.mp3`;
+  const storage = await createStorage();
+  await storage.upload(fs.readFileSync(voiceoverPath), voiceoverKey);
+  const voiceoverUrl = await storage.getSignedUrl(voiceoverKey, 7200);
 
   const props = assembleComposition({
     plan: adjustedPlan,
     assets: resolvedAssets,
     cues,
-    voiceoverFilename,
+    voiceoverFilename: voiceoverUrl,
     brandPreset: request.brandPreset,
   });
 

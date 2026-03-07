@@ -80,6 +80,7 @@
       "dependencies": {
         "@reelstack/logger": "workspace:*",
         "@reelstack/remotion": "workspace:*",
+        "@reelstack/storage": "workspace:*",
         "@reelstack/transcription": "workspace:*",
         "@reelstack/tts": "workspace:*",
         "@reelstack/types": "workspace:*",
