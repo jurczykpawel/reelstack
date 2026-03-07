@@ -38,8 +38,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      # Include old package names first so blobs are mounted to existing packages,
-      # then cross-mounted to the new reelstack-* package names.
       - name: Build and push worker
         uses: docker/build-push-action@v6
         with:
@@ -49,8 +47,7 @@ jobs:
           provenance: false
           tags: |
             ghcr.io/jurczykpawel/subtitle-burner-worker:latest
-            ghcr.io/jurczykpawel/reelstack-worker:latest
-            ghcr.io/jurczykpawel/reelstack-worker:${{ github.sha }}
+            ghcr.io/jurczykpawel/subtitle-burner-worker:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
@@ -63,7 +60,6 @@ jobs:
           provenance: false
           tags: |
             ghcr.io/jurczykpawel/subtitle-burner-reel-worker:latest
-            ghcr.io/jurczykpawel/reelstack-reel-worker:latest
-            ghcr.io/jurczykpawel/reelstack-reel-worker:${{ github.sha }}
+            ghcr.io/jurczykpawel/subtitle-burner-reel-worker:${{ github.sha }}
           cache-from: type=gha
           cache-to: type=gha,mode=max

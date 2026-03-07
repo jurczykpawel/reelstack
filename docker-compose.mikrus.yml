@@ -46,7 +46,7 @@ services:
       retries: 3
 
   worker:
-    image: ghcr.io/jurczykpawel/reelstack-worker:latest
+    image: ghcr.io/jurczykpawel/subtitle-burner-worker:latest
     env_file: .env
     depends_on:
       redis:
