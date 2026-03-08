@@ -63,7 +63,7 @@ export class PexelsTool implements ProductionTool {
       return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'PEXELS_API_KEY not set' };
     }
 
-    const query = request.searchQuery ?? request.prompt ?? 'abstract';
+    const query = request.searchQuery || request.prompt || 'abstract';
     const isVideo = !request.searchQuery?.includes('image:');
 
     const url = isVideo

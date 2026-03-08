@@ -346,7 +346,12 @@ function parseResponse(text: string, input: PlannerInput): ProductionPlan {
     throw new PlanningError('Response is not a valid JSON object');
   }
 
-  const primarySource = parsePrimarySource(parsed.primarySource, input);
+  // Build dynamic allowed tool sets from available tools in manifest
+  const availableToolIds = input.toolManifest.tools
+    .filter(t => t.available)
+    .map(t => t.id);
+
+  const primarySource = parsePrimarySource(parsed.primarySource, input, availableToolIds);
 
   // Validate shots with bounds checking
   const MAX_SHOTS = 50;
@@ -369,7 +374,7 @@ function parseResponse(text: string, input: PlannerInput): ProductionPlan {
       startTime: s.startTime as number,
       endTime: s.endTime as number,
       scriptSegment: truncStr(s.scriptSegment, 1000),
-      visual: sanitizeVisual(visual),
+      visual: sanitizeVisual(visual, availableToolIds),
       transition: sanitizeTransition(s.transition),
       reason: truncStr(s.reason, 200),
     };
@@ -413,6 +418,7 @@ function parseResponse(text: string, input: PlannerInput): ProductionPlan {
 function parsePrimarySource(
   raw: unknown,
   input: PlannerInput,
+  availableToolIds: string[],
 ): ProductionPlan['primarySource'] {
   // If user provided video, force user-recording regardless of LLM output
   if (input.primaryVideoUrl) {
@@ -426,12 +432,14 @@ function parsePrimarySource(
   if (!raw || typeof raw !== 'object') return { type: 'none' };
   const obj = raw as Record<string, unknown>;
 
-  const ALLOWED_PRIMARY_TOOLS = ['heygen', 'veo3', 'kling', 'seedance'];
   const truncStr = (v: unknown, max: number) => typeof v === 'string' ? v.substring(0, max) : '';
+  const avatarTools = availableToolIds.filter(id => id.startsWith('heygen') || id === 'heygen');
+  const videoTools = availableToolIds.filter(id => !id.startsWith('flux') && !id.startsWith('nanobanana') && !id.startsWith('midjourney') && !id.startsWith('ideogram') && !id.startsWith('recraft') && !id.startsWith('sd35') && !id.startsWith('seedream') && !id.startsWith('imagen') && id !== 'user-upload');
+  const fallbackPrimaryVideo = videoTools[0] ?? availableToolIds[0] ?? 'none';
 
   switch (obj.type) {
     case 'avatar': {
-      const toolId = ALLOWED_PRIMARY_TOOLS.includes(obj.toolId as string) ? (obj.toolId as string) : 'heygen';
+      const toolId = availableToolIds.includes(obj.toolId as string) ? (obj.toolId as string) : (avatarTools[0] ?? fallbackPrimaryVideo);
       return {
         type: 'avatar',
         toolId,
@@ -449,7 +457,7 @@ function parsePrimarySource(
       return { type: 'user-recording', url };
     }
     case 'ai-video': {
-      const toolId = ALLOWED_PRIMARY_TOOLS.includes(obj.toolId as string) ? (obj.toolId as string) : 'veo3';
+      const toolId = availableToolIds.includes(obj.toolId as string) ? (obj.toolId as string) : fallbackPrimaryVideo;
       return {
         type: 'ai-video',
         toolId,
@@ -626,23 +634,28 @@ function sanitizeCaptionStyle(raw: unknown): Record<string, unknown> | undefined
 }
 
 /** Sanitize visual from LLM output - truncate strings, validate tool IDs */
-function sanitizeVisual(v: Record<string, unknown>): ShotPlan['visual'] {
-  const ALLOWED_TOOLS = ['pexels', 'heygen', 'veo3', 'kling', 'seedance', 'nanobanana', 'user-upload'];
+function sanitizeVisual(v: Record<string, unknown>, availableToolIds: string[]): ShotPlan['visual'] {
   const truncStr = (val: unknown, max: number) => typeof val === 'string' ? val.substring(0, max) : '';
+  // Derive fallbacks from what's actually available
+  const fallbackBroll = availableToolIds.includes('pexels') ? 'pexels' : (availableToolIds.find(id => id.startsWith('user-upload')) ?? availableToolIds[0] ?? 'pexels');
+  const imageTools = availableToolIds.filter(id => id.startsWith('flux') || id.startsWith('nanobanana') || id.startsWith('midjourney') || id.startsWith('ideogram') || id.startsWith('recraft') || id.startsWith('sd35') || id.startsWith('seedream') || id.startsWith('imagen') || id.startsWith('qwen-image'));
+  const videoTools = availableToolIds.filter(id => !imageTools.includes(id) && id !== 'user-upload' && id !== 'pexels');
+  const fallbackVideo = videoTools[0] ?? availableToolIds[0] ?? 'user-upload';
+  const fallbackImage = imageTools[0] ?? availableToolIds[0] ?? 'user-upload';
 
   switch (v.type) {
     case 'primary':
       return { type: 'primary' };
     case 'b-roll': {
-      const toolId = ALLOWED_TOOLS.includes(v.toolId as string) ? (v.toolId as string) : 'pexels';
+      const toolId = availableToolIds.includes(v.toolId as string) ? (v.toolId as string) : fallbackBroll;
       return { type: 'b-roll', searchQuery: truncStr(v.searchQuery, 100), toolId };
     }
     case 'ai-video': {
-      const toolId = ALLOWED_TOOLS.includes(v.toolId as string) ? (v.toolId as string) : 'veo3';
+      const toolId = availableToolIds.includes(v.toolId as string) ? (v.toolId as string) : fallbackVideo;
       return { type: 'ai-video', prompt: truncStr(v.prompt, 500), toolId };
     }
     case 'ai-image': {
-      const toolId = ALLOWED_TOOLS.includes(v.toolId as string) ? (v.toolId as string) : 'nanobanana';
+      const toolId = availableToolIds.includes(v.toolId as string) ? (v.toolId as string) : fallbackImage;
       return { type: 'ai-image', prompt: truncStr(v.prompt, 500), toolId };
     }
     case 'text-card': {

@@ -136,26 +136,51 @@ Exit animations: ${EXIT_ANIMATIONS.join(', ')}
    - If AI video tools available: use "ai-video" for the main visual
    - Otherwise: use "none" (faceless reel - B-roll only)
 
-2. SHOTS: Break the script into 3-8 second segments. Each shot needs a visual:
+2. TOOL PREFERENCES (follow strictly):
+   - **AI video**: Prefer Seedance tools (any id containing "seedance") for best motion quality. Fallback to WAN, Hailuo, or Kling.
+   - **AI image**: Prefer NanoBanana tools (any id containing "nanobanana") for best quality. Fallback to FLUX or other image tools.
+   - **Stock footage**: Use Pexels ("pexels") as B-roll filler when AI generation is too slow or when generic footage fits better than generated content. Pexels is free and instant.
+   - **Mix intelligently**: Not every shot needs AI generation. Use AI for hero shots that need specific visuals. Use Pexels for generic scenes (city, nature, people working). Use text-cards for stats or key takeaways.
+
+3. SHOTS: Break the script into 3-8 second segments. Each shot needs a visual:
    - "primary": Show the primary video (talking head / avatar / user recording)
-   - "b-roll": Stock footage. Provide a 2-3 word Pexels search query. Use tool "pexels"
-   - "ai-video": AI-generated video clip. Provide a detailed prompt. Use appropriate tool ID
+   - "b-roll": Stock footage. Provide a concrete 2-3 word Pexels search query. Use tool "pexels". NEVER leave searchQuery empty.
+   - "ai-video": AI-generated video clip. Provide a detailed visual prompt (50-100 words). Use appropriate tool ID
    - "ai-image": AI-generated still image. Provide a detailed prompt
-   - "text-card": Text overlay on solid/gradient background. For key points or transitions
+   - "text-card": Text overlay on solid/gradient background. For key points, stats, or transitions
 
-3. TIMING: Shots must cover the entire duration. No gaps. Shots can overlap slightly for transitions.
+4. TIMING: Shots must cover the entire duration. No gaps. Shots can overlap slightly for transitions.
 
-4. TRANSITIONS between shots: crossfade (default), slide-left, slide-right, zoom-in, wipe, none
+5. TRANSITIONS between shots: crossfade (default), slide-left, slide-right, zoom-in, wipe, none
 
-5. EFFECTS: Place visual effects at key moments. Never stack effects at the same time.
-   - Hook: text-emphasis in first 2 seconds
-   - Key moments: emoji-popup, screen-shake
-   - Topic changes: glitch-transition, color-flash
-   - CTA: subscribe-banner near the end
+6. EFFECTS - CRITICAL RULES (follow strictly):
+   **Less is more.** A clean reel with 2-3 well-placed effects beats a cluttered one with 8.
 
-6. B-ROLL SEARCH QUERIES: Use concrete, visual 2-3 word phrases ("typing laptop", "city skyline", "coffee shop")
+   a) **NEVER duplicate captions.** The reel already has auto-generated captions that show every spoken word. Your text-emphasis effects must NOT repeat the same text. Instead, use text-emphasis ONLY for:
+      - Single keywords or short phrases that AREN'T in the script (e.g., a statistic "73%", a brand name, a reaction word "WOW")
+      - Visual emphasis that adds new information (e.g., showing a URL, a price, a name)
+      - NEVER put a sentence from the script into text-emphasis — the captions already show it
 
-7. COST OPTIMIZATION: Prefer cheaper tools when quality difference is minimal.
+   b) **Never stack effects.** No two effects should overlap in time. Leave at least 0.5s gap between effects.
+
+   c) **Purposeful placement only:**
+      - Hook (first 1-2s): ONE text-emphasis with a short hook word (not the full sentence)
+      - Key moments: emoji-popup OR screen-shake (not both)
+      - Topic shifts: ONE glitch-transition or color-flash
+      - CTA: subscribe-banner near the end
+      - That's it. A 15s reel needs 2-4 effects total. A 30s reel needs 3-6.
+
+   d) **Sequential reveals are good** (like NetworkChuck showing 3 logos appearing one after another). This means multiple png-overlay or text-emphasis effects with staggered timing — each appearing AFTER the previous one exits. This is the exception to "don't stack" — sequential is fine, simultaneous is not.
+
+   e) **Match effect density to style:**
+      - "dynamic": max 5-6 effects per 30s, but still never stacked
+      - "calm": max 2 effects per 30s
+      - "cinematic": max 3 effects per 30s
+      - "educational": max 3-4 per 30s, focus on text-emphasis for key terms only
+
+7. B-ROLL SEARCH QUERIES: Use concrete, visual 2-3 word phrases ("typing laptop", "city skyline", "coffee shop"). NEVER leave searchQuery empty — if you can't think of a query, use the most visual noun from the script segment.
+
+8. COST OPTIMIZATION: Prefer cheaper tools when quality difference is minimal.
    If multiple AI video tools available, distribute load or pick the best for each shot type.
 
 ## OUTPUT FORMAT
