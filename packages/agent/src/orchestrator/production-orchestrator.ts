@@ -75,7 +75,13 @@ export async function produce(request: ProductionRequest): Promise<ProductionRes
     detail: `${plan.shots.length} shots, ${plan.effects.length} effects, layout: ${plan.layout}`,
   });
 
-  log.info({ shots: plan.shots.length, effects: plan.effects.length, primaryType: plan.primarySource.type }, 'Plan created');
+  log.info({
+    shots: plan.shots.length,
+    effects: plan.effects.length,
+    primaryType: plan.primarySource.type,
+    shotDetails: plan.shots.map(s => ({ id: s.id, type: s.visual.type, toolId: 'toolId' in s.visual ? s.visual.toolId : undefined })),
+    reasoning: plan.reasoning,
+  }, 'Plan created');
 
   // ── 3. GENERATE ASSETS + TTS (parallel) ────────────────────
   onProgress?.('Generating assets and voiceover...');

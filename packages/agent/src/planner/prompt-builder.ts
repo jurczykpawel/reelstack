@@ -137,10 +137,12 @@ Exit animations: ${EXIT_ANIMATIONS.join(', ')}
    - Otherwise: use "none" (faceless reel - B-roll only)
 
 2. TOOL PREFERENCES (follow strictly):
-   - **AI video**: Prefer Seedance tools (any id containing "seedance") for best motion quality. Fallback to WAN, Hailuo, or Kling.
-   - **AI image**: Prefer NanoBanana tools (any id containing "nanobanana") for best quality. Fallback to FLUX or other image tools.
-   - **Stock footage**: Use Pexels ("pexels") as B-roll filler when AI generation is too slow or when generic footage fits better than generated content. Pexels is free and instant.
-   - **Mix intelligently**: Not every shot needs AI generation. Use AI for hero shots that need specific visuals. Use Pexels for generic scenes (city, nature, people working). Use text-cards for stats or key takeaways.
+   - **ALWAYS prefer AI-generated content over stock footage.** AI video and AI images make the reel unique and visually striking. Stock footage is generic and forgettable.
+   - **AI video**: Prefer Seedance tools (any id containing "seedance") for best motion quality. Fallback to WAN, Hailuo, or Kling. Use for at least 50% of shots.
+   - **AI image**: Prefer NanoBanana tools (any id containing "nanobanana") for best quality. Fallback to FLUX or other image tools. Great for product shots, concept art, title screens.
+   - **Stock footage (Pexels)**: Use ONLY as a fallback when no AI tools are available, or for max 1 shot per reel when you need generic real-world footage (e.g. someone typing on laptop). Never make Pexels the primary visual strategy.
+   - **Text-cards**: Use sparingly for stats, key takeaways, or transitions. Max 1 per reel.
+   - **Write detailed AI prompts**: Follow the prompt guidelines for each tool. This is what makes the reel look professional. Lazy prompts = ugly output.
 
 3. SHOTS: Break the script into 3-8 second segments. Each shot needs a visual:
    - "primary": Show the primary video (talking head / avatar / user recording)
@@ -180,8 +182,8 @@ Exit animations: ${EXIT_ANIMATIONS.join(', ')}
 
 7. B-ROLL SEARCH QUERIES: Use concrete, visual 2-3 word phrases ("typing laptop", "city skyline", "coffee shop"). NEVER leave searchQuery empty — if you can't think of a query, use the most visual noun from the script segment.
 
-8. COST OPTIMIZATION: Prefer cheaper tools when quality difference is minimal.
-   If multiple AI video tools available, distribute load or pick the best for each shot type.
+8. QUALITY FIRST: Always prioritize visual quality over cost. Use the best available AI tools.
+   If multiple AI video tools available, pick the best for each shot type (Seedance for cinematic, Kling for action).
 
 ## OUTPUT FORMAT
 
