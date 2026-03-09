@@ -158,7 +158,10 @@ async function generateSingle(
   const assetType = tool.capabilities[0]?.assetType;
   if (!assetType) return null;
 
-  const alternatives = registry.getByCapability(assetType).filter((t) => t.id !== task.toolId);
+  const alternatives = sortByPriority(
+    registry.getByCapability(assetType).filter((t) => t.id !== task.toolId),
+    assetType,
+  );
   if (alternatives.length === 0) {
     log.warn({ toolId: task.toolId, shotId: task.shotId }, 'No fallback tools available');
     return null;
@@ -218,4 +221,20 @@ async function tryGenerate(
     log.warn({ toolId: tool.id, shotId: task.shotId, err }, 'Generation threw error');
     return null;
   }
+}
+
+const VIDEO_FALLBACK_ORDER = ['seedance2-piapi', 'seedance-piapi', 'seedance-kie', 'wan-kie', 'hunyuan-piapi', 'hailuo-piapi', 'kling-kie', 'kling-piapi'];
+const IMAGE_FALLBACK_ORDER = ['nanobanana2-kie', 'nanobanana', 'flux-kie', 'flux-piapi'];
+
+function sortByPriority(
+  tools: import('../registry/tool-interface').ProductionTool[],
+  assetType: string,
+): import('../registry/tool-interface').ProductionTool[] {
+  const order = assetType === 'ai-video' ? VIDEO_FALLBACK_ORDER : assetType === 'ai-image' ? IMAGE_FALLBACK_ORDER : [];
+  if (order.length === 0) return tools;
+  return [...tools].sort((a, b) => {
+    const ai = order.indexOf(a.id);
+    const bi = order.indexOf(b.id);
+    return (ai === -1 ? 999 : ai) - (bi === -1 ? 999 : bi);
+  });
 }
