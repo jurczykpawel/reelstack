@@ -248,6 +248,7 @@ async function callLLM(
 
 async function callAnthropic(systemPrompt: string, userMessage: string): Promise<string> {
   const model = process.env.PLANNER_MODEL ?? 'claude-sonnet-4-6';
+  log.info({ provider: 'anthropic', model }, 'Calling LLM planner');
 
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
@@ -299,6 +300,7 @@ async function callOpenAICompatible(
     : process.env.OPENAI_API_KEY!;
   const defaultModel = isOpenRouter ? 'anthropic/claude-sonnet-4-6' : 'gpt-4o';
   const model = process.env.PLANNER_MODEL ?? defaultModel;
+  log.info({ provider, model }, 'Calling LLM planner');
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

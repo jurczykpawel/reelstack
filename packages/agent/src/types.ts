@@ -178,6 +178,8 @@ export interface EffectPlan {
 // ── Production request / result ──────────────────────────────
 
 export interface ProductionRequest {
+  /** External job ID for log correlation (e.g. ReelJob.id) */
+  readonly jobId?: string;
   readonly script: string;
   readonly style?: 'dynamic' | 'calm' | 'cinematic' | 'educational';
   readonly layout?: 'fullscreen' | 'split-screen' | 'picture-in-picture';
@@ -246,6 +248,8 @@ export interface UserAsset {
  * No tool discovery, no asset generation — pure composition planning.
  */
 export interface ComposeRequest {
+  /** External job ID for log correlation (e.g. ReelJob.id) */
+  readonly jobId?: string;
   /** Script / narration text */
   readonly script: string;
   /** All available materials with descriptions */

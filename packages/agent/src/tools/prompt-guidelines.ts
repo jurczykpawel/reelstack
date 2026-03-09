@@ -37,10 +37,20 @@ Lighting parameters:
 
 Style tokens (max 2-3): anamorphic | film grain | digital clean | muted | neon-saturated | warm/cold contrast
 
-FORBIDDEN words (degrade quality): cinematic, epic, masterpiece, ultra-real, award-winning, stunning, 8K, beautiful, breathtaking, immersive, ethereal, magical
-Use measurable descriptions instead:
+FORBIDDEN words (these literally degrade Seedance output quality — NEVER use them):
+cinematic, epic, masterpiece, ultra-real, award-winning, stunning, 8K, 4K, beautiful, breathtaking, immersive, ethereal, magical, hyper-realistic, photorealistic, high quality, professional, amazing
+
+Replace with MEASURABLE descriptions:
 - WRONG: "cinematic lighting" → RIGHT: "45-degree hard key camera-left, warm amber, deep shadow"
 - WRONG: "epic scale" → RIGHT: "wide shot, subject occupies 10% of frame, mountain backdrop"
+- WRONG: "cinematic aerial shot" → RIGHT: "bird's eye crane descending, wide shot"
+- WRONG: "cinematic 4K" → RIGHT: "digital clean, locked wide shot"
+
+MANDATORY STRUCTURE for every prompt:
+1. SUBJECT + ACTION (first 20-30 words — model weights these heavily)
+2. CAMERA: framing (wide/medium/close-up/ECU) + movement (locked-off/dolly push/pan/orbit/crane) + speed + angle
+3. LIGHTING: direction (camera-left/above/behind) + contrast (low-key/high-key) + temperature (warm amber/cool blue) + shadows (hard-edged/soft wrap)
+4. STYLE: max 2-3 tokens (anamorphic, film grain, muted, neon-saturated)
 
 Good for: product reveals, lifestyle B-roll, mood pieces, architecture, social proof moments`;
 

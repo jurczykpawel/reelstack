@@ -196,6 +196,7 @@ model ReelJob {
   callbackSent  Boolean   @default(false)
   parentJobId   String?   // For batch jobs - links back to the original batch request
   language      String?   // ISO language code (e.g., "en", "pl") - for multi-language reels
+  productionMeta Json?    // AI production metadata: plan, prompts, models, generated assets
   startedAt     DateTime?
   completedAt   DateTime?
   createdAt     DateTime  @default(now())

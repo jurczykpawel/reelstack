@@ -17,7 +17,7 @@ import { assembleComposition } from './composition-assembler';
 import type { ProductionRequest, ProductionResult, ProductionStep, ComposeRequest, ProductionPlan, ShotPlan, EffectPlan, GeneratedAsset } from '../types';
 import { createLogger } from '@reelstack/logger';
 
-const log = createLogger('production-orchestrator');
+const baseLog = createLogger('production-orchestrator');
 
 /**
  * Main production orchestrator.
@@ -29,6 +29,9 @@ export async function produce(request: ProductionRequest): Promise<ProductionRes
   if (!request.script || request.script.length > MAX_SCRIPT_LENGTH) {
     throw new Error(`Script must be between 1 and ${MAX_SCRIPT_LENGTH} characters`);
   }
+
+  // Create job-scoped logger so all logs from this pipeline run are correlated
+  const log = request.jobId ? baseLog.child({ jobId: request.jobId }) : baseLog;
 
   const steps: ProductionStep[] = [];
   const onProgress = request.onProgress;
@@ -86,10 +89,18 @@ export async function produce(request: ProductionRequest): Promise<ProductionRes
       duration: +(s.endTime - s.startTime).toFixed(1),
       type: s.visual.type,
       toolId: 'toolId' in s.visual ? s.visual.toolId : undefined,
-      prompt: 'prompt' in s.visual ? (s.visual.prompt as string).substring(0, 80) : undefined,
+      prompt: 'prompt' in s.visual ? (s.visual.prompt as string) : undefined,
+      searchQuery: 'searchQuery' in s.visual ? s.visual.searchQuery : undefined,
     })),
     reasoning: plan.reasoning,
   }, 'Plan created');
+
+  // Log full prompts separately for easy debugging
+  for (const s of plan.shots) {
+    if ('prompt' in s.visual && s.visual.prompt) {
+      log.info({ shotId: s.id, toolId: (s.visual as { toolId: string }).toolId, prompt: s.visual.prompt }, 'Shot prompt');
+    }
+  }
 
   // ── 3. GENERATE ASSETS + TTS (parallel) ────────────────────
   onProgress?.('Generating assets and voiceover...');
@@ -184,6 +195,8 @@ export async function produceComposition(request: ComposeRequest): Promise<Produ
   if (request.assets.length > 50) {
     throw new Error('Maximum 50 assets allowed');
   }
+
+  const log = request.jobId ? baseLog.child({ jobId: request.jobId }) : baseLog;
 
   const steps: ProductionStep[] = [];
   const onProgress = request.onProgress;

@@ -431,6 +431,7 @@ export async function updateReelJobStatus(
     outputUrl?: string;
     error?: string;
     publishStatus?: object;
+    productionMeta?: object;
     startedAt?: Date;
     completedAt?: Date;
   }

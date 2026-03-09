@@ -112,6 +112,7 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
       };
 
       const composeRequest: ComposeRequest = {
+        jobId,
         script: job.script ?? '',
         assets: [primaryAsset],
         style: config.style as ComposeRequest['style'],
@@ -138,6 +139,7 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
       const assets = (config.assets as UserAsset[]) ?? [];
 
       const composeRequest: ComposeRequest = {
+        jobId,
         script: job.script ?? '',
         assets,
         style: config.style as ComposeRequest['style'],
@@ -165,6 +167,7 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
       log.info({ jobId }, 'Running full auto pipeline');
 
       const agentResult = await agentProduce({
+        jobId,
         script: job.script ?? '',
         layout: config.layout as 'fullscreen' | 'split-screen' | 'picture-in-picture' | undefined,
         style: config.style as 'dynamic' | 'calm' | 'cinematic' | 'educational' | undefined,
@@ -185,6 +188,12 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
       });
 
       outputPath = agentResult.outputPath;
+
+      // Save production metadata to DB for debugging and traceability
+      await updateReelJobStatus(jobId, {
+        productionMeta: buildProductionMeta(agentResult),
+      }).catch(err => log.warn({ jobId, err }, 'Failed to save production meta'));
+
       log.info({ jobId, steps: agentResult.steps.length, assets: agentResult.generatedAssets.length }, 'Auto pipeline complete');
     }
 
@@ -246,4 +255,45 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
 
     throw err;
   }
+}
+
+/**
+ * Build production metadata object to persist in DB.
+ * Contains everything needed to trace what happened during production:
+ * - LLM plan (shots with prompts, effects, layout)
+ * - Generated assets (toolId, URL, type)
+ * - Pipeline steps with durations
+ */
+function buildProductionMeta(result: import('@reelstack/agent').ProductionResult): Record<string, unknown> {
+  return {
+    plan: {
+      layout: result.plan.layout,
+      primarySource: result.plan.primarySource,
+      reasoning: result.plan.reasoning,
+      shots: result.plan.shots.map(s => ({
+        id: s.id,
+        startTime: s.startTime,
+        endTime: s.endTime,
+        visualType: s.visual.type,
+        toolId: 'toolId' in s.visual ? s.visual.toolId : undefined,
+        prompt: 'prompt' in s.visual ? s.visual.prompt : undefined,
+        searchQuery: 'searchQuery' in s.visual ? s.visual.searchQuery : undefined,
+        reason: s.reason,
+      })),
+      effectCount: result.plan.effects.length,
+    },
+    assets: result.generatedAssets.map(a => ({
+      toolId: a.toolId,
+      shotId: a.shotId,
+      type: a.type,
+      url: a.url,
+      durationSeconds: a.durationSeconds,
+    })),
+    steps: result.steps.map(s => ({
+      name: s.name,
+      durationMs: Math.round(s.durationMs),
+      detail: s.detail,
+    })),
+    durationSeconds: result.durationSeconds,
+  };
 }

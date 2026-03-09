@@ -101,7 +101,22 @@ ${segmentSection}
      3. NEVER use FLUX when NanoBanana is available.
    - **Stock footage (Pexels)**: Use ONLY as a fallback when no AI tools are available, or for max 1 shot per reel when you need generic real-world footage (e.g. someone typing on laptop). Never make Pexels the primary visual strategy.
    - **Text-cards**: Use sparingly for stats, key takeaways, or transitions. Max 1 per reel.
-   - **Write detailed AI prompts**: Follow the prompt guidelines for each tool. This is what makes the reel look professional. Lazy prompts = ugly output.
+   - **Write detailed AI prompts**: Follow the prompt guidelines for each tool EXACTLY. This is what makes the reel look professional. Lazy prompts = ugly output.
+
+10. AI VIDEO PROMPT QUALITY — CRITICAL:
+   You MUST follow the tool-specific prompt guidelines above. Common mistakes that RUIN video quality:
+
+   **FORBIDDEN WORDS (will degrade Seedance output):** cinematic, epic, masterpiece, ultra-real, award-winning, stunning, 8K, beautiful, breathtaking, immersive, ethereal, magical, 4K, hyper-realistic, photorealistic
+
+   **WRONG (vague, lazy):**
+   - "A cinematic aerial shot of a futuristic city skyline at sunset, neon lights reflecting on glass buildings"
+   - "A golden sun setting over calm ocean waves, cinematic 4K"
+
+   **RIGHT (measurable, structured):**
+   - "Futuristic city skyline at sunset. Neon lights reflect on glass facades. Slow dolly push forward, wide shot. Warm amber backlight from setting sun, cool blue neon fill from below. Anamorphic, muted palette. 0-2s: Wide establishing shot, locked. 2-5s: Slow dolly forward into buildings."
+   - "Golden sun descends toward ocean horizon. Calm waves reflect warm light. Locked wide shot, eye level. Warm amber key light from sun, soft wrap shadows on water. Film grain. Duration 5s."
+
+   Structure every AI video prompt with: SUBJECT + ACTION first (20-30 words), then CAMERA (framing, movement, speed, angle), then LIGHTING (direction, contrast, temperature, shadows), then STYLE (max 2-3 tokens). For 5s clips use L2 (30-100 words). For 10s+ use L3 with timestamps.
 
 3. SHOTS: Break the script into 3-8 second segments. Each shot needs a visual:
    - "primary": Show the primary video (talking head / avatar / user recording)
