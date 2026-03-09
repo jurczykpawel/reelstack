@@ -139,6 +139,16 @@ class PiapiTool implements ProductionTool {
       if (!taskData) return { jobId, toolId: this.id, status: 'processing' };
 
       if (taskData.status === 'failed') {
+        log.warn(
+          {
+            toolId: this.id,
+            jobId,
+            error: taskData.error?.message,
+            rawOutput: JSON.stringify(taskData.output ?? null).substring(0, 300),
+            rawError: JSON.stringify(taskData.error ?? null).substring(0, 300),
+          },
+          'piapi poll returned failed status',
+        );
         return { jobId, toolId: this.id, status: 'failed', error: taskData.error?.message ?? 'piapi generation failed' };
       }
 

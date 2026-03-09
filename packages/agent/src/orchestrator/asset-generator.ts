@@ -197,7 +197,7 @@ async function tryGenerate(
     }
 
     if (finalJob.status !== 'completed' || !finalJob.url) {
-      log.warn({ toolId: tool.id, error: finalJob.error }, 'Generation did not complete');
+      log.warn({ toolId: tool.id, jobId: job.jobId, shotId: task.shotId, error: finalJob.error }, 'Generation did not complete');
       return null;
     }
 
@@ -209,6 +209,11 @@ async function tryGenerate(
     }
 
     const assetType = tool.capabilities[0]?.assetType ?? 'stock-video';
+
+    log.info(
+      { toolId: tool.id, shotId: task.shotId, assetType, url, durationSeconds: finalJob.durationSeconds },
+      'Asset generated successfully',
+    );
 
     return {
       toolId: tool.id,

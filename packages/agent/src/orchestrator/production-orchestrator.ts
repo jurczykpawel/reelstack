@@ -79,7 +79,15 @@ export async function produce(request: ProductionRequest): Promise<ProductionRes
     shots: plan.shots.length,
     effects: plan.effects.length,
     primaryType: plan.primarySource.type,
-    shotDetails: plan.shots.map(s => ({ id: s.id, type: s.visual.type, toolId: 'toolId' in s.visual ? s.visual.toolId : undefined })),
+    shotDetails: plan.shots.map(s => ({
+      id: s.id,
+      startTime: s.startTime,
+      endTime: s.endTime,
+      duration: +(s.endTime - s.startTime).toFixed(1),
+      type: s.visual.type,
+      toolId: 'toolId' in s.visual ? s.visual.toolId : undefined,
+      prompt: 'prompt' in s.visual ? (s.visual.prompt as string).substring(0, 80) : undefined,
+    })),
     reasoning: plan.reasoning,
   }, 'Plan created');
 

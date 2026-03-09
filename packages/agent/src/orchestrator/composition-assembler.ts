@@ -76,6 +76,21 @@ export function assembleComposition(input: AssemblyInput): AssembledProps {
     if (asset.shotId) assetMap.set(asset.shotId, asset);
   }
 
+  log.info(
+    {
+      totalAssets: assets.length,
+      mappedAssets: assetMap.size,
+      assetDetails: assets.map((a) => ({
+        shotId: a.shotId ?? 'PRIMARY',
+        toolId: a.toolId,
+        type: a.type,
+        url: a.url.substring(0, 100),
+        durationSeconds: a.durationSeconds,
+      })),
+    },
+    'Asset map built',
+  );
+
   // Primary video URL
   let primaryVideoUrl: string | undefined;
   if (plan.primarySource.type === 'user-recording') {
@@ -141,6 +156,21 @@ export function assembleComposition(input: AssemblyInput): AssembledProps {
       transition: { type: shot.transition.type, durationMs: shot.transition.durationMs },
     });
   }
+
+  log.info(
+    {
+      bRollCount: bRollSegments.length,
+      bRollDetails: bRollSegments.map((br) => ({
+        startTime: br.startTime,
+        endTime: br.endTime,
+        mediaType: br.media.type,
+        mediaUrl: br.media.url.substring(0, 100),
+        transition: br.transition?.type,
+      })),
+      primaryVideoUrl: primaryVideoUrl?.substring(0, 100) ?? 'NONE',
+    },
+    'B-roll segments assembled',
+  );
 
   // Convert effects - flatten config into top-level props (spread config first so sanitized fields can't be overridden)
   const effects: EffectEntry[] = plan.effects.map((e) => ({
