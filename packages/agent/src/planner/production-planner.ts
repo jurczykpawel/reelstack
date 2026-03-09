@@ -1,4 +1,4 @@
-import type { ToolManifest, ProductionPlan, ShotPlan, EffectPlan, UserAsset } from '../types';
+import type { ToolManifest, ProductionPlan, ShotPlan, EffectPlan, UserAsset, ZoomSegmentPlan, LowerThirdPlan, CounterPlan, HighlightPlan, CtaPlan } from '../types';
 import { buildPlannerPrompt, buildComposerPrompt } from './prompt-builder';
 import { PlanningError } from '../errors';
 import { createLogger } from '@reelstack/logger';
@@ -204,6 +204,11 @@ function ruleBasedCompose(input: ComposerInput): ProductionPlan {
     primarySource,
     shots,
     effects,
+    zoomSegments: [],
+    lowerThirds: [],
+    counters: [],
+    highlights: [],
+    ctaSegments: [],
     layout: input.layout ?? 'fullscreen',
     reasoning: 'Rule-based composition (no AI API key configured)',
   };
@@ -399,6 +404,13 @@ function parseResponse(text: string, input: PlannerInput): ProductionPlan {
     reason: typeof e.reason === 'string' ? e.reason.substring(0, 200) : '',
   }));
 
+  // Parse composition segments
+  const zoomSegments = parseZoomSegments(parsed.zoomSegments);
+  const lowerThirds = parseLowerThirds(parsed.lowerThirds);
+  const counters = parseCounters(parsed.counters);
+  const highlights = parseHighlights(parsed.highlights);
+  const ctaSegments = parseCtaSegments(parsed.ctaSegments);
+
   const VALID_LAYOUTS = ['fullscreen', 'split-screen', 'picture-in-picture'] as const;
   const rawLayout = parsed.layout as string | undefined;
   const layout = rawLayout && (VALID_LAYOUTS as readonly string[]).includes(rawLayout)
@@ -409,6 +421,11 @@ function parseResponse(text: string, input: PlannerInput): ProductionPlan {
     primarySource,
     shots,
     effects,
+    zoomSegments,
+    lowerThirds,
+    counters,
+    highlights,
+    ctaSegments,
     layout,
     captionStyle: sanitizeCaptionStyle(parsed.captionStyle),
     reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning : '',
@@ -538,7 +555,12 @@ function ruleBasedPlan(input: PlannerInput): ProductionPlan {
     primarySource,
     shots,
     effects,
-    layout: input.layout ?? (primarySource.type === 'none' ? 'fullscreen' : 'fullscreen'),
+    zoomSegments: [],
+    lowerThirds: [],
+    counters: [],
+    highlights: [],
+    ctaSegments: [],
+    layout: input.layout ?? 'fullscreen',
     reasoning: 'Rule-based plan (no AI API key configured)',
   };
 }
@@ -669,6 +691,84 @@ function sanitizeVisual(v: Record<string, unknown>, availableToolIds: string[]):
     default:
       return { type: 'primary' };
   }
+}
+
+// ── Segment parsers ─────────────────────────────────────────
+
+function parseTimedArray(raw: unknown, maxItems: number): Record<string, unknown>[] {
+  if (!Array.isArray(raw)) return [];
+  return raw.slice(0, maxItems).filter((item): item is Record<string, unknown> => {
+    if (typeof item !== 'object' || item === null) return false;
+    const obj = item as Record<string, unknown>;
+    return typeof obj.startTime === 'number' && typeof obj.endTime === 'number'
+      && obj.startTime >= 0 && obj.endTime <= 3600;
+  });
+}
+
+function parseZoomSegments(raw: unknown): ZoomSegmentPlan[] {
+  return parseTimedArray(raw, 20).map((z) => ({
+    startTime: z.startTime as number,
+    endTime: z.endTime as number,
+    scale: typeof z.scale === 'number' ? Math.max(1, Math.min(3, z.scale)) : 1.5,
+    focusPoint: z.focusPoint && typeof z.focusPoint === 'object'
+      ? { x: Number((z.focusPoint as Record<string, unknown>).x) || 50, y: Number((z.focusPoint as Record<string, unknown>).y) || 50 }
+      : { x: 50, y: 50 },
+    easing: z.easing === 'smooth' ? 'smooth' as const : 'spring' as const,
+  }));
+}
+
+function parseLowerThirds(raw: unknown): LowerThirdPlan[] {
+  return parseTimedArray(raw, 10).filter((l) => typeof l.title === 'string').map((l) => ({
+    startTime: l.startTime as number,
+    endTime: l.endTime as number,
+    title: (l.title as string).substring(0, 100),
+    subtitle: typeof l.subtitle === 'string' ? l.subtitle.substring(0, 100) : undefined,
+    backgroundColor: typeof l.backgroundColor === 'string' ? sanitizeCssValue(l.backgroundColor) : undefined,
+    textColor: typeof l.textColor === 'string' ? sanitizeCssValue(l.textColor) : undefined,
+    accentColor: typeof l.accentColor === 'string' ? sanitizeCssValue(l.accentColor) : undefined,
+    position: l.position === 'center' ? 'center' as const : 'left' as const,
+  }));
+}
+
+function parseCounters(raw: unknown): CounterPlan[] {
+  return parseTimedArray(raw, 10).filter((c) => typeof c.value === 'number').map((c) => ({
+    startTime: c.startTime as number,
+    endTime: c.endTime as number,
+    value: c.value as number,
+    prefix: typeof c.prefix === 'string' ? c.prefix.substring(0, 10) : undefined,
+    suffix: typeof c.suffix === 'string' ? c.suffix.substring(0, 10) : undefined,
+    format: c.format === 'abbreviated' ? 'abbreviated' as const : 'full' as const,
+    textColor: typeof c.textColor === 'string' ? sanitizeCssValue(c.textColor) : undefined,
+    fontSize: typeof c.fontSize === 'number' ? Math.max(24, Math.min(200, c.fontSize)) : undefined,
+    position: ['center', 'top', 'bottom'].includes(c.position as string) ? (c.position as 'center' | 'top' | 'bottom') : undefined,
+  }));
+}
+
+function parseHighlights(raw: unknown): HighlightPlan[] {
+  return parseTimedArray(raw, 10).map((h) => ({
+    startTime: h.startTime as number,
+    endTime: h.endTime as number,
+    x: typeof h.x === 'number' ? Math.max(0, Math.min(100, h.x)) : 0,
+    y: typeof h.y === 'number' ? Math.max(0, Math.min(100, h.y)) : 0,
+    width: typeof h.width === 'number' ? Math.max(1, Math.min(100, h.width)) : 20,
+    height: typeof h.height === 'number' ? Math.max(1, Math.min(100, h.height)) : 20,
+    color: typeof h.color === 'string' ? sanitizeCssValue(h.color) : undefined,
+    borderWidth: typeof h.borderWidth === 'number' ? Math.max(1, Math.min(20, h.borderWidth)) : undefined,
+    label: typeof h.label === 'string' ? h.label.substring(0, 50) : undefined,
+    glow: typeof h.glow === 'boolean' ? h.glow : undefined,
+  }));
+}
+
+function parseCtaSegments(raw: unknown): CtaPlan[] {
+  return parseTimedArray(raw, 5).filter((c) => typeof c.text === 'string').map((c) => ({
+    startTime: c.startTime as number,
+    endTime: c.endTime as number,
+    text: (c.text as string).substring(0, 100),
+    style: ['button', 'banner', 'pill'].includes(c.style as string) ? (c.style as 'button' | 'banner' | 'pill') : undefined,
+    backgroundColor: typeof c.backgroundColor === 'string' ? sanitizeCssValue(c.backgroundColor) : undefined,
+    textColor: typeof c.textColor === 'string' ? sanitizeCssValue(c.textColor) : undefined,
+    position: ['bottom', 'center', 'top'].includes(c.position as string) ? (c.position as 'bottom' | 'center' | 'top') : undefined,
+  }));
 }
 
 /**

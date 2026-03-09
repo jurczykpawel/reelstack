@@ -88,9 +88,68 @@ export interface ProductionPlan {
 
   readonly shots: readonly ShotPlan[];
   readonly effects: readonly EffectPlan[];
+  readonly zoomSegments: readonly ZoomSegmentPlan[];
+  readonly lowerThirds: readonly LowerThirdPlan[];
+  readonly counters: readonly CounterPlan[];
+  readonly highlights: readonly HighlightPlan[];
+  readonly ctaSegments: readonly CtaPlan[];
   readonly layout: 'fullscreen' | 'split-screen' | 'picture-in-picture';
   readonly captionStyle?: Record<string, unknown>;
   readonly reasoning: string;
+}
+
+export interface ZoomSegmentPlan {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly scale: number;
+  readonly focusPoint: { readonly x: number; readonly y: number };
+  readonly easing: 'spring' | 'smooth';
+}
+
+export interface LowerThirdPlan {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly title: string;
+  readonly subtitle?: string;
+  readonly backgroundColor?: string;
+  readonly textColor?: string;
+  readonly accentColor?: string;
+  readonly position?: 'left' | 'center';
+}
+
+export interface CounterPlan {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly value: number;
+  readonly prefix?: string;
+  readonly suffix?: string;
+  readonly format?: 'full' | 'abbreviated';
+  readonly textColor?: string;
+  readonly fontSize?: number;
+  readonly position?: 'center' | 'top' | 'bottom';
+}
+
+export interface HighlightPlan {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly x: number;
+  readonly y: number;
+  readonly width: number;
+  readonly height: number;
+  readonly color?: string;
+  readonly borderWidth?: number;
+  readonly label?: string;
+  readonly glow?: boolean;
+}
+
+export interface CtaPlan {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly text: string;
+  readonly style?: 'button' | 'banner' | 'pill';
+  readonly backgroundColor?: string;
+  readonly textColor?: string;
+  readonly position?: 'bottom' | 'center' | 'top';
 }
 
 export interface ShotPlan {

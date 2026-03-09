@@ -175,6 +175,61 @@ export function assembleComposition(input: AssemblyInput): AssembledProps {
       }
     : undefined;
 
+  // Map plan segments to props
+  const zoomSegments = (plan.zoomSegments ?? []).map((z) => ({
+    startTime: z.startTime,
+    endTime: z.endTime,
+    scale: z.scale,
+    focusPoint: z.focusPoint,
+    easing: z.easing,
+  }));
+
+  const lowerThirds = (plan.lowerThirds ?? []).map((l) => ({
+    startTime: l.startTime,
+    endTime: l.endTime,
+    title: l.title,
+    subtitle: l.subtitle,
+    backgroundColor: l.backgroundColor,
+    textColor: l.textColor,
+    position: l.position,
+    accentColor: l.accentColor,
+  }));
+
+  const counters = (plan.counters ?? []).map((c) => ({
+    startTime: c.startTime,
+    endTime: c.endTime,
+    value: c.value,
+    prefix: c.prefix,
+    suffix: c.suffix,
+    format: c.format,
+    textColor: c.textColor,
+    fontSize: c.fontSize,
+    position: c.position,
+  }));
+
+  const highlights = (plan.highlights ?? []).map((h) => ({
+    startTime: h.startTime,
+    endTime: h.endTime,
+    x: h.x,
+    y: h.y,
+    width: h.width,
+    height: h.height,
+    color: h.color,
+    borderWidth: h.borderWidth,
+    label: h.label,
+    glow: h.glow,
+  }));
+
+  const ctaSegments = (plan.ctaSegments ?? []).map((c) => ({
+    startTime: c.startTime,
+    endTime: c.endTime,
+    text: c.text,
+    style: c.style,
+    backgroundColor: c.backgroundColor,
+    textColor: c.textColor,
+    position: c.position,
+  }));
+
   return {
     layout: plan.layout,
     primaryVideoUrl,
@@ -182,11 +237,11 @@ export function assembleComposition(input: AssemblyInput): AssembledProps {
     bRollSegments,
     effects,
     pipSegments: [],
-    lowerThirds: [],
-    ctaSegments: [],
-    counters: [],
-    zoomSegments: [],
-    highlights: [],
+    lowerThirds,
+    ctaSegments,
+    counters,
+    zoomSegments,
+    highlights,
     cues: cues.map((c) => ({ ...c })),
     captionStyle,
     dynamicCaptionPosition: false,

@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./pipeline": "./src/pipeline/index.ts",
     "./director": "./src/director/index.ts",
-    "./render": "./src/render/index.ts"
+    "./render": "./src/render/index.ts",
+    "./catalog": "./src/schemas/catalog.ts"
   },
   "scripts": {
     "dev": "remotion studio",

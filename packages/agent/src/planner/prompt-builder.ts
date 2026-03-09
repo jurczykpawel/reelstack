@@ -1,79 +1,16 @@
 import type { ToolManifest, UserAsset } from '../types';
-
-/**
- * Available effect types and their configurable properties.
- * Extracted from the effect registry schemas at build time.
- * This avoids importing React components in the agent package.
- */
-const EFFECT_CATALOG = [
-  {
-    type: 'emoji-popup',
-    description: 'Animated emoji reaction overlay',
-    config: 'emoji (string), position ({x,y} percentage), size (number), rotation (number), entrance, exit',
-  },
-  {
-    type: 'text-emphasis',
-    description: 'Bold text flash overlay',
-    config: 'text (string), fontSize (number), fontColor (string), backgroundColor (string, optional), position ("top"|"center"|"bottom"), entrance, exit',
-  },
-  {
-    type: 'screen-shake',
-    description: 'Camera shake/jitter effect',
-    config: 'intensity (number 1-20), frequency (number 1-10). Duration: 0.3-0.5s',
-  },
-  {
-    type: 'color-flash',
-    description: 'Fullscreen color flash overlay',
-    config: 'color (hex string), maxOpacity (0-1). Duration: 0.2-0.4s',
-  },
-  {
-    type: 'glitch-transition',
-    description: 'RGB split + scanlines + displacement',
-    config: 'rgbSplitAmount (number), scanlineOpacity (0-1), displacement (number). Duration: 0.3-0.6s',
-  },
-  {
-    type: 'subscribe-banner',
-    description: 'Subscribe CTA banner',
-    config: 'channelName (string), backgroundColor (hex), textColor (hex), position ("top"|"bottom"), entrance, exit',
-  },
-  {
-    type: 'circular-counter',
-    description: 'Animated circular progress counter',
-    config: 'segments ([{value, holdFrames?}]), size, fillColor, trackColor, textColor, fontSize, strokeWidth, position, entrance, exit',
-  },
-  {
-    type: 'png-overlay',
-    description: 'Static image overlay',
-    config: 'src (URL), width, height, position ({x,y}), opacity, entrance, exit',
-  },
-  {
-    type: 'gif-overlay',
-    description: 'Animated GIF overlay',
-    config: 'src (URL), width, height, position ({x,y}), opacity, entrance, exit',
-  },
-  {
-    type: 'blur-background',
-    description: 'Blur background with centered overlay',
-    config: 'blurAmount (number), overlayOpacity (0-1), overlayColor (hex)',
-  },
-  {
-    type: 'parallax-screenshot',
-    description: '3D perspective tilt and scroll',
-    config: 'src (URL), width, height, tiltX, tiltY, scrollDistance',
-  },
-  {
-    type: 'split-screen-divider',
-    description: 'Split screen with glowing divider',
-    config: 'direction ("horizontal"|"vertical"), offset, dividerWidth, dividerColor, glowIntensity',
-  },
-];
-
-const ENTRANCE_ANIMATIONS = ['fade', 'spring-scale', 'slide-up', 'slide-down', 'slide-left', 'slide-right', 'glitch', 'bounce', 'pop'];
-const EXIT_ANIMATIONS = ['fade', 'slide-down', 'shrink', 'glitch'];
+import {
+  EFFECT_CATALOG,
+  SEGMENT_CATALOG,
+  ENTRANCE_ANIMATIONS,
+  EXIT_ANIMATIONS,
+  TRANSITION_TYPES,
+} from '@reelstack/remotion/catalog';
 
 /**
  * Builds a dynamic system prompt for the LLM planner.
- * Includes available tools, effect types, and production guidelines.
+ * Effect catalog and segment catalog are auto-imported from the remotion package.
+ * When new effects or segments are added there, the prompt updates automatically.
  */
 export function buildPlannerPrompt(manifest: ToolManifest): string {
   const availableTools = manifest.tools.filter((t) => t.available);
@@ -96,6 +33,15 @@ export function buildPlannerPrompt(manifest: ToolManifest): string {
     .map((e) => `- "${e.type}": ${e.description}\n  Config: ${e.config}`)
     .join('\n');
 
+  const segmentSection = SEGMENT_CATALOG
+    .map((s) => `### ${s.type}\n${s.description}\nConfig: ${s.config}\nGuideline: ${s.dynamicGuideline}`)
+    .join('\n\n');
+
+  // Build output format example with all segment arrays
+  const segmentOutputExamples = SEGMENT_CATALOG
+    .map((s) => `  "${s.type}": []`)
+    .join(',\n');
+
   return `You are an AI video production planner. Given a script and available tools, create a complete production plan.
 
 ## AVAILABLE TOOLS
@@ -115,6 +61,12 @@ ${effectSection}
 Entrance animations: ${ENTRANCE_ANIMATIONS.join(', ')}
 Exit animations: ${EXIT_ANIMATIONS.join(', ')}
 
+## ADVANCED COMPOSITION ELEMENTS
+
+Beyond effects, use these to make the reel dynamic and professional:
+
+${segmentSection}
+
 ## LAYOUTS
 
 - "fullscreen": Single video fills the frame (best for faceless or avatar-only)
@@ -123,10 +75,10 @@ Exit animations: ${EXIT_ANIMATIONS.join(', ')}
 
 ## STYLE GUIDELINES
 
-- "dynamic": Fast cuts, 4-6 effects per 30s, emoji popups, screen shakes, glitch transitions
-- "calm": Slow transitions, 1-2 effects per 30s, subtle text emphasis only
-- "cinematic": Medium pacing, 2-3 effects per 30s, color flashes, glitch, text emphasis
-- "educational": Medium pacing, 2-4 effects per 30s, text emphasis on key terms, emoji for engagement
+- "dynamic": Fast cuts (2-4s per shot), 4-6 effects per 30s, LOTS of zoom segments (3-5 per 30s with spring easing), emoji popups, screen shakes, glitch transitions, varied transitions (mix slide-left, zoom-in, wipe — NOT all crossfade). This is NetworkChuck energy — every 2-3 seconds something new happens visually.
+- "calm": Slow transitions, 1-2 effects per 30s, subtle text emphasis only, smooth zoom easing
+- "cinematic": Medium pacing, 2-3 effects per 30s, color flashes, glitch, text emphasis, smooth zooms for dramatic moments
+- "educational": Medium pacing, 2-4 effects per 30s, text emphasis on key terms, lower thirds for concepts, counters for stats, zoom in on key points
 
 ## PLANNING RULES
 
@@ -160,7 +112,7 @@ Exit animations: ${EXIT_ANIMATIONS.join(', ')}
 
 4. TIMING: Shots must cover the entire duration. No gaps. Shots can overlap slightly for transitions.
 
-5. TRANSITIONS between shots: crossfade (default), slide-left, slide-right, zoom-in, wipe, none
+5. TRANSITIONS between shots: ${TRANSITION_TYPES.join(', ')}
 
 6. EFFECTS - CRITICAL RULES (follow strictly):
    **Less is more.** A clean reel with 2-3 well-placed effects beats a cluttered one with 8.
@@ -187,9 +139,16 @@ Exit animations: ${EXIT_ANIMATIONS.join(', ')}
       - "cinematic": max 3 effects per 30s
       - "educational": max 3-4 per 30s, focus on text-emphasis for key terms only
 
-7. B-ROLL SEARCH QUERIES: Use concrete, visual 2-3 word phrases ("typing laptop", "city skyline", "coffee shop"). NEVER leave searchQuery empty — if you can't think of a query, use the most visual noun from the script segment.
+7. ZOOM SEGMENTS — CRITICAL FOR DYNAMIC FEEL:
+   Zoom segments add camera movement to your reel. Without them the video feels static.
+   - "dynamic" style: ADD 3-5 zoom segments per 30s. Scale 1.2-2.0, spring easing, 1-3s each.
+   - "cinematic" style: ADD 2-3 zoom segments per 30s. Scale 1.1-1.5, smooth easing.
+   - Zoom in on key moments (when a stat is mentioned, when the hook lands, on visual reveals).
+   - Alternate between zoom-in and normal to create rhythm.
 
-8. QUALITY FIRST: Always prioritize visual quality over cost. Use the best available AI tools.
+8. B-ROLL SEARCH QUERIES: Use concrete, visual 2-3 word phrases ("typing laptop", "city skyline", "coffee shop"). NEVER leave searchQuery empty — if you can't think of a query, use the most visual noun from the script segment.
+
+9. QUALITY FIRST: Always prioritize visual quality over cost. Use the best available AI tools.
    If multiple AI video tools available, pick the best for each shot type (Seedance for cinematic, Kling for action).
 
 ## OUTPUT FORMAT
@@ -217,6 +176,7 @@ Return a JSON object (no markdown, just raw JSON):
       "reason": "Hook emphasis"
     }
   ],
+${segmentOutputExamples},
   "layout": "fullscreen",
   "reasoning": "Brief explanation of creative decisions"
 }`;
@@ -242,6 +202,10 @@ export function buildComposerPrompt(assets: readonly UserAsset[]): string {
     .map((e) => `- "${e.type}": ${e.description}\n  Config: ${e.config}`)
     .join('\n');
 
+  const segmentSection = SEGMENT_CATALOG
+    .map((s) => `### ${s.type}\n${s.description}\nConfig: ${s.config}\nGuideline: ${s.dynamicGuideline}`)
+    .join('\n\n');
+
   return `You are an AI video director/composer. The user has provided all their materials (videos, images, screenshots). Your job is to arrange them into a compelling video composition.
 
 ## USER'S AVAILABLE MATERIALS
@@ -255,6 +219,10 @@ ${effectSection}
 Entrance animations: ${ENTRANCE_ANIMATIONS.join(', ')}
 Exit animations: ${EXIT_ANIMATIONS.join(', ')}
 
+## ADVANCED COMPOSITION ELEMENTS
+
+${segmentSection}
+
 ## LAYOUTS
 
 - "fullscreen": Single video fills the frame
@@ -263,10 +231,10 @@ Exit animations: ${EXIT_ANIMATIONS.join(', ')}
 
 ## STYLE GUIDELINES
 
-- "dynamic": Fast cuts, 4-6 effects per 30s, emoji popups, screen shakes, glitch transitions
-- "calm": Slow transitions, 1-2 effects per 30s, subtle text emphasis only
-- "cinematic": Medium pacing, 2-3 effects per 30s, color flashes, glitch, text emphasis
-- "educational": Medium pacing, 2-4 effects per 30s, text emphasis on key terms, emoji for engagement
+- "dynamic": Fast cuts (2-4s per shot), 4-6 effects per 30s, LOTS of zoom segments (3-5 per 30s with spring easing), emoji popups, screen shakes, glitch transitions, varied transitions (mix slide-left, zoom-in, wipe — NOT all crossfade). This is NetworkChuck energy — every 2-3 seconds something new happens visually.
+- "calm": Slow transitions, 1-2 effects per 30s, subtle text emphasis only, smooth zoom easing
+- "cinematic": Medium pacing, 2-3 effects per 30s, color flashes, glitch, text emphasis, smooth zooms for dramatic moments
+- "educational": Medium pacing, 2-4 effects per 30s, text emphasis on key terms, lower thirds for concepts, counters for stats, zoom in on key points
 
 ## COMPOSITION RULES
 
@@ -285,11 +253,13 @@ Exit animations: ${EXIT_ANIMATIONS.join(', ')}
 
 4. TIMING: Shots must cover the entire duration. No gaps. Image B-roll shots: 3-8 seconds.
 
-5. TRANSITIONS: crossfade (default), slide-left, slide-right, zoom-in, wipe, none
+5. TRANSITIONS: ${TRANSITION_TYPES.join(', ')}
 
 6. EFFECTS: Place visual effects at key moments. Match the style. Never stack effects at the same time.
 
-7. You MUST use only the materials provided. Do NOT reference any asset IDs that are not in the list above.
+7. ZOOM SEGMENTS: Add zoom segments to create camera movement. Critical for dynamic feel.
+
+8. You MUST use only the materials provided. Do NOT reference any asset IDs that are not in the list above.
 
 ## OUTPUT FORMAT
 
@@ -308,6 +278,11 @@ Return a JSON object (no markdown, just raw JSON):
     }
   ],
   "effects": [...],
+  "zoomSegments": [...],
+  "lowerThirds": [...],
+  "counters": [...],
+  "highlights": [...],
+  "ctaSegments": [...],
   "layout": "fullscreen",
   "reasoning": "Brief explanation of creative decisions"
 }`;
