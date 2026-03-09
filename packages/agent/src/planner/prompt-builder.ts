@@ -138,8 +138,15 @@ Exit animations: ${EXIT_ANIMATIONS.join(', ')}
 
 2. TOOL PREFERENCES (follow strictly):
    - **ALWAYS prefer AI-generated content over stock footage.** AI video and AI images make the reel unique and visually striking. Stock footage is generic and forgettable.
-   - **AI video**: Prefer Seedance tools (any id containing "seedance") for best motion quality. Fallback to WAN, Hailuo, or Kling. Use for at least 50% of shots.
-   - **AI image**: Prefer NanoBanana tools (any id containing "nanobanana") for best quality. Fallback to FLUX or other image tools. Great for product shots, concept art, title screens.
+   - **AI video — MANDATORY tool selection order:**
+     1. Use "seedance2-piapi" or "seedance-piapi" (Seedance 2.0) if available — ALWAYS first choice
+     2. If no seedance available, use "seedance-kie" (Seedance 1.5 Pro)
+     3. Only if NO seedance tools available, fall back to WAN, Hailuo, or Kling
+     4. NEVER use Kling when Seedance is available. Seedance produces significantly better results.
+   - **AI image — MANDATORY tool selection order:**
+     1. Use "nanobanana2-kie" (NanoBanana 2) if available — ALWAYS first choice
+     2. If no nanobanana available, use FLUX tools
+     3. NEVER use FLUX when NanoBanana is available.
    - **Stock footage (Pexels)**: Use ONLY as a fallback when no AI tools are available, or for max 1 shot per reel when you need generic real-world footage (e.g. someone typing on laptop). Never make Pexels the primary visual strategy.
    - **Text-cards**: Use sparingly for stats, key takeaways, or transitions. Max 1 per reel.
    - **Write detailed AI prompts**: Follow the prompt guidelines for each tool. This is what makes the reel look professional. Lazy prompts = ugly output.

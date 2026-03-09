@@ -1,7 +1,6 @@
 import type { ProductionPlan, ShotPlan, AssetGenerationJob, GeneratedAsset } from '../types';
 import type { ToolRegistry } from '../registry/tool-registry';
 import { pollUntilDone } from '../polling';
-import { GenerationError } from '../errors';
 import { isPublicUrl } from '../planner/production-planner';
 import { createLogger } from '@reelstack/logger';
 
@@ -151,36 +150,72 @@ async function generateSingle(
     return null;
   }
 
-  log.info({ toolId: task.toolId, shotId: task.shotId }, 'Starting generation');
-  const job = await tool.generate(task.request);
+  // Try primary tool, then fallback to alternatives on failure
+  const result = await tryGenerate(tool, task);
+  if (result) return result;
 
-  if (job.status === 'failed') {
-    throw new GenerationError(job.error ?? 'Generation failed', task.toolId);
+  // Primary tool failed — find alternatives with the same asset type
+  const assetType = tool.capabilities[0]?.assetType;
+  if (!assetType) return null;
+
+  const alternatives = registry.getByCapability(assetType).filter((t) => t.id !== task.toolId);
+  if (alternatives.length === 0) {
+    log.warn({ toolId: task.toolId, shotId: task.shotId }, 'No fallback tools available');
+    return null;
   }
 
-  // If the tool is async, poll for completion
-  let finalJob: AssetGenerationJob = job;
-  if (job.status === 'pending' || job.status === 'processing') {
-    finalJob = await pollUntilDone(tool, job.jobId);
+  for (const alt of alternatives) {
+    log.info({ originalToolId: task.toolId, fallbackToolId: alt.id, shotId: task.shotId }, 'Trying fallback tool');
+    const fallbackResult = await tryGenerate(alt, task);
+    if (fallbackResult) return fallbackResult;
   }
 
-  if (finalJob.status !== 'completed' || !finalJob.url) {
-    throw new GenerationError(finalJob.error ?? 'Generation did not complete', task.toolId);
+  log.warn({ toolId: task.toolId, shotId: task.shotId, triedFallbacks: alternatives.map((t) => t.id) }, 'All tools failed');
+  return null;
+}
+
+async function tryGenerate(
+  tool: import('../registry/tool-interface').ProductionTool,
+  task: GenerationTask,
+): Promise<GeneratedAsset | null> {
+  try {
+    log.info({ toolId: tool.id, shotId: task.shotId }, 'Starting generation');
+    const job = await tool.generate(task.request);
+
+    if (job.status === 'failed') {
+      log.warn({ toolId: tool.id, error: job.error }, 'Generation failed');
+      return null;
+    }
+
+    // If the tool is async, poll for completion
+    let finalJob: AssetGenerationJob = job;
+    if (job.status === 'pending' || job.status === 'processing') {
+      finalJob = await pollUntilDone(tool, job.jobId);
+    }
+
+    if (finalJob.status !== 'completed' || !finalJob.url) {
+      log.warn({ toolId: tool.id, error: finalJob.error }, 'Generation did not complete');
+      return null;
+    }
+
+    // Validate returned URL: allow public URLs and local temp file paths
+    const url = finalJob.url;
+    if (!url.startsWith('/') && !isPublicUrl(url)) {
+      log.warn({ toolId: tool.id }, 'Tool returned invalid URL');
+      return null;
+    }
+
+    const assetType = tool.capabilities[0]?.assetType ?? 'stock-video';
+
+    return {
+      toolId: tool.id,
+      shotId: task.shotId,
+      url,
+      type: assetType,
+      durationSeconds: finalJob.durationSeconds,
+    };
+  } catch (err) {
+    log.warn({ toolId: tool.id, shotId: task.shotId, err }, 'Generation threw error');
+    return null;
   }
-
-  // Validate returned URL: allow public URLs and local temp file paths
-  const url = finalJob.url;
-  if (!url.startsWith('/') && !isPublicUrl(url)) {
-    throw new GenerationError(`Tool returned invalid URL: blocked by security policy`, task.toolId);
-  }
-
-  const assetType = tool.capabilities[0]?.assetType ?? 'stock-video';
-
-  return {
-    toolId: task.toolId,
-    shotId: task.shotId,
-    url,
-    type: assetType,
-    durationSeconds: finalJob.durationSeconds,
-  };
 }
