@@ -405,7 +405,7 @@ function parseResponse(text: string, input: PlannerInput): ProductionPlan {
     ? (rawLayout as ProductionPlan['layout'])
     : (input.layout ?? 'fullscreen');
 
-  return {
+  const plan: ProductionPlan = {
     primarySource,
     shots,
     effects,
@@ -413,6 +413,8 @@ function parseResponse(text: string, input: PlannerInput): ProductionPlan {
     captionStyle: sanitizeCaptionStyle(parsed.captionStyle),
     reasoning: typeof parsed.reasoning === 'string' ? parsed.reasoning : '',
   };
+
+  return enforceToolPreferences(plan, availableToolIds);
 }
 
 function parsePrimarySource(
@@ -667,6 +669,44 @@ function sanitizeVisual(v: Record<string, unknown>, availableToolIds: string[]):
     default:
       return { type: 'primary' };
   }
+}
+
+/**
+ * Post-process plan to enforce mandatory tool selection order.
+ * LLM often ignores tool preference instructions, so we fix it programmatically.
+ *
+ * AI video priority: seedance2-piapi > seedance-piapi > seedance-kie > others
+ * AI image priority: nanobanana2-kie > nanobanana > flux-* > others
+ */
+function enforceToolPreferences(plan: ProductionPlan, availableToolIds: string[]): ProductionPlan {
+  const VIDEO_PRIORITY = ['seedance2-piapi', 'seedance-piapi', 'seedance-kie', 'wan-kie', 'hunyuan-piapi', 'hailuo-piapi', 'kling-kie', 'kling-piapi'];
+  const IMAGE_PRIORITY = ['nanobanana2-kie', 'nanobanana', 'flux-kie', 'flux-piapi'];
+
+  const bestVideo = VIDEO_PRIORITY.find((id) => availableToolIds.includes(id));
+  const bestImage = IMAGE_PRIORITY.find((id) => availableToolIds.includes(id));
+
+  if (!bestVideo && !bestImage) return plan;
+
+  const fixedShots = plan.shots.map((shot) => {
+    if (shot.visual.type === 'ai-video' && bestVideo && shot.visual.toolId !== bestVideo) {
+      log.info({ shotId: shot.id, from: shot.visual.toolId, to: bestVideo }, 'Enforcing video tool preference');
+      return { ...shot, visual: { ...shot.visual, toolId: bestVideo } };
+    }
+    if (shot.visual.type === 'ai-image' && bestImage && shot.visual.toolId !== bestImage) {
+      log.info({ shotId: shot.id, from: shot.visual.toolId, to: bestImage }, 'Enforcing image tool preference');
+      return { ...shot, visual: { ...shot.visual, toolId: bestImage } };
+    }
+    return shot;
+  });
+
+  // Also fix primarySource if it's ai-video
+  let fixedPrimary = plan.primarySource;
+  if (fixedPrimary.type === 'ai-video' && bestVideo && fixedPrimary.toolId !== bestVideo) {
+    log.info({ from: fixedPrimary.toolId, to: bestVideo }, 'Enforcing primary video tool preference');
+    fixedPrimary = { ...fixedPrimary, toolId: bestVideo };
+  }
+
+  return { ...plan, shots: fixedShots, primarySource: fixedPrimary };
 }
 
 /** Validate URL is public HTTPS (not internal/private) */
