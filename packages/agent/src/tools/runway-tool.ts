@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { RUNWAY_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('runway-tool');
 
@@ -22,7 +23,7 @@ function validateJobId(jobId: string): boolean {
 export class RunwayTool implements ProductionTool {
   readonly id = 'runway';
   readonly name = 'Runway Gen-4';
-  readonly promptGuidelines = `Runway Gen-4 excels at cinematic camera moves, smooth transitions, and photorealistic scenes. Focus on: motion type (push, pull, pan, dolly), lighting quality (golden hour, studio, overcast), and subject clarity. Keep prompts under 50 words. Avoid: people's faces (copyright), text in frame, logo requests.`;
+  readonly promptGuidelines = RUNWAY_GUIDELINES;
   readonly capabilities: ToolCapability[] = [
     {
       assetType: 'ai-video',

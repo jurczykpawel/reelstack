@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { NANOBANANA_GUIDELINES, WAN_GUIDELINES, QWEN_IMAGE_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('wavespeed-tool');
 
@@ -208,8 +209,7 @@ export const wavespeedNanaBananaProTool: ProductionTool = new WavespeedTool({
   id: 'nanobanana-pro-wavespeed',
   name: 'NanoBanana Pro via WaveSpeed',
   modelSlug: 'google/nano-banana-pro/text-to-image',
-  promptGuidelines: `NanoBanana Pro (Gemini 3 Pro): highest quality Google image model on WaveSpeed.
-Supports 1k/2k/4k resolution. Great for complex compositions and text-in-image.`,
+  promptGuidelines: NANOBANANA_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',
@@ -232,9 +232,7 @@ export const wavespeedWan26Tool: ProductionTool = new WavespeedTool({
   id: 'wan26-wavespeed',
   name: 'WAN 2.6 via WaveSpeed',
   modelSlug: 'alibaba/wan-2.6-t2v-720p',
-  promptGuidelines: `WAN 2.6 (Alibaba): advanced video with native audio support, 720p.
-Stronger than WAN 2.1 in motion quality and character consistency.
-Good for: lifestyle, nature, urban scenes. Supports multi-shot descriptions.`,
+  promptGuidelines: WAN_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-video',
@@ -257,9 +255,7 @@ export const wavespeedQwenImageTool: ProductionTool = new WavespeedTool({
   id: 'qwen-image-wavespeed',
   name: 'Qwen Image 2.0 via WaveSpeed',
   modelSlug: 'alibaba/qwen-image-2.0/text-to-image',
-  promptGuidelines: `Qwen Image 2.0 (Alibaba): photorealistic images, bilingual (Chinese/English), $0.04/image.
-Excellent prompt adherence, strong for lifestyle and commercial imagery.
-Works well with natural language — no special syntax needed.`,
+  promptGuidelines: QWEN_IMAGE_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',

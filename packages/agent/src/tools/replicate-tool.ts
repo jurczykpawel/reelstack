@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { IDEOGRAM_GUIDELINES, RECRAFT_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('replicate-tool');
 
@@ -228,8 +229,7 @@ export const replicateIdeogramTool: ProductionTool = new ReplicateTool({
   name: 'Ideogram v3 via Replicate',
   owner: 'ideogram-ai',
   model: 'ideogram-v3-balanced',
-  promptGuidelines: `Ideogram v3: best for images with readable text (signs, titles, labels).
-Put quoted text in prompt: 'storefront sign reading "SALE"'. Supports Polish characters.`,
+  promptGuidelines: IDEOGRAM_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',
@@ -253,9 +253,7 @@ export const replicateRecraftTool: ProductionTool = new ReplicateTool({
   name: 'Recraft v3 via Replicate',
   owner: 'recraft-ai',
   model: 'recraft-v3',
-  promptGuidelines: `Recraft v3: design-style images, illustrations, UI mockups, icons, vector-like art.
-Best for: infographic elements, product mockups, flat design, brand visuals.
-Avoid for: photorealistic scenes (use FLUX Pro or Imagen4 instead).`,
+  promptGuidelines: RECRAFT_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { SEEDANCE_GUIDELINES, HUNYUAN_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('piapi-tool');
 
@@ -17,7 +18,7 @@ interface PiapiModelConfig {
   id: string;
   name: string;
   model: string;
-  task_type: 'txt2video' | 'txt2img' | 'imagine' | 'video_generation';
+  task_type: 'txt2video' | 'txt2img' | 'imagine' | 'video_generation' | 'seedance-2-preview' | 'seedance-2-fast-preview';
   capabilities: ToolCapability[];
   promptGuidelines?: string;
   buildInput(req: AssetGenerationRequest): Record<string, unknown>;
@@ -32,10 +33,10 @@ interface PiapiTaskData {
     image_urls?: string[];
     // Video models (simple)
     video_url?: string;
+    // Seedance 2 output format
+    video?: string | { url?: string };
     // Kling output format
     works?: Array<{ resource?: { resource?: string } }>;
-    // Hailuo output format
-    video?: { url?: string };
   };
   error?: { message?: string };
 }
@@ -47,7 +48,7 @@ class PiapiTool implements ProductionTool {
   readonly promptGuidelines?: string;
 
   private readonly model: string;
-  private readonly task_type: 'txt2video' | 'txt2img' | 'imagine' | 'video_generation';
+  private readonly task_type: string;
   private readonly buildInput: (req: AssetGenerationRequest) => Record<string, unknown>;
   private readonly parseOutput: (data: PiapiTaskData) => string | undefined;
 
@@ -157,6 +158,14 @@ class PiapiTool implements ProductionTool {
   }
 }
 
+/** Extract video URL from output.video which can be a string (Seedance 2) or object with url (Hailuo) */
+function extractVideoUrl(data: PiapiTaskData): string | undefined {
+  const v = data.output?.video;
+  if (typeof v === 'string') return v;
+  if (v && typeof v === 'object') return v.url;
+  return data.output?.video_url;
+}
+
 // ── Exported instances ────────────────────────────────────────
 
 export const piapiKlingTool: ProductionTool = new PiapiTool({
@@ -186,20 +195,19 @@ export const piapiKlingTool: ProductionTool = new PiapiTool({
   parseOutput: (data) => data.output?.works?.[0]?.resource?.resource ?? data.output?.video_url,
 });
 
-// Seedance model name on piapi is not publicly documented — placeholder with best-guess.
-// Will be retried with correct name once piapi confirms.
 export const piapiSeedanceTool: ProductionTool = new PiapiTool({
   id: 'seedance-piapi',
-  name: 'Seedance via piapi.ai',
-  model: 'Qubico/seedance-video',
-  task_type: 'txt2video',
+  name: 'Seedance 2.0 (fast) via piapi.ai',
+  model: 'seedance',
+  task_type: 'seedance-2-fast-preview',
+  promptGuidelines: SEEDANCE_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-video',
       supportsPrompt: true,
       supportsScript: false,
-      maxDurationSeconds: 10,
-      estimatedLatencyMs: 120_000,
+      maxDurationSeconds: 15,
+      estimatedLatencyMs: 90_000,
       isAsync: true,
       costTier: 'moderate',
     },
@@ -208,9 +216,8 @@ export const piapiSeedanceTool: ProductionTool = new PiapiTool({
     prompt: req.prompt ?? 'abstract cinematic background',
     duration: req.durationSeconds ?? 5,
     aspect_ratio: req.aspectRatio ?? '9:16',
-    resolution: '480p',
   }),
-  parseOutput: (data) => data.output?.video_url,
+  parseOutput: extractVideoUrl,
 });
 
 export const piapiHailuoTool: ProductionTool = new PiapiTool({
@@ -233,7 +240,7 @@ export const piapiHailuoTool: ProductionTool = new PiapiTool({
     model_name: 't2v-01',
     prompt: req.prompt ?? 'abstract cinematic background',
   }),
-  parseOutput: (data) => data.output?.video?.url ?? data.output?.video_url,
+  parseOutput: extractVideoUrl,
 });
 
 export const piapiFluxTool: ProductionTool = new PiapiTool({
@@ -262,17 +269,15 @@ export const piapiFluxTool: ProductionTool = new PiapiTool({
 export const piapiSeedance2Tool: ProductionTool = new PiapiTool({
   id: 'seedance2-piapi',
   name: 'Seedance 2.0 via piapi.ai',
-  model: 'Qubico/seedance-video-2',
-  task_type: 'txt2video',
-  promptGuidelines: `Seedance 2.0: cinematic multi-shot video, ultra-realistic, supports 720p/1080p.
-Subject + Action first. Supports camera movement hints and multi-shot descriptions.
-Better than Seedance 1.x for complex scenes and character consistency.`,
+  model: 'seedance',
+  task_type: 'seedance-2-preview',
+  promptGuidelines: SEEDANCE_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-video',
       supportsPrompt: true,
       supportsScript: false,
-      maxDurationSeconds: 10,
+      maxDurationSeconds: 15,
       estimatedLatencyMs: 150_000,
       isAsync: true,
       costTier: 'moderate',
@@ -282,9 +287,8 @@ Better than Seedance 1.x for complex scenes and character consistency.`,
     prompt: req.prompt ?? 'abstract cinematic background',
     duration: req.durationSeconds ?? 5,
     aspect_ratio: req.aspectRatio ?? '9:16',
-    resolution: '720p',
   }),
-  parseOutput: (data) => data.output?.video_url,
+  parseOutput: extractVideoUrl,
 });
 
 export const piapiHunyuanTool: ProductionTool = new PiapiTool({
@@ -292,9 +296,7 @@ export const piapiHunyuanTool: ProductionTool = new PiapiTool({
   name: 'Hunyuan Video via piapi.ai',
   model: 'Qubico/hunyuan',
   task_type: 'txt2video',
-  promptGuidelines: `Hunyuan Video (Tencent): excellent cinematic quality, strong motion realism.
-Natural language prompts work well. Good for: people, urban scenes, product videos.
-Keep prompts descriptive but not too long — 50-100 words optimal.`,
+  promptGuidelines: HUNYUAN_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-video',

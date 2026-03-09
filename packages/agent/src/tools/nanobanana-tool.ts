@@ -5,6 +5,7 @@ import path from 'path';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { NANOBANANA_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('nanobanana-tool');
 
@@ -17,41 +18,7 @@ const GEMINI_API = 'https://generativelanguage.googleapis.com/v1beta';
 export class NanoBananaTool implements ProductionTool {
   readonly id = 'nanobanana';
   readonly name = 'NanoBanana (Gemini Image)';
-  readonly promptGuidelines = `NanoBanana (Gemini Imagen) prompt guidelines:
-
-KEY INSIGHT: Plain text with structured sections beats vague descriptions. Negative prompts are CRITICAL.
-
-Use structured sections (Wzorzec A — best quality):
-\`\`\`
-Scene: [brief scene description]
-Subject: [who/what, pose, expression, clothing]
-Environment: [setting, background, atmosphere]
-Lighting: [type, direction, intensity, color temperature]
-Camera: [lens mm, framing, focus/DOF]
-Negative: [what to avoid]
-\`\`\`
-
-Lighting parameters (most impactful field):
-- Type: natural | studio | golden hour | neon | dramatic
-- Direction: front | side | back | rim
-- Intensity: soft / diffused | hard | harsh
-- Temperature: warm amber | cool blue | neutral white
-
-Camera parameters:
-- Lens: 24mm (wide) | 35mm (street) | 50mm (natural) | 85mm (portrait) | 135mm (telephoto)
-- Framing: extreme close-up | close-up | medium shot | wide shot | bird's eye
-- Focus: sharp | shallow depth of field (f/1.4–f/2.8) | tilt-shift
-- Layout: centered | rule of thirds | symmetrical | negative space on right
-
-Style keywords: "documentary realism" | "lifestyle photography" | "editorial" | "vintage film" | "product shot" | "isometric illustration" | "technical blueprint"
-
-Negative prompt patterns (always include):
-- For photos: "blurry, distorted, low quality, text, watermarks, logos, uncanny"
-- For clean product shots: "clutter, busy background, harsh shadows, overexposed"
-- Add "No text" at the end if no text wanted in frame
-
-Good for: thumbnails, infographics, product shots, title card backgrounds, editorial stills, concept art
-Avoid for: logos (use Ideogram instead), animation, video thumbnails with text overlays`;
+  readonly promptGuidelines = NANOBANANA_GUIDELINES;
   readonly capabilities: ToolCapability[] = [
     {
       assetType: 'ai-image',

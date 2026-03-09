@@ -2,6 +2,16 @@ import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
 import { createLogger } from '@reelstack/logger';
+import {
+  NANOBANANA_GUIDELINES,
+  IDEOGRAM_GUIDELINES,
+  RECRAFT_GUIDELINES,
+  FLUX_GUIDELINES,
+  SEEDREAM_GUIDELINES,
+  PIKA_GUIDELINES,
+  LTX_GUIDELINES,
+  LUMA_GUIDELINES,
+} from './prompt-guidelines';
 
 const log = createLogger('fal-tool');
 
@@ -312,9 +322,7 @@ export const falNanaBanana2Tool: ProductionTool = new FalTool({
   id: 'nanobanana2-fal',
   name: 'NanoBanana 2 via fal.ai',
   modelId: 'fal-ai/nano-banana-2',
-  promptGuidelines: `NanoBanana 2 (Gemini Flash image): fast, cheap, great for B-roll stills and backgrounds.
-Use structured prompts: Scene + Subject + Lighting + Camera. Keep under 100 words.
-Negative prompt suffix always: "blurry, distorted, text, watermark, low quality".`,
+  promptGuidelines: NANOBANANA_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',
@@ -336,10 +344,7 @@ export const falIdeogramTool: ProductionTool = new FalTool({
   id: 'ideogram-fal',
   name: 'Ideogram v3 via fal.ai',
   modelId: 'fal-ai/ideogram/v3',
-  promptGuidelines: `Ideogram v3: best model for images WITH TEXT (titles, captions, labels in frame).
-Include quoted text exactly as it should appear: 'A neon sign reading "SALE 50% OFF"'.
-For pure visuals without text, prefer FLUX or NanoBanana instead.
-Aspect ratio support: 9:16, 16:9, 1:1. rendering_speed: TURBO (fast) or QUALITY (better).`,
+  promptGuidelines: IDEOGRAM_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',
@@ -362,10 +367,7 @@ export const falRecraftTool: ProductionTool = new FalTool({
   id: 'recraft-fal',
   name: 'Recraft v3 via fal.ai',
   modelId: 'fal-ai/recraft-v3',
-  promptGuidelines: `Recraft v3: best for design-style images, illustrations, icons, UI mockups, vector-like artwork.
-Style options via prompt suffix: "realistic_image" | "digital_illustration" | "vector_illustration" | "icon".
-Good for: infographic elements, product mockups, flat design, brand imagery.
-Avoid for: photorealistic scenes (use FLUX or Imagen4 instead).`,
+  promptGuidelines: RECRAFT_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',
@@ -388,9 +390,7 @@ export const falFluxProTool: ProductionTool = new FalTool({
   id: 'flux-pro-fal',
   name: 'FLUX Pro via fal.ai',
   modelId: 'fal-ai/flux-pro',
-  promptGuidelines: `FLUX Pro: higher quality than FLUX Schnell, better prompt adherence, photorealistic.
-Use for hero shots, key visuals, thumbnail-quality images. Budget accordingly (10x cost of Schnell).
-Prompts work best with detailed scene description + lighting + camera specs.`,
+  promptGuidelines: FLUX_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',
@@ -438,10 +438,7 @@ export const falNanaBananaProTool: ProductionTool = new FalTool({
   id: 'nanobanana-pro-fal',
   name: 'NanoBanana Pro via fal.ai',
   modelId: 'fal-ai/nano-banana-pro',
-  promptGuidelines: `NanoBanana Pro (Gemini 3 Pro Image): highest quality Google image model.
-Understands conversational prompts — no keyword stuffing needed.
-Excellent for: text in images (signs, labels, Polish text), complex compositions, marketing visuals.
-$0.15/image — use for hero shots, thumbnails, key visuals. Use NanoBanana 2 for bulk B-roll.`,
+  promptGuidelines: NANOBANANA_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',
@@ -463,10 +460,7 @@ export const falSeedream45Tool: ProductionTool = new FalTool({
   id: 'seedream45-fal',
   name: 'Seedream 4.5 via fal.ai',
   modelId: 'fal-ai/bytedance/seedream/v4.5/text-to-image',
-  promptGuidelines: `Seedream 4.5 (ByteDance): photorealistic images in 2-3s, up to 4MP (2048×2048), $0.04/image.
-Best for: product shots, lifestyle photos, editorial imagery, social media visuals.
-Prompts: natural language works well, no special syntax needed.
-Supports: text-in-image (Chinese and English), photorealistic, illustration styles.`,
+  promptGuidelines: SEEDREAM_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',
@@ -488,9 +482,7 @@ export const falFluxDevTool: ProductionTool = new FalTool({
   id: 'flux-dev-fal',
   name: 'FLUX Dev via fal.ai',
   modelId: 'fal-ai/flux/dev',
-  promptGuidelines: `FLUX Dev: 12B parameter model, higher quality than Schnell (28 steps vs 4).
-Better prompt adherence, more detail, photorealistic. ~2-3x slower and costlier than Schnell.
-Use for: key hero images where quality > speed. Use Schnell for quick B-roll.`,
+  promptGuidelines: FLUX_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',
@@ -521,9 +513,7 @@ export const falPika22Tool: ProductionTool = new FalTool({
   id: 'pika22-fal',
   name: 'Pika 2.2 via fal.ai',
   modelId: 'fal-ai/pika/v2.2/text-to-video',
-  promptGuidelines: `Pika 2.2: cinematic text-to-video, up to 1080p. Great for transitions and product reveals.
-Lead with action: "A coffee cup slides into frame on a marble surface".
-Duration: 5s or 10s. Supports camera motion hints: "slow zoom", "pan left", "tracking shot".`,
+  promptGuidelines: PIKA_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-video',
@@ -548,9 +538,7 @@ export const falLtx23Tool: ProductionTool = new FalTool({
   id: 'ltx23-fal',
   name: 'LTX-2.3 via fal.ai',
   modelId: 'fal-ai/ltx-2.3/text-to-video',
-  promptGuidelines: `LTX-2.3 (Lightricks): open-source, fast, up to 4K, up to 20s, native audio support.
-Good for: atmospheric B-roll, nature, abstract, motion graphics.
-Negative prompt important: always include "blurry, low quality, distorted, flickering".`,
+  promptGuidelines: LTX_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-video',
@@ -575,10 +563,7 @@ export const falLumaDreamMachineTool: ProductionTool = new FalTool({
   id: 'luma-fal',
   name: 'Luma Dream Machine via fal.ai',
   modelId: 'fal-ai/luma-dream-machine',
-  promptGuidelines: `Luma Dream Machine: smooth cinematic motion, great physics simulation.
-Strengths: fluid motion, reflections, caustics, natural environments.
-Keep prompt focused on one scene: "Ocean waves crash on rocky shore at golden hour, slow motion, handheld".
-Duration: "5s" or "10s" (as string).`,
+  promptGuidelines: LUMA_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-video',

@@ -3,6 +3,7 @@ import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
 import { createLogger } from '@reelstack/logger';
 import { isPublicUrl } from '../planner/production-planner';
+import { SEEDANCE_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('seedance-tool');
 
@@ -21,37 +22,7 @@ const SEEDANCE_API = 'https://api.seedance.ai';
 export class SeedanceTool implements ProductionTool {
   readonly id = 'seedance';
   readonly name = 'Seedance Video';
-  readonly promptGuidelines = `Seedance 2.0 prompt framework (5 layers):
-SUBJECT + ACTION + CAMERA + STYLE + SOUND
-
-CRITICAL RULE: Subject + Action must appear in the FIRST 20-30 words. The model weights early tokens heavily.
-
-Complexity levels:
-- L1 (≤30 words): atmospheric, let the model decide — "Foggy mountain lake at dawn, still water, bird call. Locked wide shot."
-- L2 (30-100 words): directed shot with clear subject + camera + lighting
-- L3 (100-300 words): add timestamps — "0-3s: Wide shot. 3-6s: Slow dolly push. 6-10s: Close-up."
-- L4 (300-1000w): full choreography per shot with physics and reactions
-
-Camera parameters:
-- Framing: wide | medium | close-up | ECU | over-shoulder | full body
-- Movement: locked-off | dolly push | dolly pull | pan | tilt | orbit | handheld | crane | tracking
-- Speed: slow | moderate | fast | "over 8 seconds"
-- Angle: eye level | low angle | high angle | bird's eye | Dutch angle
-
-Lighting parameters:
-- Direction: camera-left | camera-right | above | below | behind (rim)
-- Contrast: low-key (shadows) | high-key (bright, flat)
-- Temperature: warm amber | cool blue | neutral white
-- Shadows: hard-edged | soft wrap | absent
-
-Style tokens (max 2-3): anamorphic | film grain | digital clean | muted | neon-saturated | warm/cold contrast
-
-FORBIDDEN words (degrade quality): cinematic, epic, masterpiece, ultra-real, award-winning, stunning, 8K, beautiful, breathtaking, immersive, ethereal, magical
-Use measurable descriptions instead:
-- WRONG: "cinematic lighting" → RIGHT: "45-degree hard key camera-left, warm amber, deep shadow"
-- WRONG: "epic scale" → RIGHT: "wide shot, subject occupies 10% of frame, mountain backdrop"
-
-Good for: product reveals, lifestyle B-roll, mood pieces, architecture, social proof moments`;
+  readonly promptGuidelines = SEEDANCE_GUIDELINES;
   readonly capabilities: ToolCapability[] = [
     {
       assetType: 'ai-video',

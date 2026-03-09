@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob } from '../types';
 import { isPublicUrl } from '../planner/production-planner';
+import { PEXELS_GUIDELINES } from './prompt-guidelines';
 
 const PEXELS_API = 'https://api.pexels.com';
 
@@ -12,15 +13,7 @@ const PEXELS_API = 'https://api.pexels.com';
 export class PexelsTool implements ProductionTool {
   readonly id = 'pexels';
   readonly name = 'Pexels Stock';
-  readonly promptGuidelines = `Pexels search query guidelines:
-- Use 2-3 word concrete visual phrases, NOT full sentences
-- Good: "typing laptop", "city skyline night", "coffee pour slow motion", "hands shaking business"
-- Bad: "a person working on their computer in a modern office"
-- Think visually: what would a camera lens literally see?
-- For abstract topics use visual metaphors: "tangled rope" for complexity, "open road" for freedom, "puzzle pieces" for strategy
-- Include style hints if needed: "aerial city", "macro water drop", "time lapse traffic"
-- Stock footage exists for: nature, business, lifestyle, city, food, technology, sports
-- Does NOT have: fictional characters, brand-specific products, niche technical equipment`;
+  readonly promptGuidelines = PEXELS_GUIDELINES;
   readonly capabilities: ToolCapability[] = [
     {
       assetType: 'stock-video',

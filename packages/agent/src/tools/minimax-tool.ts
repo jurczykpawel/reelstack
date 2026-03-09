@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { HAILUO_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('minimax-tool');
 
@@ -24,13 +25,7 @@ function validateJobId(jobId: string): boolean {
 export class MinimaxVideoTool implements ProductionTool {
   readonly id = 'minimax';
   readonly name = 'MiniMax Hailuo (direct)';
-  readonly promptGuidelines = `MiniMax Hailuo prompt guidelines:
-- Lead with subject + action: "A woman walks through a neon-lit market" not "A market with a woman"
-- Camera hints work: "slow push-in", "tracking shot", "locked wide"
-- Keep under 200 words — model reads full prompt but quality drops after ~100 words
-- Best at: cinematic short clips, lifestyle, product reveals, urban/nature scenes
-- video-01-live: more dynamic motion, good for action
-- video-01: smoother, better for calm/atmospheric shots`;
+  readonly promptGuidelines = HAILUO_GUIDELINES;
   readonly capabilities: readonly ToolCapability[] = [
     {
       assetType: 'ai-video',

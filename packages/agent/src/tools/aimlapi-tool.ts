@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { KLING_GUIDELINES, VEO3_GUIDELINES, SORA_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('aimlapi-tool');
 
@@ -319,8 +320,7 @@ export const aimlapiKlingV3Tool: ProductionTool = new AimlapiVideoTool({
   name: 'Kling v3 Pro via AIML API',
   modelId: 'klingai/video-v3-pro-text-to-video',
   provider: 'kling',
-  promptGuidelines: `Kling v3 Pro: narrative control, multi-scene, native audio, up to 15s.
-Latest Kling — better consistency and motion than v2.x.`,
+  promptGuidelines: KLING_GUIDELINES,
   capabilities: [
     { assetType: 'ai-video', supportsPrompt: true, supportsScript: false, maxDurationSeconds: 10, estimatedLatencyMs: 180_000, isAsync: true, costTier: 'moderate' },
   ],
@@ -338,8 +338,7 @@ export const aimlapiVeo3Tool: ProductionTool = new AimlapiVideoTool({
   name: 'Veo 3 via AIML API',
   modelId: 'google/veo3',
   provider: 'google',
-  promptGuidelines: `Google Veo 3: 720p/1080p, 8s, photorealistic, supports dialogue and audio.
-Best for high-fidelity scenes where quality is top priority.`,
+  promptGuidelines: VEO3_GUIDELINES,
   capabilities: [
     { assetType: 'ai-video', supportsPrompt: true, supportsScript: false, maxDurationSeconds: 8, estimatedLatencyMs: 300_000, isAsync: true, costTier: 'expensive' },
   ],
@@ -355,9 +354,7 @@ export const aimlapiSora2Tool: ProductionTool = new AimlapiVideoTool({
   name: 'Sora 2 via AIML API',
   modelId: 'sora-2-t2v',
   provider: 'openai',
-  promptGuidelines: `Sora 2 (OpenAI): accurate physics, sharp realism, synchronized audio.
-State-of-the-art for photorealistic video. Expensive — use for hero shots only.
-Prompts: cinematic scene descriptions work best. Avoid vague adjectives.`,
+  promptGuidelines: SORA_GUIDELINES,
   capabilities: [
     { assetType: 'ai-video', supportsPrompt: true, supportsScript: false, maxDurationSeconds: 10, estimatedLatencyMs: 300_000, isAsync: true, costTier: 'expensive' },
   ],

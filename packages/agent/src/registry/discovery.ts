@@ -18,7 +18,7 @@ import { replicateWanTool, replicateFluxTool, replicateSdxlTool, replicateIdeogr
 import { runwayTool } from '../tools/runway-tool';
 import { aimlapiKlingTool, aimlapiFluxTool, aimlapiKlingV3Tool, aimlapiVeo3Tool, aimlapiSora2Tool, aimlapiPixverseTool } from '../tools/aimlapi-tool';
 import { wavespeedSeedanceTool, wavespeedWanTool, wavespeedFluxTool, wavespeedNanaBananaProTool, wavespeedWan26Tool, wavespeedQwenImageTool } from '../tools/wavespeed-tool';
-import { kieKlingTool, kieWanTool, kieFluxTool, kieNanaBanana2Tool } from '../tools/kie-tool';
+import { kieKlingTool, kieSeedanceTool, kieWanTool, kieFluxTool, kieNanaBanana2Tool } from '../tools/kie-tool';
 import { MinimaxVideoTool } from '../tools/minimax-tool';
 
 /**
@@ -92,7 +92,7 @@ export function discoverTools(): ProductionTool[] {
 
   // kie.ai
   if (process.env.KIE_API_KEY) {
-    tools.push(kieKlingTool, kieWanTool, kieFluxTool, kieNanaBanana2Tool);
+    tools.push(kieKlingTool, kieSeedanceTool, kieWanTool, kieFluxTool, kieNanaBanana2Tool);
   }
 
   // MiniMax direct API (platform.minimax.io)

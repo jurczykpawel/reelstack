@@ -2,10 +2,11 @@ import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { SEEDANCE_GUIDELINES, NANOBANANA_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('kie-tool');
 
-const KIE_BASE = 'https://kieai.erweima.ai/api/v1';
+const KIE_BASE = 'https://api.kie.ai/api/v1';
 
 const JOB_ID_RE = /^[a-zA-Z0-9\-_.~:]+$/;
 
@@ -13,15 +14,15 @@ function validateJobId(jobId: string): boolean {
   return jobId.length > 0 && jobId.length <= 256 && JOB_ID_RE.test(jobId);
 }
 
-interface KieTaskOutput {
-  video_url?: string;
-  image_url?: string;
-}
-
-interface KieTaskData {
-  status?: string;
-  output?: KieTaskOutput;
-  error?: string;
+interface KieRecordData {
+  taskId?: string;
+  model?: string;
+  state?: string; // 'waiting' | 'queuing' | 'generating' | 'success' | 'fail'
+  resultJson?: string; // JSON string: {"resultUrls": ["https://..."]}
+  failCode?: string | null;
+  failMsg?: string | null;
+  costTime?: number;
+  progress?: number;
 }
 
 interface KieModelConfig {
@@ -32,7 +33,16 @@ interface KieModelConfig {
   capabilities: ToolCapability[];
   promptGuidelines?: string;
   buildInput(req: AssetGenerationRequest): Record<string, unknown>;
-  parseOutput(data: KieTaskData): string | undefined;
+}
+
+function parseResultUrl(data: KieRecordData): string | undefined {
+  if (!data.resultJson) return undefined;
+  try {
+    const parsed = JSON.parse(data.resultJson) as { resultUrls?: string[] };
+    return parsed.resultUrls?.[0];
+  } catch {
+    return undefined;
+  }
 }
 
 class KieTool implements ProductionTool {
@@ -44,7 +54,6 @@ class KieTool implements ProductionTool {
   private readonly model: string;
   private readonly task_type: 'txt2video' | 'txt2img';
   private readonly buildInput: (req: AssetGenerationRequest) => Record<string, unknown>;
-  private readonly parseOutput: (data: KieTaskData) => string | undefined;
 
   constructor(config: KieModelConfig) {
     this.id = config.id;
@@ -54,7 +63,6 @@ class KieTool implements ProductionTool {
     this.capabilities = config.capabilities;
     this.promptGuidelines = config.promptGuidelines;
     this.buildInput = config.buildInput;
-    this.parseOutput = config.parseOutput;
   }
 
   private get apiKey(): string | undefined {
@@ -72,7 +80,7 @@ class KieTool implements ProductionTool {
     }
 
     try {
-      const res = await fetch(`${KIE_BASE}/task`, {
+      const res = await fetch(`${KIE_BASE}/jobs/createTask`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -92,15 +100,15 @@ class KieTool implements ProductionTool {
         return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `kie.ai API error (${res.status})` };
       }
 
-      const data = (await res.json()) as { code?: number; data?: { task_id?: string } };
+      const data = (await res.json()) as { code?: number; data?: { taskId?: string } };
 
-      if (!data.data?.task_id) {
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'No task_id returned' };
+      if (!data.data?.taskId) {
+        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'No taskId returned' };
       }
 
-      log.info({ toolId: this.id, taskId: data.data.task_id }, 'kie generation started');
+      log.info({ toolId: this.id, taskId: data.data.taskId }, 'kie generation started');
 
-      return { jobId: data.data.task_id, toolId: this.id, status: 'processing' };
+      return { jobId: data.data.taskId, toolId: this.id, status: 'processing' };
     } catch (err) {
       log.warn({ toolId: this.id, err }, 'kie generate error');
       return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `kie.ai request failed: ${err instanceof Error ? err.message : 'unknown'}` };
@@ -117,8 +125,11 @@ class KieTool implements ProductionTool {
     }
 
     try {
-      const res = await fetch(`${KIE_BASE}/task/${encodeURIComponent(jobId)}`, {
-        headers: { Authorization: `Bearer ${this.apiKey}` },
+      const res = await fetch(`${KIE_BASE}/jobs/recordInfo?taskId=${encodeURIComponent(jobId)}`, {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
         signal: AbortSignal.timeout(10_000),
       });
 
@@ -127,23 +138,24 @@ class KieTool implements ProductionTool {
         return { jobId, toolId: this.id, status: 'processing' };
       }
 
-      const body = (await res.json()) as { data?: KieTaskData };
+      const body = (await res.json()) as { code?: number; data?: KieRecordData };
       const taskData = body.data;
 
       if (!taskData) return { jobId, toolId: this.id, status: 'processing' };
 
-      if (taskData.status === 'failed') {
-        return { jobId, toolId: this.id, status: 'failed', error: taskData.error ?? 'kie.ai generation failed' };
+      if (taskData.state === 'fail') {
+        return { jobId, toolId: this.id, status: 'failed', error: taskData.failMsg ?? 'kie.ai generation failed' };
       }
 
-      if (taskData.status === 'completed') {
-        const url = this.parseOutput(taskData);
+      if (taskData.state === 'success') {
+        const url = parseResultUrl(taskData);
         if (!url) {
           return { jobId, toolId: this.id, status: 'failed', error: 'No URL in kie.ai result' };
         }
         return { jobId, toolId: this.id, status: 'completed', url };
       }
 
+      // waiting, queuing, generating
       return { jobId, toolId: this.id, status: 'processing' };
     } catch (err) {
       log.warn({ toolId: this.id, jobId, err }, 'kie poll error');
@@ -156,8 +168,8 @@ class KieTool implements ProductionTool {
 
 export const kieKlingTool: ProductionTool = new KieTool({
   id: 'kling-kie',
-  name: 'Kling via kie.ai',
-  model: 'kling-video',
+  name: 'Kling 2.1 via kie.ai',
+  model: 'kling-v2.1-standard',
   task_type: 'txt2video',
   capabilities: [
     {
@@ -175,16 +187,46 @@ export const kieKlingTool: ProductionTool = new KieTool({
     negative_prompt: 'blurry, low quality',
     duration: req.durationSeconds ?? 5,
     aspect_ratio: req.aspectRatio ?? '9:16',
-    version: '2.1',
-    mode: 'std',
   }),
-  parseOutput: (data) => data.output?.video_url,
+});
+
+export const kieSeedanceTool: ProductionTool = new KieTool({
+  id: 'seedance-kie',
+  name: 'Seedance 1.5 Pro via kie.ai',
+  model: 'bytedance/seedance-1.5-pro',
+  task_type: 'txt2video',
+  promptGuidelines: SEEDANCE_GUIDELINES,
+  capabilities: [
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 12,
+      estimatedLatencyMs: 120_000,
+      isAsync: true,
+      costTier: 'moderate',
+    },
+  ],
+  buildInput: (req) => {
+    // Seedance 1.5 Pro accepts duration as string: "4", "8", "12"
+    const dur = req.durationSeconds ?? 5;
+    const validDurations = [4, 8, 12];
+    const closest = validDurations.reduce((prev, curr) =>
+      Math.abs(curr - dur) < Math.abs(prev - dur) ? curr : prev
+    );
+    return {
+      prompt: req.prompt ?? 'abstract cinematic background',
+      duration: String(closest),
+      aspect_ratio: req.aspectRatio ?? '9:16',
+      resolution: '720p',
+    };
+  },
 });
 
 export const kieWanTool: ProductionTool = new KieTool({
   id: 'wan-kie',
-  name: 'WAN 2.1 via kie.ai',
-  model: 'wan-2.1',
+  name: 'WAN 2.6 via kie.ai',
+  model: 'wan/2-6-text-to-video',
   task_type: 'txt2video',
   capabilities: [
     {
@@ -201,9 +243,7 @@ export const kieWanTool: ProductionTool = new KieTool({
     prompt: req.prompt ?? 'abstract cinematic background',
     duration: req.durationSeconds ?? 5,
     aspect_ratio: req.aspectRatio ?? '9:16',
-    resolution: '480p',
   }),
-  parseOutput: (data) => data.output?.video_url,
 });
 
 export const kieFluxTool: ProductionTool = new KieTool({
@@ -224,9 +264,7 @@ export const kieFluxTool: ProductionTool = new KieTool({
   buildInput: (req) => ({
     prompt: req.prompt ?? 'abstract background',
     aspect_ratio: req.aspectRatio ?? '9:16',
-    steps: 4,
   }),
-  parseOutput: (data) => data.output?.image_url,
 });
 
 export const kieNanaBanana2Tool: ProductionTool = new KieTool({
@@ -234,12 +272,13 @@ export const kieNanaBanana2Tool: ProductionTool = new KieTool({
   name: 'NanoBanana 2 via kie.ai',
   model: 'nano-banana-2',
   task_type: 'txt2img',
+  promptGuidelines: NANOBANANA_GUIDELINES,
   capabilities: [
     {
       assetType: 'ai-image',
       supportsPrompt: true,
       supportsScript: false,
-      estimatedLatencyMs: 8_000,
+      estimatedLatencyMs: 30_000,
       isAsync: true,
       costTier: 'cheap',
     },
@@ -248,5 +287,4 @@ export const kieNanaBanana2Tool: ProductionTool = new KieTool({
     prompt: req.prompt ?? 'abstract background',
     aspect_ratio: req.aspectRatio ?? '9:16',
   }),
-  parseOutput: (data) => data.output?.image_url,
 });
