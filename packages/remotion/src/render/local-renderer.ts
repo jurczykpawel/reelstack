@@ -76,7 +76,7 @@ export class LocalRenderer implements RemotionRenderer {
           Math.max(1, remotionMaxCpus),
         );
 
-    log.info({ remotionMaxCpus, requestedConcurrency, concurrency, cwd: process.cwd(), bundlePath }, 'Render config');
+    log.info({ remotionMaxCpus, concurrency, cwd: process.cwd(), bundlePath }, 'Render config');
 
     const startMs = performance.now();
 
