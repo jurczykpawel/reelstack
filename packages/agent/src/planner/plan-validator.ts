@@ -53,7 +53,7 @@ export function validatePlan(plan: ProductionPlan, audioDuration: number): Valid
   }
 
   // ── 2. B-roll gap detection (faceless reels) ───────────────────
-  if (plan.primarySource === 'none') {
+  if (plan.primarySource.type === 'none') {
     const gapIssues = findBRollGaps(plan.shots, audioDuration);
     issues.push(...gapIssues);
   }

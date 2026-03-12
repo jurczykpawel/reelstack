@@ -74,7 +74,7 @@ export interface TTSPipelineResult {
     startTime: number;
     endTime: number;
     words?: Array<{ text: string; startTime: number; endTime: number }>;
-    animationStyle?: string;
+    animationStyle?: 'none' | 'word-highlight' | 'word-by-word' | 'karaoke' | 'bounce' | 'typewriter';
   }>;
   steps: ProductionStep[];
 }
