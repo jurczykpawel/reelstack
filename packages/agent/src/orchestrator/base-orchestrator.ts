@@ -216,8 +216,9 @@ export async function renderVideo(
 ): Promise<RenderResult> {
   onProgress?.('Rendering video...');
   const finalPath = outputPath ?? path.join(os.tmpdir(), 'remotion-out', `reel-${randomUUID()}.mp4`);
+  const compositionId = typeof props.compositionId === 'string' ? props.compositionId : undefined;
   const renderer = createRenderer();
-  const renderResult = await renderer.render(props as never, { outputPath: finalPath });
+  const renderResult = await renderer.render(props as never, { outputPath: finalPath, compositionId });
 
   return {
     outputPath: finalPath,
