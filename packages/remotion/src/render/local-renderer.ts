@@ -66,12 +66,15 @@ export class LocalRenderer implements RemotionRenderer {
       remotionMaxCpus = os.cpus().length;
     }
 
-    const requestedConcurrency = options.concurrency
-      ?? (process.env.REMOTION_CONCURRENCY
-        ? parseInt(process.env.REMOTION_CONCURRENCY, 10)
-        : Math.max(1, Math.floor(remotionMaxCpus / 2)));
-    // Cap at Remotion's max to avoid "Maximum for --concurrency" error
-    const concurrency = Math.min(requestedConcurrency, Math.max(1, remotionMaxCpus));
+    // If concurrency is explicitly set, use it as-is.
+    // Only auto-selected values (from env or default) are capped to nproc.
+    const concurrency = options.concurrency
+      ?? Math.min(
+          process.env.REMOTION_CONCURRENCY
+            ? parseInt(process.env.REMOTION_CONCURRENCY, 10)
+            : Math.max(1, Math.floor(remotionMaxCpus / 2)),
+          Math.max(1, remotionMaxCpus),
+        );
 
     log.info({ remotionMaxCpus, requestedConcurrency, concurrency, cwd: process.cwd(), bundlePath }, 'Render config');
 
