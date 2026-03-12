@@ -208,6 +208,7 @@ export async function createReel(
       musicVolume: 0,
       showProgressBar: true,
       backgroundColor: request.brandPreset?.backgroundColor ?? '#000000',
+      speedRamps: [],
     };
 
     // ── Step 7: Remotion render ─────────────────────────────

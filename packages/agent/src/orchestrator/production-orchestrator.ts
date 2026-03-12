@@ -1,27 +1,35 @@
-import { randomUUID } from 'node:crypto';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
-import { createTTSProvider } from '@reelstack/tts';
-import type { TTSConfig } from '@reelstack/tts';
-import { groupWordsIntoCues } from '@reelstack/transcription';
 import { normalizeAudioForWhisper, getAudioDuration, transcribeAudio } from '@reelstack/remotion/pipeline';
-import { createRenderer } from '@reelstack/remotion/render';
-import { createStorage } from '@reelstack/storage';
+import { groupWordsIntoCues } from '@reelstack/transcription';
 import { ToolRegistry } from '../registry/tool-registry';
 import { discoverTools } from '../registry/discovery';
 import { planProduction, planComposition } from '../planner/production-planner';
 import { generateAssets } from './asset-generator';
-import { adjustTimeline } from './timeline-adjuster';
 import { assembleComposition } from './composition-assembler';
-import type { ProductionRequest, ProductionResult, ProductionStep, ComposeRequest, ProductionPlan, ShotPlan, EffectPlan, GeneratedAsset } from '../types';
+import { validatePlan } from '../planner/plan-validator';
+import { supervisePlan } from '../planner/plan-supervisor';
+import {
+  buildTimingReference,
+  resolvePresetConfig,
+  runTTSPipeline,
+  uploadVoiceover,
+  renderVideo,
+} from './base-orchestrator';
+import type { TTSPipelineResult } from './base-orchestrator';
+import type { ProductionRequest, ProductionResult, ProductionStep, ComposeRequest, BrandPreset, ProductionPlan, ShotPlan, EffectPlan, GeneratedAsset } from '../types';
+import { selectMontageProfile } from '../planner/montage-profile';
 import { createLogger } from '@reelstack/logger';
 
 const baseLog = createLogger('production-orchestrator');
 
 /**
  * Main production orchestrator.
- * Flow: discover -> plan -> generate assets + TTS (parallel) -> adjust timeline -> assemble -> render
+ * Flow: discover + TTS (parallel) -> plan with exact timestamps -> generate assets -> assemble -> render
+ *
+ * IMPORTANT: Audio/transcription runs BEFORE planning so the director (LLM) receives
+ * exact speech timestamps and plans to them. No timeline adjustment needed.
  */
 export async function produce(request: ProductionRequest): Promise<ProductionResult> {
   // Input validation
@@ -35,41 +43,58 @@ export async function produce(request: ProductionRequest): Promise<ProductionRes
 
   const steps: ProductionStep[] = [];
   const onProgress = request.onProgress;
+  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reelstack-agent-'));
 
-  // ── 1. DISCOVER TOOLS ──────────────────────────────────────
-  onProgress?.('Discovering available tools...');
-  const discoverStart = performance.now();
+  // ── 1. DISCOVER TOOLS + TTS (parallel) ─────────────────────
+  // Both are independent — run in parallel to save time.
+  onProgress?.('Discovering tools and generating voiceover...');
+  const parallelStart = performance.now();
 
-  const registry = new ToolRegistry();
-  for (const tool of discoverTools()) {
-    registry.register(tool);
-  }
-  await registry.discover();
+  const registryPromise = (async () => {
+    const registry = new ToolRegistry();
+    for (const tool of discoverTools()) {
+      registry.register(tool);
+    }
+    await registry.discover();
+    return registry;
+  })();
+
+  const [registry, ttsResult] = await Promise.all([
+    registryPromise,
+    runTTSPipeline(request, tmpDir, onProgress),
+  ]);
 
   const manifest = registry.getToolManifest();
   steps.push({
-    name: 'Tool discovery',
-    durationMs: performance.now() - discoverStart,
+    name: 'Tool discovery + TTS',
+    durationMs: performance.now() - parallelStart,
     detail: manifest.summary,
   });
+  steps.push(...ttsResult.steps);
 
   log.info({ available: manifest.tools.filter((t) => t.available).map((t) => t.id) }, 'Tools discovered');
 
-  // ── 2. PLAN PRODUCTION ─────────────────────────────────────
-  onProgress?.('Planning production...');
+  // ── 2. BUILD TIMING REFERENCE ──────────────────────────────
+  // Director gets exact speech timestamps from Whisper transcription
+  const timingReference = buildTimingReference(ttsResult.transcriptionWords);
+
+  // ── 2b. SELECT MONTAGE PROFILE ────────────────────────────
+  const montageProfile = selectMontageProfile(request.script, request.montageProfile);
+  log.info({ profileId: montageProfile.id, profileName: montageProfile.name }, 'Selected montage profile');
+
+  // ── 3. PLAN PRODUCTION (with exact timestamps) ─────────────
+  onProgress?.('Planning production (with exact speech timing)...');
   const planStart = performance.now();
 
-  // Estimate duration from script length (~150 words/min for TTS)
-  const wordCount = request.script.split(/\s+/).length;
-  const durationEstimate = (wordCount / 150) * 60;
-
-  const plan = await planProduction({
+  let plan = await planProduction({
     script: request.script,
-    durationEstimate,
+    durationEstimate: ttsResult.audioDuration,
     style: request.style ?? 'dynamic',
     toolManifest: manifest,
     primaryVideoUrl: request.primaryVideoUrl,
     layout: request.layout,
+    timingReference,
+    montageProfile,
   });
 
   steps.push({
@@ -102,40 +127,50 @@ export async function produce(request: ProductionRequest): Promise<ProductionRes
     }
   }
 
-  // ── 3. GENERATE ASSETS + TTS (parallel) ────────────────────
-  onProgress?.('Generating assets and voiceover...');
+  // ── 3b. SUPERVISOR REVIEW ──────────────────────────────────
+  onProgress?.('Supervisor reviewing plan...');
+  const supervision = await supervisePlan({
+    plan,
+    script: request.script,
+    audioDuration: ttsResult.audioDuration,
+    style: request.style ?? 'dynamic',
+    toolManifest: manifest,
+    timingReference,
+    montageProfile,
+  });
+  plan = supervision.plan;
+  log.info({
+    approved: supervision.approved,
+    iterations: supervision.iterations,
+    reviews: supervision.reviews,
+  }, 'Supervisor review complete');
+
+  // ── 4. GENERATE ASSETS ─────────────────────────────────────
+  onProgress?.('Generating visual assets...');
   const genStart = performance.now();
 
-  const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reelstack-agent-'));
-
-  // Run asset generation and TTS pipeline in parallel
-  const [assets, ttsResult] = await Promise.all([
-    generateAssets(plan, registry, onProgress),
-    runTTSPipeline(request, tmpDir, onProgress),
-  ]);
+  const assets = await generateAssets(plan, registry, onProgress);
 
   steps.push({
     name: 'Asset generation',
     durationMs: performance.now() - genStart,
     detail: `${assets.length} assets generated`,
   });
-  steps.push(...ttsResult.steps);
 
-  // ── 4. ADJUST TIMELINE ─────────────────────────────────────
-  const adjustedPlan = adjustTimeline(plan, ttsResult.audioDuration);
+  // ── 5. VALIDATE & ASSEMBLE COMPOSITION ─────────────────────
+  onProgress?.('Validating plan...');
+  const validation = validatePlan(plan, ttsResult.audioDuration);
+  if (validation.issues.length > 0) {
+    log.info({ issues: validation.issues }, 'Plan validation issues found and auto-fixed');
+    plan = validation.fixedPlan;
+  }
 
-  // ── 5. ASSEMBLE COMPOSITION ────────────────────────────────
   onProgress?.('Assembling composition...');
 
-  // Upload voiceover to object storage so Lambda (or any renderer) can fetch it by URL.
-  const voiceoverKey = `voiceovers/voiceover-${randomUUID()}.mp3`;
-  const storage = await createStorage();
-  await storage.upload(fs.readFileSync(ttsResult.voiceoverPath), voiceoverKey);
-  // Sign for 2 hours — more than enough for any render
-  const voiceoverUrl = await storage.getSignedUrl(voiceoverKey, 7200);
+  const voiceoverUrl = await uploadVoiceover(ttsResult.voiceoverPath);
 
   const props = assembleComposition({
-    plan: adjustedPlan,
+    plan,
     assets,
     cues: ttsResult.cues,
     voiceoverFilename: voiceoverUrl,
@@ -143,18 +178,12 @@ export async function produce(request: ProductionRequest): Promise<ProductionRes
   });
 
   // ── 6. RENDER ──────────────────────────────────────────────
-  onProgress?.('Rendering video...');
-  const renderStart = performance.now();
-
-  const outputPath = request.outputPath ?? path.join(os.tmpdir(), 'remotion-out', 'agent-reel.mp4');
-  const renderer = createRenderer();
-  const renderResult = await renderer.render(props as never, { outputPath });
-
-  steps.push({
-    name: 'Remotion render',
-    durationMs: renderResult.durationMs,
-    detail: `${outputPath} (${(renderResult.sizeBytes / 1024).toFixed(0)} KB)`,
-  });
+  const { outputPath, step: renderStep } = await renderVideo(
+    props as unknown as Record<string, unknown>,
+    request.outputPath,
+    onProgress,
+  );
+  steps.push(renderStep);
 
   // Cleanup
   try {
@@ -169,7 +198,7 @@ export async function produce(request: ProductionRequest): Promise<ProductionRes
   return {
     outputPath,
     durationSeconds: ttsResult.audioDuration,
-    plan: adjustedPlan,
+    plan,
     steps,
     generatedAssets: assets,
   };
@@ -230,9 +259,10 @@ export async function produceComposition(request: ComposeRequest): Promise<Produ
       durationSeconds: audioDuration,
     });
 
+    const composePresetConfig = resolvePresetConfig(request.brandPreset);
     cues = groupWordsIntoCues(transcription.words, {
-      maxWordsPerCue: 6, maxDurationPerCue: 3, breakOnPunctuation: true,
-    }, 'karaoke').map((c) => ({
+      maxWordsPerCue: composePresetConfig.maxWordsPerCue, maxDurationPerCue: composePresetConfig.maxDurationPerCue, breakOnPunctuation: true,
+    }, composePresetConfig.animationStyle).map((c) => ({
       id: c.id, text: c.text, startTime: c.startTime, endTime: c.endTime,
       words: c.words?.map((w) => ({ text: w.text, startTime: w.startTime, endTime: w.endTime })),
       animationStyle: c.animationStyle,
@@ -242,24 +272,36 @@ export async function produceComposition(request: ComposeRequest): Promise<Produ
       script: request.script,
       tts: request.tts,
       whisper: request.whisper,
-    } as ProductionRequest, tmpDir, onProgress);
+      brandPreset: request.brandPreset,
+    }, tmpDir, onProgress);
     voiceoverPath = ttsResult.voiceoverPath;
     audioDuration = ttsResult.audioDuration;
     cues = ttsResult.cues;
     steps.push(...ttsResult.steps);
   }
 
-  // ── 2. LLM COMPOSITION PLANNING ────────────────────────────
-  onProgress?.('LLM composing timeline...');
+  // ── 2. BUILD TIMING REFERENCE ──────────────────────────────
+  // Extract transcription words from cues for timing reference
+  const allWords: Array<{ text: string; startTime: number; endTime: number }> = [];
+  for (const cue of cues) {
+    if (cue.words) {
+      allWords.push(...cue.words);
+    }
+  }
+  const timingReference = allWords.length > 0 ? buildTimingReference(allWords) : undefined;
+
+  // ── 3. LLM COMPOSITION PLANNING (with exact timestamps) ────
+  onProgress?.('LLM composing timeline (with exact speech timing)...');
   const planStart = performance.now();
 
-  const plan = await planComposition({
+  let plan = await planComposition({
     script: request.script,
     durationEstimate: audioDuration,
     style: request.style ?? 'educational',
     assets: request.assets,
     layout: request.layout,
     directorNotes: request.directorNotes,
+    timingReference,
   });
 
   steps.push({
@@ -268,14 +310,12 @@ export async function produceComposition(request: ComposeRequest): Promise<Produ
     detail: `${plan.shots.length} shots, ${plan.effects.length} effects`,
   });
 
-  // ── 3. ADJUST TIMELINE ──────────────────────────────────────
-  const adjustedPlan = adjustTimeline(plan, audioDuration);
-
   // ── 4. BUILD ASSET MAP (resolve asset IDs → URLs) ───────────
+  // No adjustTimeline needed — director planned to exact timestamps
   const assetMap = new Map(request.assets.map((a) => [a.id, a]));
   const resolvedAssets: GeneratedAsset[] = [];
 
-  for (const shot of adjustedPlan.shots) {
+  for (const shot of plan.shots) {
     if (shot.visual.type === 'b-roll' && shot.visual.toolId === 'user-upload') {
       const userAsset = assetMap.get(shot.visual.searchQuery);
       if (userAsset) {
@@ -292,17 +332,20 @@ export async function produceComposition(request: ComposeRequest): Promise<Produ
     }
   }
 
-  // ── 5. ASSEMBLE ─────────────────────────────────────────────
+  // ── 5. VALIDATE & ASSEMBLE ──────────────────────────────────
+  onProgress?.('Validating plan...');
+  const validation = validatePlan(plan, audioDuration);
+  if (validation.issues.length > 0) {
+    log.info({ issues: validation.issues }, 'Plan validation issues found and auto-fixed');
+    plan = validation.fixedPlan;
+  }
+
   onProgress?.('Assembling composition...');
 
-  // Upload voiceover to object storage so Lambda (or any renderer) can fetch it by URL.
-  const voiceoverKey = `voiceovers/voiceover-${randomUUID()}.mp3`;
-  const storage = await createStorage();
-  await storage.upload(fs.readFileSync(voiceoverPath), voiceoverKey);
-  const voiceoverUrl = await storage.getSignedUrl(voiceoverKey, 7200);
+  const voiceoverUrl = await uploadVoiceover(voiceoverPath);
 
   const props = assembleComposition({
-    plan: adjustedPlan,
+    plan,
     assets: resolvedAssets,
     cues,
     voiceoverFilename: voiceoverUrl,
@@ -310,16 +353,12 @@ export async function produceComposition(request: ComposeRequest): Promise<Produ
   });
 
   // ── 6. RENDER ───────────────────────────────────────────────
-  onProgress?.('Rendering video...');
-  const renderStart = performance.now();
-  const outputPath = request.outputPath ?? path.join(os.tmpdir(), 'remotion-out', 'composed-reel.mp4');
-  const renderer = createRenderer();
-  const renderResult = await renderer.render(props as never, { outputPath });
-  steps.push({
-    name: 'Remotion render',
-    durationMs: renderResult.durationMs,
-    detail: `${outputPath} (${(renderResult.sizeBytes / 1024).toFixed(0)} KB)`,
-  });
+  const { outputPath, step: renderStep } = await renderVideo(
+    props as unknown as Record<string, unknown>,
+    request.outputPath,
+    onProgress,
+  );
+  steps.push(renderStep);
 
   // Cleanup
   try {
@@ -329,108 +368,8 @@ export async function produceComposition(request: ComposeRequest): Promise<Produ
   const totalMs = steps.reduce((sum, s) => sum + s.durationMs, 0);
   onProgress?.(`Done! ${(totalMs / 1000).toFixed(1)}s total`);
 
-  return { outputPath, durationSeconds: audioDuration, plan: adjustedPlan, steps, generatedAssets: resolvedAssets };
+  return { outputPath, durationSeconds: audioDuration, plan, steps, generatedAssets: resolvedAssets };
 }
 
-// ── TTS Pipeline (reused from reel-creator) ──────────────────
-
-interface TTSPipelineResult {
-  voiceoverPath: string;
-  audioDuration: number;
-  cues: Array<{
-    id: string;
-    text: string;
-    startTime: number;
-    endTime: number;
-    words?: Array<{ text: string; startTime: number; endTime: number }>;
-    animationStyle?: string;
-  }>;
-  steps: ProductionStep[];
-}
-
-async function runTTSPipeline(
-  request: ProductionRequest,
-  tmpDir: string,
-  onProgress?: (msg: string) => void,
-): Promise<TTSPipelineResult> {
-  const steps: ProductionStep[] = [];
-
-  // TTS
-  onProgress?.('Generating voiceover...');
-  const ttsStart = performance.now();
-
-  const ttsConfig: TTSConfig = {
-    provider: request.tts?.provider ?? 'edge-tts',
-    apiKey: request.tts?.provider === 'elevenlabs'
-      ? process.env.ELEVENLABS_API_KEY
-      : request.tts?.provider === 'openai'
-        ? process.env.OPENAI_API_KEY
-        : undefined,
-    defaultLanguage: request.tts?.language ?? 'pl-PL',
-  };
-  const ttsProvider = createTTSProvider(ttsConfig);
-  const ttsResult = await ttsProvider.synthesize(request.script, {
-    voice: request.tts?.voice,
-    language: request.tts?.language,
-  });
-
-  const voiceoverPath = path.join(tmpDir, `voiceover.${ttsResult.format}`);
-  fs.writeFileSync(voiceoverPath, ttsResult.audioBuffer);
-
-  steps.push({
-    name: 'TTS',
-    durationMs: performance.now() - ttsStart,
-    detail: `${ttsProvider.name}, ${(ttsResult.audioBuffer.length / 1024).toFixed(0)} KB`,
-  });
-
-  // Normalize audio
-  onProgress?.('Normalizing audio...');
-  const normStart = performance.now();
-
-  const wavBuffer = normalizeAudioForWhisper(ttsResult.audioBuffer, ttsResult.format);
-  const audioDuration = getAudioDuration(ttsResult.audioBuffer, ttsResult.format);
-
-  steps.push({
-    name: 'Audio normalization',
-    durationMs: performance.now() - normStart,
-    detail: `${audioDuration.toFixed(1)}s, 16kHz mono WAV`,
-  });
-
-  // Whisper transcription
-  onProgress?.('Transcribing audio...');
-  const whisperStart = performance.now();
-
-  const transcription = await transcribeAudio(wavBuffer, {
-    apiKey: request.whisper?.apiKey,
-    language: request.tts?.language?.split('-')[0],
-    text: request.script,
-    durationSeconds: audioDuration,
-  });
-
-  steps.push({
-    name: 'Whisper transcription',
-    durationMs: performance.now() - whisperStart,
-    detail: `${transcription.words.length} words`,
-  });
-
-  // Group into cues
-  const cues = groupWordsIntoCues(transcription.words, {
-    maxWordsPerCue: 6,
-    maxDurationPerCue: 3,
-    breakOnPunctuation: true,
-  }, 'karaoke');
-
-  return {
-    voiceoverPath,
-    audioDuration,
-    cues: cues.map((c) => ({
-      id: c.id,
-      text: c.text,
-      startTime: c.startTime,
-      endTime: c.endTime,
-      words: c.words?.map((w) => ({ text: w.text, startTime: w.startTime, endTime: w.endTime })),
-      animationStyle: c.animationStyle,
-    })),
-    steps,
-  };
-}
+// Shared functions (buildTimingReference, resolvePresetConfig, runTTSPipeline,
+// uploadVoiceover, renderVideo) are now in base-orchestrator.ts

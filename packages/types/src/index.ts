@@ -30,7 +30,7 @@ export interface SubtitleCue {
 // ==========================================
 
 export type TextAlignment = 'left' | 'center' | 'right';
-export type HighlightMode = 'text' | 'pill';
+export type HighlightMode = 'text' | 'pill' | 'label' | 'hormozi' | 'glow' | 'pop-word' | 'underline-sweep' | 'box-highlight';
 export type CaptionTextTransform = 'none' | 'uppercase';
 
 export interface SubtitleStyle {
@@ -75,6 +75,209 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
   lineHeight: 1.4,
   padding: 8,
 };
+
+// ==========================================
+// Caption Preset Types
+// ==========================================
+
+/**
+ * CaptionPreset bundles caption style + animation + word grouping into a named config.
+ * Presets define the full "look & feel" of captions for reels.
+ * Individual field overrides can be applied on top.
+ */
+export interface CaptionPreset {
+  readonly name: string;
+  readonly animationStyle: CaptionAnimationStyle;
+  readonly maxWordsPerCue: number;
+  readonly maxDurationPerCue: number;
+  readonly style: SubtitleStyle;
+  readonly musicVolume: number;
+  readonly dynamicCaptionPosition: boolean;
+  readonly showProgressBar: boolean;
+}
+
+/**
+ * Built-in caption presets for reels.
+ * Font sizes are calibrated for 1080x1920 (9:16 vertical video).
+ */
+export const BUILT_IN_CAPTION_PRESETS: Record<string, CaptionPreset> = {
+  tiktok: {
+    name: 'TikTok',
+    animationStyle: 'word-highlight',
+    maxWordsPerCue: 3,
+    maxDurationPerCue: 2,
+    musicVolume: 0.15,
+    dynamicCaptionPosition: false,
+    showProgressBar: false,
+    style: {
+      fontFamily: 'Outfit',
+      fontSize: 72,
+      fontColor: '#FFFFFF',
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      backgroundColor: '#000000',
+      backgroundOpacity: 0,
+      outlineColor: '#000000',
+      outlineWidth: 4,
+      shadowColor: '#000000',
+      shadowBlur: 8,
+      position: 75,
+      alignment: 'center',
+      lineHeight: 1.2,
+      padding: 12,
+      highlightColor: '#F59E0B',
+      highlightMode: 'text',
+      textTransform: 'uppercase',
+    },
+  },
+  mrbeast: {
+    name: 'MrBeast',
+    animationStyle: 'word-by-word',
+    maxWordsPerCue: 2,
+    maxDurationPerCue: 1.5,
+    musicVolume: 0.2,
+    dynamicCaptionPosition: false,
+    showProgressBar: false,
+    style: {
+      fontFamily: 'Inter',
+      fontSize: 80,
+      fontColor: '#FFFFFF',
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      backgroundColor: '#000000',
+      backgroundOpacity: 0,
+      outlineColor: '#000000',
+      outlineWidth: 5,
+      shadowColor: '#000000',
+      shadowBlur: 12,
+      position: 70,
+      alignment: 'center',
+      lineHeight: 1.1,
+      padding: 16,
+      highlightColor: '#22C55E',
+      highlightMode: 'text',
+      textTransform: 'uppercase',
+    },
+  },
+  cinematic: {
+    name: 'Cinematic',
+    animationStyle: 'karaoke',
+    maxWordsPerCue: 5,
+    maxDurationPerCue: 3,
+    musicVolume: 0.3,
+    dynamicCaptionPosition: true,
+    showProgressBar: false,
+    style: {
+      fontFamily: 'Montserrat',
+      fontSize: 48,
+      fontColor: '#FFFFFF',
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      backgroundColor: '#000000',
+      backgroundOpacity: 0,
+      outlineColor: '#000000',
+      outlineWidth: 0,
+      shadowColor: '#000000',
+      shadowBlur: 16,
+      position: 85,
+      alignment: 'center',
+      lineHeight: 1.4,
+      padding: 8,
+      highlightColor: '#60A5FA',
+      highlightMode: 'text',
+      textTransform: 'none',
+    },
+  },
+  minimal: {
+    name: 'Minimal',
+    animationStyle: 'none',
+    maxWordsPerCue: 6,
+    maxDurationPerCue: 3,
+    musicVolume: 0,
+    dynamicCaptionPosition: false,
+    showProgressBar: false,
+    style: {
+      fontFamily: 'Inter',
+      fontSize: 36,
+      fontColor: '#FFFFFF',
+      fontWeight: 'normal',
+      fontStyle: 'normal',
+      backgroundColor: '#000000',
+      backgroundOpacity: 0.5,
+      outlineColor: '#000000',
+      outlineWidth: 0,
+      shadowColor: '#000000',
+      shadowBlur: 4,
+      position: 10,
+      alignment: 'center',
+      lineHeight: 1.5,
+      padding: 8,
+      highlightMode: 'text',
+      textTransform: 'none',
+    },
+  },
+  neon: {
+    name: 'Neon',
+    animationStyle: 'bounce',
+    maxWordsPerCue: 3,
+    maxDurationPerCue: 2,
+    musicVolume: 0.15,
+    dynamicCaptionPosition: false,
+    showProgressBar: false,
+    style: {
+      fontFamily: 'Poppins',
+      fontSize: 64,
+      fontColor: '#00FF88',
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      backgroundColor: '#000000',
+      backgroundOpacity: 0,
+      outlineColor: '#00FF88',
+      outlineWidth: 1,
+      shadowColor: '#00FF88',
+      shadowBlur: 16,
+      position: 75,
+      alignment: 'center',
+      lineHeight: 1.2,
+      padding: 12,
+      highlightColor: '#00FF88',
+      highlightMode: 'text',
+      textTransform: 'uppercase',
+    },
+  },
+  classic: {
+    name: 'Classic',
+    animationStyle: 'karaoke',
+    maxWordsPerCue: 6,
+    maxDurationPerCue: 3,
+    musicVolume: 0,
+    dynamicCaptionPosition: false,
+    showProgressBar: true,
+    style: {
+      fontFamily: 'Arial',
+      fontSize: 48,
+      fontColor: '#FFFFFF',
+      fontWeight: 'bold',
+      fontStyle: 'normal',
+      backgroundColor: '#000000',
+      backgroundOpacity: 0.7,
+      outlineColor: '#000000',
+      outlineWidth: 2,
+      shadowColor: '#000000',
+      shadowBlur: 4,
+      position: 75,
+      alignment: 'center',
+      lineHeight: 1.4,
+      padding: 12,
+      highlightColor: '#F59E0B',
+      highlightMode: 'text',
+      textTransform: 'none',
+    },
+  },
+};
+
+/** Default preset for reels when none specified */
+export const DEFAULT_CAPTION_PRESET = 'tiktok';
 
 // ==========================================
 // Template Types
@@ -272,17 +475,24 @@ export interface KenBurnsConfig {
   readonly endPosition?: { readonly x: number; readonly y: number };
 }
 
+export interface MediaPanelSource {
+  readonly url: string;
+  readonly type: 'video' | 'image';
+}
+
 export interface MediaSource {
   readonly url: string;
-  readonly type: 'video' | 'image' | 'color' | 'split-screen' | 'text-card';
+  readonly type: 'video' | 'image' | 'color' | 'split-screen' | 'text-card' | 'multi-panel';
   readonly label?: string;
   readonly startFrom?: number; // seconds - trim start
   readonly endAt?: number; // seconds - trim end
   readonly textCard?: TextCardConfig;
   readonly kenBurns?: KenBurnsConfig;
+  /** Array of panel sources for multi-panel layout (2-3 equal horizontal strips). */
+  readonly panels?: readonly MediaPanelSource[];
 }
 
-export type TransitionType = 'crossfade' | 'slide-left' | 'slide-right' | 'zoom-in' | 'wipe' | 'none';
+export type TransitionType = 'crossfade' | 'slide-left' | 'slide-right' | 'slide-perspective-right' | 'zoom-in' | 'wipe' | 'blur-dissolve' | 'flash-white' | 'whip-pan' | 'cross-zoom' | 'iris-circle' | 'spin' | 'none';
 
 export interface BRollTransition {
   readonly type: TransitionType;
@@ -295,6 +505,8 @@ export interface BRollSegment {
   readonly media: MediaSource;
   readonly animation?: 'spring-scale' | 'fade' | 'slide' | 'none';
   readonly transition?: BRollTransition;
+  /** CSS filter string applied to the B-roll content (e.g. 'brightness(0.8) contrast(1.1)'). */
+  readonly cssFilter?: string;
 }
 
 export interface ZoomSegment {
@@ -302,7 +514,7 @@ export interface ZoomSegment {
   readonly endTime: number;
   readonly scale: number; // 1.2-2.0, default 1.5
   readonly focusPoint?: { readonly x: number; readonly y: number }; // % default {50,50}
-  readonly easing?: 'spring' | 'smooth';
+  readonly easing?: 'spring' | 'smooth' | 'instant';
 }
 
 export interface ChapterSegment {
@@ -326,6 +538,8 @@ export interface CounterSegment {
   readonly textColor?: string;
   readonly fontSize?: number;
   readonly position?: 'center' | 'top' | 'bottom';
+  /** 'count-up' (default) = 0→value, 'countdown' = value→0. Countdown uses mono/digital font. */
+  readonly mode?: 'count-up' | 'countdown';
 }
 
 export interface HighlightSegment {
@@ -340,6 +554,14 @@ export interface HighlightSegment {
   readonly borderRadius?: number;
   readonly label?: string;
   readonly glow?: boolean;
+  /** 'border' = outline box (default), 'marker' = filled semi-transparent rectangle (highlighter pen) */
+  readonly style?: 'border' | 'marker';
+}
+
+export interface SpeedRampSegment {
+  readonly startTime: number;
+  readonly endTime: number;
+  readonly rate: number;
 }
 
 export interface PublishStatus {

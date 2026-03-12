@@ -29,7 +29,10 @@ export const ZoomEffect: React.FC<ZoomEffectProps> = ({ segment, children }) => 
 
   // Entrance zoom
   let zoomProgress: number;
-  if (easing === 'spring') {
+  if (easing === 'instant') {
+    // Jump-cut: instant scale change, no transition
+    zoomProgress = 1;
+  } else if (easing === 'spring') {
     zoomProgress = spring({
       frame: frame - startFrame,
       fps,

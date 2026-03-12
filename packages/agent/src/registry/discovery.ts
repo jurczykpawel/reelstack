@@ -20,6 +20,7 @@ import { aimlapiKlingTool, aimlapiFluxTool, aimlapiKlingV3Tool, aimlapiVeo3Tool,
 import { wavespeedSeedanceTool, wavespeedWanTool, wavespeedFluxTool, wavespeedNanaBananaProTool, wavespeedWan26Tool, wavespeedQwenImageTool } from '../tools/wavespeed-tool';
 import { kieKlingTool, kieSeedanceTool, kieWanTool, kieFluxTool, kieNanaBanana2Tool } from '../tools/kie-tool';
 import { MinimaxVideoTool } from '../tools/minimax-tool';
+import { humoTool } from '../tools/humo-tool';
 
 /**
  * Auto-discover available production tools based on environment variables.
@@ -98,6 +99,11 @@ export function discoverTools(): ProductionTool[] {
   // MiniMax direct API (platform.minimax.io)
   if (process.env.MINIMAX_API_KEY) {
     tools.push(new MinimaxVideoTool());
+  }
+
+  // HuMo 1.7B - self-hosted on RunPod serverless (cheapest avatar-video option)
+  if (process.env.RUNPOD_API_KEY && process.env.HUMO_RUNPOD_ENDPOINT_ID) {
+    tools.push(humoTool);
   }
 
   return tools;

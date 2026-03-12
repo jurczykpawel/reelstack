@@ -44,7 +44,11 @@ export const POST = withAuth(
       );
     }
 
-    const mode = parsed.data.assets ? 'compose' : 'generate';
+    // Use explicit mode from schema (defaults to 'generate').
+    // Backward compat: if assets provided but mode not explicitly set, treat as compose.
+    const mode = parsed.data.mode === 'generate' && parsed.data.assets
+      ? 'compose'
+      : parsed.data.mode;
 
     const job = await createReelJob({
       userId: ctx.user.id,
@@ -59,6 +63,13 @@ export const POST = withAuth(
         assets: parsed.data.assets,
         directorNotes: parsed.data.directorNotes,
         avatar: parsed.data.avatar,
+        workflowUrl: parsed.data.workflowUrl,
+        topic: parsed.data.topic,
+        language: parsed.data.language,
+        persona: parsed.data.persona,
+        numberOfTips: parsed.data.numberOfTips,
+        variant: parsed.data.variant,
+        montageProfile: parsed.data.montageProfile,
       },
       apiKeyId: ctx.apiKeyId ?? undefined,
       creditCost: cost,

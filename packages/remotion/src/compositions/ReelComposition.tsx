@@ -1,6 +1,10 @@
 import { AbsoluteFill, Audio, useCurrentFrame, useVideoConfig, interpolate } from 'remotion';
 import { loadFont as loadOutfit } from '@remotion/google-fonts/Outfit';
 import { loadFont as loadInter } from '@remotion/google-fonts/Inter';
+import { loadFont as loadMontserrat } from '@remotion/google-fonts/Montserrat';
+import { loadFont as loadPoppins } from '@remotion/google-fonts/Poppins';
+import { loadFont as loadRoboto } from '@remotion/google-fonts/Roboto';
+import { loadFont as loadUbuntu } from '@remotion/google-fonts/Ubuntu';
 import type { ReelProps } from '../schemas/reel-props';
 import { resolveMediaUrl } from '../utils/resolve-media-url';
 import { SplitScreenLayout } from '../layouts/SplitScreenLayout';
@@ -16,9 +20,13 @@ import { ZoomEffect } from '../components/ZoomEffect';
 import { HighlightBox } from '../components/HighlightBox';
 import { getEffect } from '../effects';
 
-// Load brand fonts with Polish character support
+// Load all fonts used by caption presets and templates, with Polish character support
 loadOutfit('normal', { weights: ['500', '600', '700'], subsets: ['latin', 'latin-ext'] });
-loadInter('normal', { weights: ['400', '500', '600'], subsets: ['latin', 'latin-ext'] });
+loadInter('normal', { weights: ['400', '500', '600', '700'], subsets: ['latin', 'latin-ext'] });
+loadMontserrat('normal', { weights: ['400', '500', '600', '700'], subsets: ['latin', 'latin-ext'] });
+loadPoppins('normal', { weights: ['400', '500', '600', '700'], subsets: ['latin', 'latin-ext'] });
+loadRoboto('normal', { weights: ['400', '500', '700'], subsets: ['latin', 'latin-ext'] });
+loadUbuntu('normal', { weights: ['400', '500', '700'], subsets: ['latin', 'latin-ext'] });
 
 const DEFAULT_TRANSITION_MS = 300;
 
@@ -29,7 +37,7 @@ const DEFAULT_TRANSITION_MS = 300;
 function computeEntrance(
   currentTime: number,
   segment: ReelProps['bRollSegments'][number],
-): { opacity: number; transform: string; clipPath?: string } {
+): { opacity: number; transform: string; clipPath?: string; filter?: string } {
   const transition = segment.transition ?? { type: 'crossfade' as const, durationMs: DEFAULT_TRANSITION_MS };
   const type = transition.type ?? 'crossfade';
   const durationSec = (transition.durationMs ?? DEFAULT_TRANSITION_MS) / 1000;
@@ -56,8 +64,45 @@ function computeEntrance(
       const scale = interpolate(progress, [0, 1], [1.3, 1]);
       return { opacity: progress, transform: `scale(${scale})` };
     }
+    case 'slide-perspective-right': {
+      // Card slides from the right with 3D perspective — left edge closer, right edge recedes into depth.
+      const tx = interpolate(progress, [0, 1], [100, 0]);
+      const rotY = interpolate(progress, [0, 1], [-22, 0]);
+      return { opacity: 1, transform: `perspective(900px) translateX(${tx}%) rotateY(${rotY}deg)` };
+    }
     case 'wipe':
       return { opacity: 1, transform: 'none', clipPath: `inset(0 ${(1 - progress) * 100}% 0 0)` };
+    case 'blur-dissolve': {
+      const blur = interpolate(progress, [0, 0.5, 1], [20, 10, 0]);
+      return { opacity: progress, transform: 'none', filter: `blur(${blur}px)` };
+    }
+    case 'flash-white':
+      // White flash spike at midpoint, then reveal
+      if (progress < 0.5) {
+        return { opacity: 0, transform: 'none' };
+      }
+      return { opacity: 1, transform: 'none' };
+    case 'whip-pan': {
+      const tx = interpolate(progress, [0, 1], [120, 0]);
+      const blur = interpolate(progress, [0, 0.5, 1], [15, 8, 0]);
+      return { opacity: 1, transform: `translateX(${tx}%)`, filter: `blur(${blur}px)` };
+    }
+    case 'cross-zoom': {
+      const scale = interpolate(progress, [0, 0.4, 1], [2, 1.2, 1]);
+      const blur = interpolate(progress, [0, 0.4, 1], [12, 4, 0]);
+      return { opacity: progress, transform: `scale(${scale})`, filter: `blur(${blur}px)` };
+    }
+    case 'iris-circle':
+      return {
+        opacity: 1,
+        transform: 'none',
+        clipPath: `circle(${progress * 100}% at 50% 50%)`,
+      };
+    case 'spin': {
+      const rot = interpolate(progress, [0, 1], [180, 0]);
+      const scale = interpolate(progress, [0, 0.5, 1], [0.3, 0.8, 1]);
+      return { opacity: progress, transform: `rotate(${rot}deg) scale(${scale})` };
+    }
     default:
       return { opacity: progress, transform: 'none' };
   }
@@ -89,6 +134,7 @@ export const ReelComposition: React.FC<ReelProps> = ({
   counters = [],
   zoomSegments = [],
   highlights = [],
+  speedRamps = [],
   effects = [],
   voiceoverUrl,
   musicUrl,
@@ -192,15 +238,13 @@ export const ReelComposition: React.FC<ReelProps> = ({
     (z) => currentTime >= z.startTime && currentTime < z.endTime,
   );
 
-  const baseContent = hasBRoll ? (
-    <FullscreenLayout primaryVideoUrl={primaryVideoUrl} />
-  ) : layout === 'split-screen' ? (
+  const baseContent = layout === 'split-screen' ? (
     <SplitScreenLayout
       primaryVideoUrl={primaryVideoUrl}
       secondaryVideoUrl={secondaryVideoUrl}
     />
   ) : (
-    <FullscreenLayout primaryVideoUrl={primaryVideoUrl} />
+    <FullscreenLayout primaryVideoUrl={primaryVideoUrl} speedRamps={speedRamps} />
   );
 
   return (
@@ -242,6 +286,7 @@ export const ReelComposition: React.FC<ReelProps> = ({
             transform: activeStyle.transform,
             overflow: 'hidden',
             ...(activeStyle.clipPath ? { clipPath: activeStyle.clipPath } : {}),
+            ...(activeStyle.filter ? { filter: activeStyle.filter } : {}),
           }}
         >
           <OverlayContent
@@ -251,6 +296,31 @@ export const ReelComposition: React.FC<ReelProps> = ({
           />
         </AbsoluteFill>
       )}
+
+      {/* Flash-white overlay for flash-white transition */}
+      {activeOverlay && activeOverlay.transition?.type === 'flash-white' && (() => {
+        const transitionDur = (activeOverlay.transition?.durationMs ?? DEFAULT_TRANSITION_MS) / 1000;
+        const flashProgress = interpolate(
+          currentTime,
+          [activeOverlay.startTime, activeOverlay.startTime + transitionDur],
+          [0, 1],
+          { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
+        );
+        // White flash peaks at midpoint
+        const flashOpacity = flashProgress < 0.5
+          ? interpolate(flashProgress, [0, 0.5], [0, 1])
+          : interpolate(flashProgress, [0.5, 1], [1, 0]);
+        return flashOpacity > 0 ? (
+          <AbsoluteFill
+            style={{
+              backgroundColor: '#FFFFFF',
+              opacity: flashOpacity,
+              zIndex: 20,
+              pointerEvents: 'none',
+            }}
+          />
+        ) : null;
+      })()}
 
       {/* LAYER 3: Picture-in-Picture */}
       {pipSegments.map((seg, i) => (

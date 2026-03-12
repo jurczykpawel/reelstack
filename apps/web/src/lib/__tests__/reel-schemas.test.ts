@@ -99,6 +99,201 @@ describe('generateReelSchema', () => {
     }
   });
 
+  // ── mode field ───────────────────────────────────────────
+
+  it('defaults mode to generate when not provided', () => {
+    const result = generateReelSchema.safeParse({ script: 'Hello world' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.mode).toBe('generate');
+    }
+  });
+
+  it('accepts all valid mode values', () => {
+    const modePayloads: Record<string, Record<string, unknown>> = {
+      'generate': { script: 'Hello' },
+      'compose': { script: 'Hello' },
+      'captions': { script: 'Hello' },
+      'ai-tips': { script: 'Hello', topic: 'Test topic' },
+      'n8n-explainer': { script: 'Hello', workflowUrl: 'https://n8n.io/workflows/1' },
+      'presenter-explainer': { script: 'Hello', topic: 'Test topic' },
+    };
+    for (const [mode, payload] of Object.entries(modePayloads)) {
+      const result = generateReelSchema.safeParse({ ...payload, mode });
+      expect(result.success).toBe(true);
+      if (result.success) {
+        expect(result.data.mode).toBe(mode);
+      }
+    }
+  });
+
+  it('rejects invalid mode value', () => {
+    const result = generateReelSchema.safeParse({ script: 'Hello', mode: 'invalid-mode' });
+    expect(result.success).toBe(false);
+  });
+
+  it('backward compat: old requests without mode still work', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Test script',
+      layout: 'split-screen',
+      style: 'cinematic',
+      tts: { provider: 'elevenlabs', voice: 'rachel', language: 'en-US' },
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.mode).toBe('generate');
+    }
+  });
+
+  it('backward compat: compose mode inferred from assets still works with explicit mode', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Test',
+      mode: 'compose',
+      assets: [
+        { id: 'v1', url: 'https://example.com/v.mp4', type: 'video', description: 'Video' },
+      ],
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.mode).toBe('compose');
+    }
+  });
+
+  // ── mode-specific fields ─────────────────────────────────────
+
+  it('accepts n8n-explainer mode with workflowUrl', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Explain this workflow',
+      mode: 'n8n-explainer',
+      workflowUrl: 'https://n8n.io/workflows/3121',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.workflowUrl).toBe('https://n8n.io/workflows/3121');
+    }
+  });
+
+  it('accepts ai-tips mode with topic', () => {
+    const result = generateReelSchema.safeParse({
+      script: '5 keyboard shortcuts',
+      mode: 'ai-tips',
+      topic: '5 skrótów klawiaturowych Windows',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.topic).toBe('5 skrótów klawiaturowych Windows');
+    }
+  });
+
+  it('accepts language field', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Test',
+      mode: 'n8n-explainer',
+      workflowUrl: 'https://n8n.io/workflows/1',
+      language: 'pl',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.language).toBe('pl');
+    }
+  });
+
+  it('rejects topic over 1000 chars', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Test',
+      mode: 'ai-tips',
+      topic: 'a'.repeat(1001),
+    });
+    expect(result.success).toBe(false);
+  });
+
+  // ── mode-specific required fields ────────────────────────────
+
+  it('rejects ai-tips without topic', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Test',
+      mode: 'ai-tips',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('topic'))).toBe(true);
+    }
+  });
+
+  it('rejects n8n-explainer without workflowUrl', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Test',
+      mode: 'n8n-explainer',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('workflowUrl'))).toBe(true);
+    }
+  });
+
+  it('rejects presenter-explainer without topic', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Test',
+      mode: 'presenter-explainer',
+    });
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues.some((i) => i.message.includes('topic'))).toBe(true);
+    }
+  });
+
+  it('accepts presenter-explainer with topic and persona', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Test',
+      mode: 'presenter-explainer',
+      topic: 'Docker containers explained',
+      persona: 'senior DevOps engineer',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.topic).toBe('Docker containers explained');
+      expect(result.data.persona).toBe('senior DevOps engineer');
+    }
+  });
+
+  it('accepts ai-tips with all optional fields', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Test',
+      mode: 'ai-tips',
+      topic: '5 productivity tips',
+      variant: 'multi-object',
+      numberOfTips: 5,
+      provider: 'anthropic',
+      musicUrl: 'https://example.com/music.mp3',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.variant).toBe('multi-object');
+      expect(result.data.numberOfTips).toBe(5);
+      expect(result.data.provider).toBe('anthropic');
+      expect(result.data.musicUrl).toBe('https://example.com/music.mp3');
+    }
+  });
+
+  it('accepts montageProfile field', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Docker containers tutorial',
+      montageProfile: 'network-chuck',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.montageProfile).toBe('network-chuck');
+    }
+  });
+
+  it('rejects invalid montageProfile', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Test',
+      montageProfile: 'nonexistent-profile',
+    });
+    expect(result.success).toBe(false);
+  });
+
   it('defaults tts language to pl-PL', () => {
     const result = generateReelSchema.safeParse({ script: 'Hello', tts: {} });
     expect(result.success).toBe(true);

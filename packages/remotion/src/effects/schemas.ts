@@ -6,11 +6,17 @@ import { z } from 'zod';
 
 const entranceSchema = z.enum([
   'spring-scale', 'fade', 'slide-up', 'slide-down',
-  'slide-left', 'slide-right', 'glitch', 'bounce', 'pop', 'none',
+  'slide-left', 'slide-right', 'glitch', 'bounce', 'pop',
+  'flip-up', 'elastic', 'zoom-blur', 'flicker', 'ink-print', 'none',
 ]).optional();
 
 const exitSchema = z.enum([
-  'fade', 'slide-down', 'shrink', 'glitch', 'none',
+  'fade', 'slide-down', 'slide-up', 'slide-left',
+  'shrink', 'scale-blur', 'pop-out', 'glitch', 'none',
+]).optional();
+
+const loopSchema = z.enum([
+  'pulse', 'wave', 'shake', 'swing', 'neon-pulse', 'float', 'color-cycle', 'none',
 ]).optional();
 
 const sfxSchema = z.object({
@@ -29,6 +35,7 @@ function baseFields() {
     endTime: z.number().min(0),
     entrance: entranceSchema,
     exit: exitSchema,
+    loop: loopSchema,
     sfx: sfxSchema,
   };
 }
@@ -54,6 +61,8 @@ export const textEmphasisSchema = z.object({
   fontColor: z.string().default('#FFFFFF'),
   backgroundColor: z.string().optional(),
   position: z.enum(['center', 'top', 'bottom']).default('center'),
+  jitter: z.number().min(0).max(10).default(0),
+  neonGlow: z.string().optional(),
 });
 
 export const screenShakeSchema = z.object({
@@ -77,6 +86,7 @@ export const pngOverlaySchema = z.object({
   position: positionXYSchema.default({ x: 50, y: 50 }),
   size: z.number().min(5).max(100).default(30),
   opacity: z.number().min(0).max(1).default(1),
+  animation: z.enum(['none', 'bounce-pulse']).default('none'),
 });
 
 export const gifOverlaySchema = z.object({
@@ -95,6 +105,9 @@ export const blurBackgroundSchema = z.object({
   overlayText: z.string().optional(),
   overlayFontSize: z.number().default(64),
   overlayColor: z.string().default('#FFFFFF'),
+  mode: z.enum(['blur', 'spotlight']).default('blur'),
+  focusPoint: z.object({ x: z.number().min(0).max(100), y: z.number().min(0).max(100) }).optional(),
+  spotlightRadius: z.number().min(5).max(50).default(20),
 });
 
 export const parallaxScreenshotSchema = z.object({
@@ -104,6 +117,7 @@ export const parallaxScreenshotSchema = z.object({
   scrollDirection: z.enum(['up', 'down']).default('up'),
   depth: z.number().min(0.5).max(3).default(1.2),
   borderRadius: z.number().default(16),
+  tiltMode: z.enum(['subtle', '3d']).default('subtle'),
 });
 
 export const splitScreenDividerSchema = z.object({
@@ -159,6 +173,78 @@ export const rectangularPipSchema = z.object({
   borderWidth: z.number().default(3),
   borderGlow: z.boolean().default(true),
   borderRadius: z.number().default(12),
+  shape: z.enum(['rectangle', 'circle']).default('rectangle'),
+});
+
+export const stickerBurstSchema = z.object({
+  type: z.literal('sticker-burst'),
+  ...baseFields(),
+  side: z.enum(['left', 'right']).default('left'),
+  count: z.number().min(2).max(5).default(3),
+  colors: z.array(z.string()).optional(),
+  shapes: z.array(z.enum(['burst', 'sparkle', 'diamond', 'star'])).optional(),
+});
+
+export const vignetteOverlaySchema = z.object({
+  type: z.literal('vignette-overlay'),
+  ...baseFields(),
+  intensity: z.number().min(0.05).max(0.8).default(0.3),
+  color: z.string().default('#000000'),
+});
+
+export const chromaticAberrationSchema = z.object({
+  type: z.literal('chromatic-aberration'),
+  ...baseFields(),
+  intensity: z.number().min(0.01).max(0.2).default(0.05),
+});
+
+export const progressRingSchema = z.object({
+  type: z.literal('progress-ring'),
+  ...baseFields(),
+  targetPercent: z.number().min(0).max(100),
+  size: z.number().min(50).max(500).default(200),
+  strokeWidth: z.number().min(4).max(40).default(12),
+  trackColor: z.string().default('#333333'),
+  fillColor: z.string().default('#3B82F6'),
+  label: z.string().optional(),
+  labelFontSize: z.number().min(16).max(120).default(48),
+  labelColor: z.string().default('#FFFFFF'),
+  position: z.enum(['center', 'top-right', 'top-left', 'bottom-right', 'bottom-left']).default('center'),
+});
+
+export const crtOverlaySchema = z.object({
+  type: z.literal('crt-overlay'),
+  ...baseFields(),
+  opacity: z.number().min(0.01).max(0.2).default(0.08),
+  scanlineSpacing: z.number().min(1).max(8).default(4),
+  grainIntensity: z.number().min(0).max(1).default(0.3),
+});
+
+export const filmGrainSchema = z.object({
+  type: z.literal('film-grain'),
+  ...baseFields(),
+  intensity: z.number().min(0.01).max(0.5).default(0.15),
+});
+
+export const lightLeakSchema = z.object({
+  type: z.literal('light-leak'),
+  ...baseFields(),
+  color: z.string().default('#FF6B35'),
+  intensity: z.number().min(0.05).max(0.6).default(0.3),
+  speed: z.number().min(0.1).max(3).default(1),
+});
+
+export const terminalTypingSchema = z.object({
+  type: z.literal('terminal-typing'),
+  ...baseFields(),
+  text: z.string().min(1),
+  fontSize: z.number().min(16).max(80).default(32),
+  fontColor: z.string().default('#00FF00'),
+  backgroundColor: z.string().default('#1E1E1E'),
+  showCursor: z.boolean().default(true),
+  cursorChar: z.string().default('▌'),
+  prompt: z.string().default('$ '),
+  position: z.enum(['center', 'top', 'bottom']).default('center'),
 });
 
 // ==========================================
@@ -179,4 +265,12 @@ export const effectSegmentSchema = z.discriminatedUnion('type', [
   glitchTransitionSchema,
   circularCounterSchema,
   rectangularPipSchema,
+  stickerBurstSchema,
+  crtOverlaySchema,
+  vignetteOverlaySchema,
+  chromaticAberrationSchema,
+  progressRingSchema,
+  terminalTypingSchema,
+  filmGrainSchema,
+  lightLeakSchema,
 ]);

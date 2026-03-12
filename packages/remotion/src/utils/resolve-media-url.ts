@@ -9,7 +9,11 @@ export function resolveMediaUrl(url: string): string {
   if (url.startsWith('http://') || url.startsWith('https://')) {
     return url;
   }
-  // Extract just the filename if it's an absolute/relative path
-  const filename = url.includes('/') ? url.split('/').pop()! : url;
-  return staticFile(filename);
+  // Absolute paths: extract filename only (e.g. /tmp/voiceover.mp3 → voiceover.mp3)
+  // Relative paths: keep as-is (e.g. sfx/pop.mp3 → sfx/pop.mp3)
+  if (url.startsWith('/')) {
+    const filename = url.split('/').pop()!;
+    return staticFile(filename);
+  }
+  return staticFile(url);
 }

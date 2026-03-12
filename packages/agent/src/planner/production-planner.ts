@@ -1,6 +1,10 @@
 import type { ToolManifest, ProductionPlan, ShotPlan, EffectPlan, UserAsset, ZoomSegmentPlan, LowerThirdPlan, CounterPlan, HighlightPlan, CtaPlan } from '../types';
-import { buildPlannerPrompt, buildComposerPrompt } from './prompt-builder';
+import { buildPlannerPrompt, buildComposerPrompt, buildRevisionPrompt } from './prompt-builder';
+import { TRANSITION_TYPES, CAPTION_PROPERTY_CATALOG } from '@reelstack/remotion/catalog';
+import type { MontageProfileEntry } from '@reelstack/remotion/catalog';
 import { PlanningError } from '../errors';
+import { detectProvider, callLLMWithSystem } from '../llm';
+import type { LLMProvider } from '../llm';
 import { createLogger } from '@reelstack/logger';
 
 const log = createLogger('production-planner');
@@ -13,18 +17,13 @@ export interface PlannerInput {
   /** Pre-set primary video (user recording) */
   readonly primaryVideoUrl?: string;
   readonly layout?: 'fullscreen' | 'split-screen' | 'picture-in-picture';
+  /** Timestamped sentence breakdown from transcription (so LLM knows EXACTLY when each sentence is spoken) */
+  readonly timingReference?: string;
+  /** Montage profile for per-profile director rules, pacing, SFX, transitions */
+  readonly montageProfile?: MontageProfileEntry;
 }
 
-/**
- * Detect which LLM provider to use based on available API keys.
- * Priority: Anthropic > OpenRouter > OpenAI > rule-based
- */
-function detectProvider(): 'anthropic' | 'openrouter' | 'openai' | null {
-  if (process.env.ANTHROPIC_API_KEY) return 'anthropic';
-  if (process.env.OPENROUTER_API_KEY) return 'openrouter';
-  if (process.env.OPENAI_API_KEY) return 'openai';
-  return null;
-}
+// detectProvider is now imported from ../llm
 
 /**
  * Uses an LLM to generate a ProductionPlan from script + available tools.
@@ -44,16 +43,66 @@ export async function planProduction(input: PlannerInput): Promise<ProductionPla
     return ruleBasedPlan(input);
   }
 
-  const systemPrompt = buildPlannerPrompt(input.toolManifest);
+  const systemPrompt = buildPlannerPrompt(input.toolManifest, input.montageProfile);
   const userMessage = buildUserMessage(input);
 
   try {
-    const raw = await callLLM(provider, systemPrompt, userMessage);
+    const raw = await callLLMWithSystem(provider, systemPrompt, userMessage);
     return parseResponse(raw, input);
   } catch (err) {
     log.warn({ err }, 'AI planner failed, falling back to rules');
     return ruleBasedPlan(input);
   }
+}
+
+export interface RevisePlanInput {
+  readonly originalPlan: ProductionPlan;
+  readonly directorNotes: string;
+  readonly script: string;
+  readonly durationEstimate: number;
+  readonly style?: string;
+  readonly toolManifest: ToolManifest;
+}
+
+/**
+ * Revises an existing ProductionPlan based on director feedback.
+ * Sends the current plan + notes to the LLM with a revision-specific prompt
+ * and returns an updated plan.
+ * Falls back to returning the original plan unchanged if no AI API key is available.
+ */
+export async function revisePlan(input: RevisePlanInput): Promise<ProductionPlan> {
+  const provider = detectProvider();
+
+  if (!provider) {
+    log.info('No AI API key, returning plan unchanged');
+    return input.originalPlan;
+  }
+
+  const systemPrompt = buildRevisionPrompt(input.originalPlan, input.directorNotes, input.toolManifest);
+  const userMessage = buildReviseUserMessage(input);
+
+  try {
+    const raw = await callLLMWithSystem(provider, systemPrompt, userMessage);
+    return parseResponse(raw, {
+      script: input.script,
+      durationEstimate: input.durationEstimate,
+      style: (input.style as PlannerInput['style']) ?? 'dynamic',
+      toolManifest: input.toolManifest,
+    });
+  } catch (err) {
+    log.warn({ err }, 'AI revision failed, returning original plan');
+    return input.originalPlan;
+  }
+}
+
+function buildReviseUserMessage(input: RevisePlanInput): string {
+  const parts = [
+    `Revise the production plan for this ${input.durationEstimate.toFixed(0)}s video.`,
+    `\nScript:\n<script>\n${input.script}\n</script>`,
+    input.style ? `\nStyle: ${input.style}` : '',
+    '\nReturn only the revised JSON production plan, no explanation outside the JSON.',
+  ];
+  return parts.filter(Boolean).join('\n');
 }
 
 export interface ComposerInput {
@@ -63,6 +112,8 @@ export interface ComposerInput {
   readonly assets: readonly UserAsset[];
   readonly layout?: 'fullscreen' | 'split-screen' | 'picture-in-picture';
   readonly directorNotes?: string;
+  /** Timestamped sentence breakdown from transcription (so LLM knows EXACTLY when each sentence is spoken) */
+  readonly timingReference?: string;
 }
 
 /**
@@ -80,7 +131,7 @@ export async function planComposition(input: ComposerInput): Promise<ProductionP
   const userMessage = buildComposerUserMessage(input);
 
   try {
-    const raw = await callLLM(provider, systemPrompt, userMessage);
+    const raw = await callLLMWithSystem(provider, systemPrompt, userMessage);
 
     const plan = parseResponse(raw, {
       script: input.script,
@@ -113,6 +164,10 @@ function buildComposerUserMessage(input: ComposerInput): string {
 
   if (input.directorNotes) {
     parts.push(`\nDirector notes: ${input.directorNotes.substring(0, 2000)}`);
+  }
+
+  if (input.timingReference) {
+    parts.push(`\n<timing>\nEXACT SPEECH TIMING from transcription — use these timestamps for all visual elements:\n${input.timingReference}\n</timing>`);
   }
 
   parts.push('\nReturn only the JSON production plan, no explanation outside the JSON.');
@@ -219,8 +274,12 @@ function buildUserMessage(input: PlannerInput): string {
     `Create a production plan for this ${input.durationEstimate.toFixed(0)}s video.`,
     `\nScript:\n<script>\n${input.script}\n</script>`,
     `\nStyle: ${input.style}`,
-    `Duration estimate: ${input.durationEstimate.toFixed(1)}s`,
+    `Duration: ${input.durationEstimate.toFixed(1)}s`,
   ];
+
+  if (input.timingReference) {
+    parts.push(`\nEXACT SPEECH TIMING (from audio transcription - use these timestamps for shot and effect timing!):\n<timing>\n${input.timingReference}\n</timing>`);
+  }
 
   if (input.primaryVideoUrl) {
     parts.push(`\nUser provided their own video recording as primary source: "${input.primaryVideoUrl}"`);
@@ -235,108 +294,7 @@ function buildUserMessage(input: PlannerInput): string {
   return parts.join('\n');
 }
 
-async function callLLM(
-  provider: 'anthropic' | 'openrouter' | 'openai',
-  systemPrompt: string,
-  userMessage: string,
-): Promise<string> {
-  if (provider === 'anthropic') {
-    return callAnthropic(systemPrompt, userMessage);
-  }
-  return callOpenAICompatible(provider, systemPrompt, userMessage);
-}
-
-async function callAnthropic(systemPrompt: string, userMessage: string): Promise<string> {
-  const model = process.env.PLANNER_MODEL ?? 'claude-sonnet-4-6';
-  log.info({ provider: 'anthropic', model }, 'Calling LLM planner');
-
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY!,
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 4096,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: userMessage }],
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    log.warn({ status: res.status, model, errorPreview: err.substring(0, 200) }, 'Anthropic planner call failed');
-    throw new PlanningError(`Anthropic API error (${res.status})`);
-  }
-
-  const data = (await res.json()) as { content: Array<{ type: string; text?: string }> };
-  const textBlock = data.content.find((b) => b.type === 'text');
-  if (!textBlock?.text) throw new PlanningError('Empty response from Anthropic');
-  return textBlock.text;
-}
-
-/**
- * OpenAI-compatible call — used for both OpenAI and OpenRouter.
- * OpenRouter is a drop-in replacement: same API, different base URL and key.
- *
- * Default models:
- *   OpenRouter: anthropic/claude-sonnet-4-6  (PLANNER_MODEL to override)
- *   OpenAI:     gpt-4o                       (PLANNER_MODEL to override)
- */
-async function callOpenAICompatible(
-  provider: 'openrouter' | 'openai',
-  systemPrompt: string,
-  userMessage: string,
-): Promise<string> {
-  const isOpenRouter = provider === 'openrouter';
-  const baseUrl = isOpenRouter
-    ? 'https://openrouter.ai/api/v1'
-    : 'https://api.openai.com/v1';
-  const apiKey = isOpenRouter
-    ? process.env.OPENROUTER_API_KEY!
-    : process.env.OPENAI_API_KEY!;
-  const defaultModel = isOpenRouter ? 'anthropic/claude-sonnet-4-6' : 'gpt-4o';
-  const model = process.env.PLANNER_MODEL ?? defaultModel;
-  log.info({ provider, model }, 'Calling LLM planner');
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    Authorization: `Bearer ${apiKey}`,
-  };
-  // OpenRouter requires site identification headers
-  if (isOpenRouter) {
-    headers['HTTP-Referer'] = 'https://github.com/jurczykpawel/subtitle-burner';
-    headers['X-Title'] = 'ReelStack';
-  }
-
-  const res = await fetch(`${baseUrl}/chat/completions`, {
-    method: 'POST',
-    headers,
-    body: JSON.stringify({
-      model,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: userMessage },
-      ],
-    }),
-    signal: AbortSignal.timeout(60_000),
-  });
-
-  if (!res.ok) {
-    const err = await res.text();
-    log.warn({ status: res.status, provider, model, errorPreview: err.substring(0, 200) }, 'LLM planner call failed');
-    throw new PlanningError(`${provider} API error (${res.status})`);
-  }
-
-  const data = (await res.json()) as { choices: Array<{ message: { content: string } }> };
-  const content = data.choices[0]?.message?.content;
-  if (!content) throw new PlanningError(`Empty response from ${provider}`);
-  return content;
-}
+// LLM call functions (callLLMWithSystem, detectProvider) are now in ../llm.ts
 
 function parseResponse(text: string, input: PlannerInput): ProductionPlan {
   // Try direct JSON parse first, then extract from markdown
@@ -573,7 +531,8 @@ function extractKeywords(text: string): string {
   return words.slice(0, 3).join(' ') || 'abstract technology';
 }
 
-const VALID_TRANSITIONS = ['crossfade', 'slide-left', 'slide-right', 'zoom-in', 'wipe', 'none', 'cut', 'fade'];
+// Derive from catalog + graceful aliases for LLM typos
+const VALID_TRANSITIONS = [...TRANSITION_TYPES, 'cut', 'fade'];
 
 function sanitizeTransition(raw: unknown): ShotPlan['transition'] {
   const fallback = { type: 'crossfade', durationMs: 400 };
@@ -584,11 +543,11 @@ function sanitizeTransition(raw: unknown): ShotPlan['transition'] {
   return { type, durationMs };
 }
 
+// Derive from catalog + extra keys that SubtitleStyle has but prompt doesn't mention
 const ALLOWED_CAPTION_KEYS = new Set([
-  'fontFamily', 'fontSize', 'fontColor', 'fontWeight', 'fontStyle',
-  'backgroundColor', 'backgroundOpacity', 'outlineColor', 'outlineWidth',
-  'shadowColor', 'shadowBlur', 'position', 'alignment', 'lineHeight',
-  'padding', 'highlightColor', 'upcomingColor', 'highlightMode', 'textTransform',
+  ...CAPTION_PROPERTY_CATALOG.map(p => p.key),
+  // Extra SubtitleStyle keys not in catalog (less common, but valid)
+  'fontStyle', 'shadowColor', 'alignment', 'lineHeight', 'padding', 'upcomingColor', 'pillPadding',
 ]);
 
 /** Sanitize effect config — flatten to max 2 levels deep, only allow primitives and simple objects */

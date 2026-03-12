@@ -1,8 +1,10 @@
-import { AbsoluteFill, OffthreadVideo, useVideoConfig } from 'remotion';
+import { AbsoluteFill, OffthreadVideo, useCurrentFrame, useVideoConfig } from 'remotion';
 import { resolveMediaUrl } from '../utils/resolve-media-url';
+import { remapFrame } from '../utils/remap-frame';
 
 interface FullscreenLayoutProps {
   readonly primaryVideoUrl?: string;
+  readonly speedRamps?: readonly { startTime: number; endTime: number; rate: number }[];
 }
 
 /**
@@ -11,8 +13,13 @@ interface FullscreenLayoutProps {
  */
 export const FullscreenLayout: React.FC<FullscreenLayoutProps> = ({
   primaryVideoUrl,
+  speedRamps,
 }) => {
-  const { width, height } = useVideoConfig();
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  const hasSpeedRamps = speedRamps && speedRamps.length > 0;
+  const videoFrame = hasSpeedRamps ? remapFrame(frame, fps, speedRamps) : undefined;
 
   return (
     <>
@@ -21,28 +28,14 @@ export const FullscreenLayout: React.FC<FullscreenLayoutProps> = ({
           muted
           src={resolveMediaUrl(primaryVideoUrl)}
           style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+          startFrom={videoFrame}
         />
       ) : (
         <AbsoluteFill
           style={{
-            backgroundColor: '#1a1a2e',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
+            backgroundColor: '#0a0a14',
           }}
-        >
-          <div
-            style={{
-              fontSize: 28,
-              color: '#8a8aaa',
-              fontFamily: 'monospace',
-              letterSpacing: 2,
-              opacity: 0.5,
-            }}
-          >
-            FULLSCREEN VIDEO
-          </div>
-        </AbsoluteFill>
+        />
       )}
     </>
   );

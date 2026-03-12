@@ -17,11 +17,19 @@ SUBJECT + ACTION + CAMERA + STYLE + SOUND
 
 CRITICAL RULE: Subject + Action must appear in the FIRST 20-30 words. The model weights early tokens heavily.
 
-Complexity levels:
+Complexity levels (use L2 for most B-roll shots):
 - L1 (≤30 words): atmospheric, let the model decide — "Foggy mountain lake at dawn, still water, bird call. Locked wide shot."
-- L2 (30-100 words): directed shot with clear subject + camera + lighting
-- L3 (100-300 words): add timestamps — "0-3s: Wide shot. 3-6s: Slow dolly push. 6-10s: Close-up."
+- L2 (30-100 words): directed shot with clear subject + camera + lighting — DEFAULT for agent
+- L3 (100-300 words): timestamped multi-scene — "[00:00-00:05] Wide shot of city at dusk, drone descending. [00:05-00:10] Medium close-up, camera tracks subject walking. [00:10-00:15] ECU on hands typing, shallow DOF."
 - L4 (300-1000w): full choreography per shot with physics and reactions
+
+Bracket-annotated format (alternative to L2, good for complex shots):
+\`\`\`
+[Subject]: developer typing on mechanical keyboard, face lit by monitor glow
+[Camera]: medium close-up, slow dolly push, eye level, handheld drift
+[Lighting]: cool blue monitor fill from front, warm amber rim from window-right, low-key
+[Style]: digital clean, muted tones
+\`\`\`
 
 Camera parameters:
 - Framing: wide | medium | close-up | ECU | over-shoulder | full body
@@ -122,9 +130,11 @@ Prompts: cinematic scene descriptions work best. Avoid vague adjectives.`;
 
 export const NANOBANANA_GUIDELINES = `NanoBanana (Gemini Imagen) prompt guidelines:
 
-KEY INSIGHT: Plain text with structured sections beats vague descriptions. Negative prompts are CRITICAL.
+KEY INSIGHT: Both plain text with structured sections AND JSON prompts work well. Choose based on use case:
+- **Structured plain text** (Wzorzec A): best for B-roll, lifestyle, editorial — more natural, flexible
+- **JSON prompt** (Wzorzec B): best for product photography, commercial shots — precise control over each aspect
 
-Use structured sections (Wzorzec A — best quality):
+Wzorzec A — Structured plain text (recommended for most shots):
 \`\`\`
 Scene: [brief scene description]
 Subject: [who/what, pose, expression, clothing]
@@ -132,6 +142,20 @@ Environment: [setting, background, atmosphere]
 Lighting: [type, direction, intensity, color temperature]
 Camera: [lens mm, framing, focus/DOF]
 Negative: [what to avoid]
+\`\`\`
+
+Wzorzec B — JSON prompt (recommended for product/commercial shots):
+\`\`\`json
+{
+  "scene_type": "commercial product photography",
+  "product": { "type": "...", "material": "...", "finish": "..." },
+  "composition": "centered / rule-of-thirds / off-center dynamic",
+  "lighting": "soft diffused studio / dramatic rim / golden hour",
+  "background": "seamless white / gradient / contextual environment",
+  "camera": "85mm macro, f/2.8 shallow depth, sharp focus on product",
+  "mood": "luxury editorial / clean minimal / aspirational lifestyle",
+  "negative": "blurry, distorted, text, watermarks, clutter"
+}
 \`\`\`
 
 Lighting parameters (most impactful field):
@@ -183,14 +207,31 @@ Works well with natural language — no special syntax needed.`;
 // ── STOCK / OTHER ───────────────────────────────────────────────
 
 export const PEXELS_GUIDELINES = `Pexels search query guidelines:
-- Use 2-3 word concrete visual phrases, NOT full sentences
-- Good: "typing laptop", "city skyline night", "coffee pour slow motion", "hands shaking business"
-- Bad: "a person working on their computer in a modern office"
-- Think visually: what would a camera lens literally see?
-- For abstract topics use visual metaphors: "tangled rope" for complexity, "open road" for freedom, "puzzle pieces" for strategy
-- Include style hints if needed: "aerial city", "macro water drop", "time lapse traffic"
-- Stock footage exists for: nature, business, lifestyle, city, food, technology, sports
-- Does NOT have: fictional characters, brand-specific products, niche technical equipment`;
+
+CRITICAL: Pexels is a LITERAL search engine. It matches EXACTLY what you type against video/photo tags.
+- Use 1-2 word CONCRETE NOUNS that describe a REAL physical object or scene
+- Good: "laptop typing", "office desk", "smartphone screen", "person coding", "server room", "whiteboard notes"
+- Bad: "magic box glowing", "checklist tasks steps", "sunrise new beginning", "creative process flowing"
+- NEVER use metaphors, adjectives, or abstract concepts — Pexels returns GARBAGE for those
+- NEVER combine unrelated nouns: "checklist tasks steps" returns cooking videos. Use "checklist" alone.
+- When in doubt, use the SIMPLEST single noun: "laptop", "phone", "office", "code", "chart"
+
+Query translation examples (script concept → Pexels query):
+- "automatyzacja zadań" → "laptop automation" or "image:workflow diagram"
+- "oszczędność czasu" → "image:clock time" or "person working fast"
+- "krok po kroku" → "image:step by step" or "person writing list"
+- "nowe możliwości" → "image:open laptop" or "person smartphone"
+- "wzrost efektywności" → "image:chart growth" or "image:dashboard analytics"
+
+ALWAYS write queries in ENGLISH — Pexels search works only in English.
+
+VIDEO vs IMAGE search:
+- To get STILL IMAGES, prefix searchQuery with "image:" (e.g. "image:laptop desk")
+- Without prefix: returns videos (e.g. "laptop typing")
+- **PREFER IMAGES** for most B-roll — they get automatic Ken Burns zoom/pan animation and look more professional than random stock video
+- Use videos ONLY when you need actual motion (hands typing, walking, pouring)
+- Images work great for: establishing shots, backgrounds, tech setups, abstract concepts, data moments
+- Videos are better for: action sequences (typing, walking, cooking), dynamic lifestyle shots`;
 
 export const HEYGEN_GUIDELINES = `HeyGen avatar script guidelines:
 - Write natural spoken language, not written prose — contractions, short sentences

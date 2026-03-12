@@ -101,9 +101,34 @@ const assetUrlSchema = z.string().url().max(2048).refine(
 // ── Shared sub-schemas ────────────────────────────────────────
 
 const brandPresetSchema = z.object({
+  // Caption preset (bundles style + animation + word grouping)
+  captionPreset: z.enum(['tiktok', 'mrbeast', 'cinematic', 'minimal', 'neon', 'classic']).optional(),
+  // Template ID (e.g. "builtin-neon") - overrides preset style
   captionTemplate: z.string().optional(),
+  // Animation style override
+  animationStyle: z.enum(['none', 'word-highlight', 'word-by-word', 'karaoke', 'bounce', 'typewriter']).optional(),
+  // Word grouping overrides
+  maxWordsPerCue: z.number().min(1).max(10).optional(),
+  maxDurationPerCue: z.number().min(0.5).max(10).optional(),
+  textTransform: z.enum(['none', 'uppercase']).optional(),
+  // Music
+  musicUrl: z.string().url().optional(),
+  musicVolume: z.number().min(0).max(1).optional(),
+  // Layout & display
+  layout: z.enum(['fullscreen', 'split-screen', 'picture-in-picture']).optional(),
+  showProgressBar: z.boolean().optional(),
+  dynamicCaptionPosition: z.boolean().optional(),
+  // Style overrides (applied on top of preset/template)
   highlightColor: z.string().optional(),
   backgroundColor: z.string().optional(),
+  fontSize: z.number().min(8).max(120).optional(),
+  fontFamily: z.string().optional(),
+  fontColor: z.string().optional(),
+  fontWeight: z.enum(['normal', 'bold']).optional(),
+  outlineWidth: z.number().min(0).max(20).optional(),
+  outlineColor: z.string().optional(),
+  position: z.number().min(0).max(100).optional(),
+  // Transition
   defaultTransition: z.enum(['crossfade', 'slide-left', 'slide-right', 'zoom-in', 'wipe', 'none']).optional(),
 }).optional();
 
@@ -157,12 +182,25 @@ const SUPPORTED_LANGUAGES = [
  * - Without `assets`: full auto mode (AI discovers tools, generates assets, renders)
  * - With `assets`: compose mode (user provides materials, LLM arranges them)
  */
+export const reelModeSchema = z.enum([
+  'generate',
+  'compose',
+  'captions',
+  'ai-tips',
+  'n8n-explainer',
+  'presenter-explainer',
+]);
+
+export type ReelMode = z.infer<typeof reelModeSchema>;
+
 export const generateReelSchema = z.object({
-  script: z.string().min(1).max(50000),
+  mode: reelModeSchema.optional().default('generate'),
+  /** Required for generate/compose/captions modes. Auto-generated for n8n-explainer/ai-tips/presenter-explainer. */
+  script: z.string().min(1).max(50000).optional(),
   style: z.enum(['dynamic', 'calm', 'cinematic', 'educational']).optional(),
   layout: z.enum(['fullscreen', 'split-screen', 'picture-in-picture']).default('fullscreen'),
-  tts: ttsSchema,
-  whisper: whisperSchema,
+  tts: ttsSchema.optional(),
+  whisper: whisperSchema.optional(),
   brandPreset: brandPresetSchema,
   /** User-provided materials. When present, triggers compose mode. */
   assets: z.array(userAssetSchema).min(1).max(20).optional(),
@@ -173,8 +211,46 @@ export const generateReelSchema = z.object({
     avatarId: z.string().optional(),
     voice: z.string().optional(),
   }).optional(),
+  /** n8n workflow URL or ID (n8n-explainer mode) */
+  workflowUrl: z.string().max(500).optional(),
+  /** Topic for AI generation (ai-tips, presenter-explainer modes) */
+  topic: z.string().min(1).max(1000).optional(),
+  /** Language for script generation (default: from tts.language or 'pl') */
+  language: z.string().max(10).optional(),
+  /** Persona for presenter-explainer mode (e.g. "senior developer", "tech reviewer") */
+  persona: z.string().max(500).optional(),
+  /** LLM provider override (e.g. "openai", "anthropic") */
+  provider: z.string().max(100).optional(),
+  /** Number of tips for ai-tips mode */
+  numberOfTips: z.number().int().min(1).max(50).optional(),
+  /** Target duration in seconds */
+  targetDuration: z.number().positive().max(600).optional(),
+  /** Background music URL */
+  musicUrl: z.string().url().max(2048).optional(),
+  /** Background music volume (0 = mute, 1 = full) */
+  musicVolume: z.number().min(0).max(1).optional(),
+  /** Reel variant / visual style */
+  variant: z.enum(['multi-object', 'single-object', 'cutaway-demo']).optional(),
+  /** Montage profile ID (auto-selected from script if not provided) */
+  montageProfile: z.enum(['network-chuck', 'leadgen-man', 'ai-tool-showcase']).optional(),
   callbackUrl: callbackUrlSchema.optional(),
-});
+}).refine(
+  (data) => {
+    const scriptModes = ['generate', 'compose', 'captions'];
+    if (scriptModes.includes(data.mode ?? 'generate') && !data.script) return false;
+    if (data.mode === 'ai-tips' && !data.topic) return false;
+    if (data.mode === 'presenter-explainer' && !data.topic) return false;
+    if (data.mode === 'n8n-explainer' && !data.workflowUrl) return false;
+    return true;
+  },
+  (data) => ({
+    message: data.mode === 'n8n-explainer'
+      ? 'workflowUrl is required for n8n-explainer mode'
+      : ['ai-tips', 'presenter-explainer'].includes(data.mode ?? '')
+        ? `topic is required for ${data.mode} mode`
+        : 'script is required for generate/compose/captions mode',
+  }),
+);
 
 /**
  * POST /api/v1/reel/captions

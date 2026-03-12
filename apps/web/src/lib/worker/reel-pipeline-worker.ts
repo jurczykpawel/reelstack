@@ -8,7 +8,7 @@ import {
 import { createLogger } from '@reelstack/logger';
 import { reelJobsTotal, reelRenderDuration } from '@/lib/metrics';
 import { produce as agentProduce, produceComposition } from '@reelstack/agent';
-import type { UserAsset, ComposeRequest } from '@reelstack/agent';
+import type { UserAsset, ComposeRequest, BrandPreset } from '@reelstack/agent';
 import { readFile, unlink } from 'fs/promises';
 import crypto from 'crypto';
 
@@ -162,6 +162,134 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
       outputPath = result.outputPath;
       log.info({ jobId, steps: result.steps.length }, 'Compose pipeline complete');
 
+    } else if (mode === 'ai-tips') {
+      // ── ai-tips path ───────────────────────────────────────────
+      log.info({ jobId }, 'Running ai-tips pipeline');
+
+      const { produceAiTips, callLLM, createBestVideoGenerator } = await import('@reelstack/agent');
+
+      const videoGenerator = await createBestVideoGenerator();
+
+      const result = await produceAiTips({
+        jobId,
+        topic: config.topic as string,
+        language: (config.language as string) ?? 'pl',
+        numberOfTips: config.numberOfTips as number | undefined,
+        variant: config.variant as 'multi-object' | 'single-object' | 'cutaway-demo' | undefined,
+        provider: config.provider as string | undefined,
+        tts: config.tts as ComposeRequest['tts'],
+        whisper: config.whisper as ComposeRequest['whisper'],
+        brandPreset: config.brandPreset as BrandPreset | undefined,
+        llmCall: callLLM,
+        videoGenerator,
+        musicUrl: config.musicUrl as string | undefined,
+        musicVolume: config.musicVolume as number | undefined,
+        onProgress: makeProgressCallback(jobId, {
+          'Generating ai-tips script...': 5,
+          'Generating video clips...': 15,
+          'Clip': 30,
+          'Generating voiceover...': 50,
+          'Transcribing audio...': 60,
+          'Assembling composition...': 70,
+          'Rendering video...': 80,
+        }),
+      });
+
+      outputPath = result.outputPath;
+      log.info({ jobId, tips: result.script.tips.length }, 'ai-tips pipeline complete');
+
+    } else if (mode === 'presenter-explainer') {
+      // ── presenter-explainer path ───────────────────────────────
+      log.info({ jobId }, 'Running presenter-explainer pipeline');
+
+      const { producePresenterExplainer, callLLM, createBestVideoGenerator } = await import('@reelstack/agent');
+
+      const videoGenerator = await createBestVideoGenerator();
+
+      // Board image resolver deps - use AI generation for now
+      // TODO: add web search and screenshot support via tools
+      const imageResolverDeps = {
+        generateImage: async (prompt: string) => {
+          const result = await videoGenerator.generate({
+            prompt,
+            duration: 1, // static image
+            aspectRatio: '9:16',
+          });
+          return result.videoUrl; // first frame as image
+        },
+        searchImage: async (query: string) => {
+          // Fallback to AI gen for now
+          const result = await videoGenerator.generate({
+            prompt: query,
+            duration: 1,
+            aspectRatio: '9:16',
+          });
+          return result.videoUrl;
+        },
+        takeScreenshot: async (url: string) => {
+          // TODO: implement Playwright screenshot
+          log.warn({ url }, 'Screenshot not yet implemented, using placeholder');
+          return '';
+        },
+      };
+
+      const result = await producePresenterExplainer({
+        jobId,
+        topic: config.topic as string,
+        persona: config.persona as string | undefined,
+        style: config.style as 'aggressive-funny' | 'edu-casual' | 'sarcastic-expert' | 'hype-energy' | undefined,
+        language: (config.language as string) ?? 'pl',
+        targetDuration: config.targetDuration as number | undefined,
+        tts: config.tts as ComposeRequest['tts'],
+        whisper: config.whisper as ComposeRequest['whisper'],
+        brandPreset: config.brandPreset as BrandPreset | undefined,
+        llmCall: callLLM,
+        videoGenerator,
+        imageResolverDeps,
+        musicUrl: config.musicUrl as string | undefined,
+        musicVolume: config.musicVolume as number | undefined,
+        onProgress: makeProgressCallback(jobId, {
+          'Generating presenter script...': 5,
+          'Generating board images': 15,
+          'Board image': 25,
+          'Generating voiceover...': 40,
+          'Transcribing audio...': 55,
+          'Assembling composition...': 70,
+          'Rendering video...': 80,
+        }),
+      });
+
+      outputPath = result.outputPath;
+      log.info({ jobId, sections: result.script.sections.length }, 'presenter-explainer pipeline complete');
+
+    } else if (mode === 'n8n-explainer') {
+      // ── n8n-explainer path ─────────────────────────────────────
+      log.info({ jobId }, 'Running n8n-explainer pipeline');
+
+      const { produceN8nExplainer, callLLM } = await import('@reelstack/agent');
+
+      const result = await produceN8nExplainer({
+        jobId,
+        workflowUrl: config.workflowUrl as string,
+        language: (config.language as string) ?? 'pl',
+        tts: config.tts as ComposeRequest['tts'],
+        whisper: config.whisper as ComposeRequest['whisper'],
+        brandPreset: config.brandPreset as BrandPreset | undefined,
+        llmCall: callLLM,
+        onProgress: makeProgressCallback(jobId, {
+          'Fetching n8n workflow...': 5,
+          'Generating narration script...': 15,
+          'Generating workflow diagrams...': 25,
+          'Generating voiceover...': 35,
+          'Transcribing audio...': 50,
+          'Assembling composition...': 65,
+          'Rendering video...': 75,
+        }),
+      });
+
+      outputPath = result.outputPath;
+      log.info({ jobId, sections: result.script.sections.length }, 'n8n-explainer pipeline complete');
+
     } else {
       // ── Full auto path (generate mode) ───────────────────────
       log.info({ jobId }, 'Running full auto pipeline');
@@ -173,8 +301,9 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
         style: config.style as 'dynamic' | 'calm' | 'cinematic' | 'educational' | undefined,
         tts: config.tts as { provider?: 'edge-tts' | 'elevenlabs' | 'openai'; voice?: string; language?: string } | undefined,
         whisper: config.whisper as { provider?: 'openrouter' | 'cloudflare' | 'ollama'; apiKey?: string } | undefined,
-        brandPreset: config.brandPreset as Record<string, unknown> | undefined,
+        brandPreset: config.brandPreset as BrandPreset | undefined,
         avatar: config.avatar as { avatarId?: string; voice?: string } | undefined,
+        montageProfile: config.montageProfile as string | undefined,
         onProgress: makeProgressCallback(jobId, {
           'Discovering available tools...': 5,
           'Planning production...': 10,

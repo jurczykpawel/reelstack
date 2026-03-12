@@ -28,7 +28,10 @@ export const HighlightBox: React.FC<HighlightBoxProps> = ({ segment }) => {
     borderRadius = 8,
     label,
     glow = false,
+    style = 'border',
   } = segment;
+
+  const isMarker = style === 'marker';
 
   // Spring entrance
   const entryScale = spring({
@@ -54,8 +57,9 @@ export const HighlightBox: React.FC<HighlightBoxProps> = ({ segment }) => {
         top: `${y}%`,
         width: `${width}%`,
         height: `${height}%`,
-        border: `${borderWidth}px solid ${color}`,
-        borderRadius,
+        border: isMarker ? 'none' : `${borderWidth}px solid ${color}`,
+        borderRadius: isMarker ? 2 : borderRadius,
+        backgroundColor: isMarker ? `${color}40` : undefined,
         opacity: exitOpacity,
         transform: `scale(${0.85 + entryScale * 0.15})`,
         transformOrigin: 'center center',

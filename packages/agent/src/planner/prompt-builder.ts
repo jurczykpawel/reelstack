@@ -1,18 +1,22 @@
-import type { ToolManifest, UserAsset } from '../types';
+import type { ToolManifest, ProductionPlan, UserAsset } from '../types';
 import {
   EFFECT_CATALOG,
   SEGMENT_CATALOG,
+  SFX_CATALOG,
   ENTRANCE_ANIMATIONS,
   EXIT_ANIMATIONS,
   TRANSITION_TYPES,
+  TRANSITION_CATALOG,
+  FONT_CATALOG,
+  LAYOUT_CATALOG,
+  CAPTION_PROPERTY_CATALOG,
 } from '@reelstack/remotion/catalog';
+import { BUILT_IN_CAPTION_PRESETS } from '@reelstack/types';
+import type { MontageProfileEntry } from '@reelstack/remotion/catalog';
+import { buildProfileGuidelines } from './montage-profile';
 
-/**
- * Builds a dynamic system prompt for the LLM planner.
- * Effect catalog and segment catalog are auto-imported from the remotion package.
- * When new effects or segments are added there, the prompt updates automatically.
- */
-export function buildPlannerPrompt(manifest: ToolManifest): string {
+/** Shared catalog sections used by planner, revision, and composer prompts. */
+function buildCatalogSections(manifest: ToolManifest) {
   const availableTools = manifest.tools.filter((t) => t.available);
 
   const toolSection = availableTools
@@ -30,19 +34,82 @@ export function buildPlannerPrompt(manifest: ToolManifest): string {
     .join('\n\n');
 
   const effectSection = EFFECT_CATALOG
-    .map((e) => `- "${e.type}": ${e.description}\n  Config: ${e.config}`)
+    .map((e) => {
+      const sfxNote = e.defaultSfx ? ` [default SFX: "${e.defaultSfx}"]` : '';
+      return `- "${e.type}": ${e.description}${sfxNote}\n  Config: ${e.config}`;
+    })
+    .join('\n');
+
+  const sfxSection = SFX_CATALOG
+    .map((s) => `- "${s.id}": ${s.description} (~${s.durationMs}ms)`)
     .join('\n');
 
   const segmentSection = SEGMENT_CATALOG
     .map((s) => `### ${s.type}\n${s.description}\nConfig: ${s.config}\nGuideline: ${s.dynamicGuideline}`)
     .join('\n\n');
 
-  // Build output format example with all segment arrays
   const segmentOutputExamples = SEGMENT_CATALOG
     .map((s) => `  "${s.type}": []`)
     .join(',\n');
 
+  // Auto-built style guidelines from catalog tags
+  const styleGuidelines = buildStyleGuidelines();
+
+  return { toolSection, guidelinesSection, effectSection, sfxSection, segmentSection, segmentOutputExamples, styleGuidelines };
+}
+
+/**
+ * Base descriptions for each video style — pacing/energy only, no effect names.
+ * Effect and transition recommendations are auto-appended from catalog tags.
+ */
+const STYLE_BASES: Record<string, string> = {
+  dynamic: 'Fast cuts (2-4s per shot), 4-6 effects per 30s, 3-5 zoom segments per 30s with spring easing. Every 2-3 seconds something new happens visually. High energy.',
+  calm: 'Slow transitions (5-8s per shot), 1-2 effects per 30s, smooth zoom easing. Minimal, elegant.',
+  cinematic: 'Medium pacing (3-6s per shot), 2-3 effects per 30s, smooth zooms for dramatic moments. Film-like quality.',
+  educational: 'Medium pacing (3-5s per shot), 2-4 effects per 30s. Focus on clarity — text emphasis for key terms, lower thirds for concepts, counters for stats, zoom in on key points.',
+};
+
+function buildStyleGuidelines(): string {
+  const styles = Object.keys(STYLE_BASES) as Array<keyof typeof STYLE_BASES>;
+
+  return styles.map((style) => {
+    const base = STYLE_BASES[style];
+
+    // Collect effects recommended for this style
+    const effects = EFFECT_CATALOG
+      .filter((e) => e.recommendedStyles?.includes(style as any))
+      .map((e) => e.styleHint ? `${e.type} (${e.styleHint})` : e.type);
+
+    // Collect transitions recommended for this style
+    const transitions = TRANSITION_CATALOG
+      .filter((t) => t.recommendedStyles?.includes(style as any))
+      .map((t) => t.type);
+
+    let line = `- "${style}": ${base}`;
+    if (effects.length > 0) {
+      line += `\n  Effects: ${effects.join(', ')}`;
+    }
+    if (transitions.length > 0) {
+      line += `\n  Transitions: ${transitions.join(', ')}${style === 'dynamic' ? ' — mix them, NOT all crossfade' : ''}`;
+    }
+    return line;
+  }).join('\n');
+}
+
+/**
+ * Builds a dynamic system prompt for the LLM planner.
+ * Effect catalog and segment catalog are auto-imported from the remotion package.
+ * When new effects or segments are added there, the prompt updates automatically.
+ */
+export function buildPlannerPrompt(manifest: ToolManifest, montageProfile?: MontageProfileEntry): string {
+  const { toolSection, guidelinesSection, effectSection, sfxSection, segmentSection, segmentOutputExamples, styleGuidelines } = buildCatalogSections(manifest);
+
+  const profileSection = montageProfile
+    ? `\n${buildProfileGuidelines(montageProfile)}\n`
+    : '';
+
   return `You are an AI video production planner. Given a script and available tools, create a complete production plan.
+${profileSection}
 
 ## AVAILABLE TOOLS
 
@@ -61,6 +128,20 @@ ${effectSection}
 Entrance animations: ${ENTRANCE_ANIMATIONS.join(', ')}
 Exit animations: ${EXIT_ANIMATIONS.join(', ')}
 
+## SOUND EFFECTS (SFX)
+
+Built-in SFX that accompany effects. Effects with [default SFX] get their sound automatically.
+You can override or add SFX to ANY effect by including "sfx" in the effect config:
+
+${sfxSection}
+
+To use: add \`"sfx": { "id": "whoosh", "volume": 0.7 }\` in the effect's config object.
+- Effects with a default SFX get it automatically — you don't need to specify it unless you want to change it or mute it.
+- To mute default SFX: \`"sfx": null\`
+- To change SFX: \`"sfx": { "id": "pop", "volume": 0.5 }\`
+- SFX volume range: 0.0 (silent) to 1.0 (full). Default: 0.7
+- Use SFX sparingly — too many sounds feel cluttered. 3-5 SFX per 30s reel is the sweet spot.
+
 ## ADVANCED COMPOSITION ELEMENTS
 
 Beyond effects, use these to make the reel dynamic and professional:
@@ -69,16 +150,21 @@ ${segmentSection}
 
 ## LAYOUTS
 
-- "fullscreen": Single video fills the frame (best for faceless or avatar-only)
-- "split-screen": Two video sources side by side (talking head + screen recording)
-- "picture-in-picture": Small overlay on main content
+${LAYOUT_CATALOG.map(l => `- "${l.type}": ${l.description}`).join('\n')}
 
-## STYLE GUIDELINES
+## CAPTION STYLE
 
-- "dynamic": Fast cuts (2-4s per shot), 4-6 effects per 30s, LOTS of zoom segments (3-5 per 30s with spring easing), emoji popups, screen shakes, glitch transitions, varied transitions (mix slide-left, zoom-in, wipe — NOT all crossfade). This is NetworkChuck energy — every 2-3 seconds something new happens visually.
-- "calm": Slow transitions, 1-2 effects per 30s, subtle text emphasis only, smooth zoom easing
-- "cinematic": Medium pacing, 2-3 effects per 30s, color flashes, glitch, text emphasis, smooth zooms for dramatic moments
-- "educational": Medium pacing, 2-4 effects per 30s, text emphasis on key terms, lower thirds for concepts, counters for stats, zoom in on key points
+The reel has auto-generated captions. You can customize their appearance via "captionStyle" in your output.
+The user may have chosen a caption preset (${Object.keys(BUILT_IN_CAPTION_PRESETS).join(', ')}). Your captionStyle suggestions will be applied ON TOP of the preset.
+
+Available captionStyle properties:
+${CAPTION_PROPERTY_CATALOG.map(p => `- ${p.key}: ${p.type} — ${p.description}`).join('\n')}
+
+Only include captionStyle if you want to override the preset for creative reasons. For most reels, the user's preset handles this.
+
+## STYLE GUIDELINES (auto-generated from effect/transition catalog)
+
+${styleGuidelines}
 
 ## PLANNING RULES
 
@@ -87,6 +173,7 @@ ${segmentSection}
    - If avatar tool available and script has a narrator: use "avatar"
    - If AI video tools available: use "ai-video" for the main visual
    - Otherwise: use "none" (faceless reel - B-roll only)
+   **CRITICAL: When primarySource is "none", B-roll shots MUST cover 100% of the duration with NO gaps.** The first shot MUST start at exactly 0.0s. Adjacent shots must touch (shot-1.endTime === shot-2.startTime). Any gap = black screen = broken reel.
 
 2. TOOL PREFERENCES (follow strictly):
    - **ALWAYS prefer AI-generated content over stock footage.** AI video and AI images make the reel unique and visually striking. Stock footage is generic and forgettable.
@@ -126,6 +213,7 @@ ${segmentSection}
    - "text-card": Text overlay on solid/gradient background. For key points, stats, or transitions
 
 4. TIMING: Shots must cover the entire duration. No gaps. Shots can overlap slightly for transitions.
+   **CRITICAL: If EXACT SPEECH TIMING is provided in the user message, you MUST use those timestamps to align shots and effects.** Match shot boundaries to sentence boundaries from the timing data. Effects that reference specific words (like "Primo", "73%") MUST appear at the EXACT time that word is spoken, not before.
 
 5. TRANSITIONS between shots: ${TRANSITION_TYPES.join(', ')}
 
@@ -154,6 +242,14 @@ ${segmentSection}
       - "cinematic": max 3 effects per 30s
       - "educational": max 3-4 per 30s, focus on text-emphasis for key terms only
 
+   f) **Effect timing MUST match speech timing.** If the script says "Primo... Secundo... Tertio" at times 25s, 28s, 31s, then text-emphasis effects for these words must appear AT those times, not before. Cross-reference effect startTime with the scriptSegment timing of the shot it belongs to.
+
+   g) **No duplicate representations.** NEVER create both a text-emphasis AND a counter effect for the same concept. For example, if you show "Primo" as text-emphasis, do NOT also show "1x" as a counter. Pick ONE representation per concept.
+
+   h) **No simultaneous bottom-screen elements.** NEVER overlap subscribe-banner with CTA segments in time. They both render at the bottom of the screen and will visually collide. Use subscribe-banner OR CTA, not both, OR separate them in time with at least 2s gap.
+
+   i) **Caption-safe zones.** Auto-generated captions occupy the bottom 20-30% of the screen (around y=70-80%). Position text-emphasis effects at "top" or "center" position to avoid overlapping with captions. Only use "bottom" position for effects when you know captions are not active at that time.
+
 7. ZOOM SEGMENTS — CRITICAL FOR DYNAMIC FEEL:
    Zoom segments add camera movement to your reel. Without them the video feels static.
    - "dynamic" style: ADD 3-5 zoom segments per 30s. Scale 1.2-2.0, spring easing, 1-3s each.
@@ -161,7 +257,11 @@ ${segmentSection}
    - Zoom in on key moments (when a stat is mentioned, when the hook lands, on visual reveals).
    - Alternate between zoom-in and normal to create rhythm.
 
-8. B-ROLL SEARCH QUERIES: Use concrete, visual 2-3 word phrases ("typing laptop", "city skyline", "coffee shop"). NEVER leave searchQuery empty — if you can't think of a query, use the most visual noun from the script segment.
+8. B-ROLL SEARCH QUERIES: Use 1-2 word CONCRETE NOUNS ("laptop", "office desk", "smartphone"). NEVER use metaphors or abstract phrases — Pexels returns garbage for those. NEVER leave searchQuery empty.
+   When the script is in Polish or another non-English language, write Pexels search queries in ENGLISH.
+   **PREFER IMAGES over videos** for B-roll: prefix with "image:" (e.g. "image:laptop desk"). Images get automatic Ken Burns zoom/pan animation and look more professional. Use videos only when you need actual motion (hands typing, walking).
+
+11. COUNTER-UP FOR NUMBERS: Whenever the script mentions a number, percentage, price, or statistic (e.g. "73%", "5x faster", "$299", "10 000 users"), you MUST add a "counters" segment at the exact time that number is spoken. Numbers without counter-up animation look amateur. Use "rise" SFX with counters for extra impact.
 
 9. QUALITY FIRST: Always prioritize visual quality over cost. Use the best available AI tools.
    If multiple AI video tools available, pick the best for each shot type (Seedance for cinematic, Kling for action).
@@ -193,6 +293,7 @@ Return a JSON object (no markdown, just raw JSON):
   ],
 ${segmentOutputExamples},
   "layout": "fullscreen",
+  "captionStyle": { "fontSize": 72, "textTransform": "uppercase", "highlightColor": "#FFD700" },
   "reasoning": "Brief explanation of creative decisions"
 }`;
 }
@@ -214,7 +315,14 @@ export function buildComposerPrompt(assets: readonly UserAsset[]): string {
     .join('\n');
 
   const effectSection = EFFECT_CATALOG
-    .map((e) => `- "${e.type}": ${e.description}\n  Config: ${e.config}`)
+    .map((e) => {
+      const sfxNote = e.defaultSfx ? ` [default SFX: "${e.defaultSfx}"]` : '';
+      return `- "${e.type}": ${e.description}${sfxNote}\n  Config: ${e.config}`;
+    })
+    .join('\n');
+
+  const sfxSection = SFX_CATALOG
+    .map((s) => `- "${s.id}": ${s.description} (~${s.durationMs}ms)`)
     .join('\n');
 
   const segmentSection = SEGMENT_CATALOG
@@ -234,27 +342,43 @@ ${effectSection}
 Entrance animations: ${ENTRANCE_ANIMATIONS.join(', ')}
 Exit animations: ${EXIT_ANIMATIONS.join(', ')}
 
+## SOUND EFFECTS (SFX)
+
+Built-in SFX that accompany effects. Effects with [default SFX] get their sound automatically.
+Override or add SFX to ANY effect by including "sfx" in the config:
+
+${sfxSection}
+
+Usage: \`"sfx": { "id": "whoosh", "volume": 0.7 }\` in effect config. \`"sfx": null\` to mute default.
+Use sparingly — 3-5 SFX per 30s reel max.
+
 ## ADVANCED COMPOSITION ELEMENTS
 
 ${segmentSection}
 
 ## LAYOUTS
 
-- "fullscreen": Single video fills the frame
-- "split-screen": Two sources side by side
-- "picture-in-picture": Small overlay on main content
+${LAYOUT_CATALOG.map(l => `- "${l.type}": ${l.description}`).join('\n')}
 
-## STYLE GUIDELINES
+## CAPTION STYLE
 
-- "dynamic": Fast cuts (2-4s per shot), 4-6 effects per 30s, LOTS of zoom segments (3-5 per 30s with spring easing), emoji popups, screen shakes, glitch transitions, varied transitions (mix slide-left, zoom-in, wipe — NOT all crossfade). This is NetworkChuck energy — every 2-3 seconds something new happens visually.
-- "calm": Slow transitions, 1-2 effects per 30s, subtle text emphasis only, smooth zoom easing
-- "cinematic": Medium pacing, 2-3 effects per 30s, color flashes, glitch, text emphasis, smooth zooms for dramatic moments
-- "educational": Medium pacing, 2-4 effects per 30s, text emphasis on key terms, lower thirds for concepts, counters for stats, zoom in on key points
+The reel has auto-generated captions. You can customize their appearance via "captionStyle" in your output.
+The user may have chosen a caption preset (${Object.keys(BUILT_IN_CAPTION_PRESETS).join(', ')}). Your captionStyle suggestions will be applied ON TOP of the preset.
+
+Available captionStyle properties:
+${CAPTION_PROPERTY_CATALOG.map(p => `- ${p.key}: ${p.type} — ${p.description}`).join('\n')}
+
+Only include captionStyle if you want to override the preset for creative reasons.
+
+## STYLE GUIDELINES (auto-generated from effect/transition catalog)
+
+${buildStyleGuidelines()}
 
 ## COMPOSITION RULES
 
 1. PRIMARY SOURCE: If any asset is marked as primary (talking head), use it as the primary source.
    Otherwise choose the longest video or use "none" for a faceless composition.
+   **CRITICAL: When primarySource is "none", shots MUST cover 100% of the duration with NO gaps.** First shot starts at 0.0s. No black screen allowed.
 
 2. SHOTS: Break the script into segments and assign a visual to each:
    - "primary": Show the primary video (talking head)
@@ -275,6 +399,8 @@ ${segmentSection}
 7. ZOOM SEGMENTS: Add zoom segments to create camera movement. Critical for dynamic feel.
 
 8. You MUST use only the materials provided. Do NOT reference any asset IDs that are not in the list above.
+
+9. COUNTER-UP FOR NUMBERS: Whenever the script mentions a number, percentage, price, or statistic (e.g. "73%", "5x faster", "$299", "10 000 users"), you MUST add a "counters" segment at the exact time that number is spoken. Numbers without counter-up animation look amateur. Use "rise" SFX with counters for extra impact.
 
 ## OUTPUT FORMAT
 
@@ -299,6 +425,84 @@ Return a JSON object (no markdown, just raw JSON):
   "highlights": [...],
   "ctaSegments": [...],
   "layout": "fullscreen",
+  "captionStyle": { "fontSize": 72, "textTransform": "uppercase", "highlightColor": "#FFD700" },
   "reasoning": "Brief explanation of creative decisions"
+}`;
+}
+
+/**
+ * Builds a system prompt for revising an existing production plan based on director feedback.
+ */
+export function buildRevisionPrompt(
+  originalPlan: ProductionPlan,
+  directorNotes: string,
+  manifest: ToolManifest,
+): string {
+  const { toolSection, guidelinesSection, effectSection, sfxSection, segmentSection, segmentOutputExamples, styleGuidelines } = buildCatalogSections(manifest);
+
+  return `You are an AI video production planner revising an existing plan based on director feedback.
+
+## AVAILABLE TOOLS
+
+${toolSection || 'No tools available - use text cards and effects only.'}
+
+## PROMPT WRITING GUIDELINES PER TOOL
+
+${guidelinesSection || 'No specific guidelines — use descriptive, visual language.'}
+
+## AVAILABLE VISUAL EFFECTS
+
+${effectSection}
+
+Entrance animations: ${ENTRANCE_ANIMATIONS.join(', ')}
+Exit animations: ${EXIT_ANIMATIONS.join(', ')}
+
+## SOUND EFFECTS (SFX)
+
+${sfxSection}
+
+Usage: \`"sfx": { "id": "whoosh", "volume": 0.7 }\` in effect config. \`"sfx": null\` to mute.
+
+## ADVANCED COMPOSITION ELEMENTS
+
+${segmentSection}
+
+## LAYOUTS
+
+${LAYOUT_CATALOG.map(l => `- "${l.type}": ${l.description}`).join('\n')}
+
+## CAPTION STYLE
+
+Available captionStyle properties:
+${CAPTION_PROPERTY_CATALOG.map(p => `- ${p.key}: ${p.type} — ${p.description}`).join('\n')}
+
+## TRANSITIONS
+
+Available: ${TRANSITION_TYPES.join(', ')}
+
+## REVISION REQUEST
+
+### Original Plan
+\`\`\`json
+${JSON.stringify(originalPlan, null, 2)}
+\`\`\`
+
+### Director's Feedback
+${directorNotes.substring(0, 5000)}
+
+### Instructions
+Revise the plan based on the director's feedback. Return the COMPLETE revised plan in the same JSON format. Keep everything that works, fix what the director asked for.
+
+## OUTPUT FORMAT
+
+Return a JSON object (no markdown, just raw JSON):
+{
+  "primarySource": { "type": "avatar"|"user-recording"|"ai-video"|"none", ... },
+  "shots": [...],
+  "effects": [...],
+${segmentOutputExamples},
+  "layout": "fullscreen",
+  "captionStyle": { ... },
+  "reasoning": "Brief explanation of what was changed and why"
 }`;
 }

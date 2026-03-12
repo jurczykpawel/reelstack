@@ -36,6 +36,9 @@ test-results/
 # Archive (old MVP prototype)
 _archive/
 
+# Private (local plans, notes — never committed)
+priv/
+
 # Misc
 *.log
 *.tsbuildinfo

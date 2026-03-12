@@ -18,17 +18,28 @@ export const BlurBackground: React.FC<Props> = ({ segment }) => {
     overlayText,
     overlayFontSize = 64,
     overlayColor = '#FFFFFF',
+    mode = 'blur',
+    focusPoint = { x: 50, y: 50 },
+    spotlightRadius = 20,
   } = segment;
+
+  const isSpotlight = mode === 'spotlight';
 
   return (
     <>
-      {/* Blur overlay */}
+      {/* Blur / Spotlight overlay */}
       <div
         style={{
           position: 'absolute',
           inset: 0,
-          backdropFilter: `blur(${blurAmount}px)`,
-          backgroundColor: 'rgba(0,0,0,0.3)',
+          ...(isSpotlight
+            ? {
+                background: `radial-gradient(circle at ${focusPoint.x}% ${focusPoint.y}%, transparent ${spotlightRadius}%, rgba(0,0,0,0.7) ${spotlightRadius + 5}%)`,
+              }
+            : {
+                backdropFilter: `blur(${blurAmount}px)`,
+                backgroundColor: 'rgba(0,0,0,0.3)',
+              }),
           zIndex: 2,
           pointerEvents: 'none',
           ...style,

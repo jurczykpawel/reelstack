@@ -157,6 +157,12 @@ NANOBANANA_API_KEY=         # NanoBanana image (or use GEMINI_API_KEY)
 GEMINI_API_KEY=             # Google Gemini (NanoBanana fallback)
 ELEVENLABS_API_KEY=         # ElevenLabs TTS
 OPENAI_API_KEY=             # OpenAI TTS / Whisper
+
+# HuMo 1.7B - self-hosted avatar-video via RunPod (najtańsza opcja ~$0.10/video)
+# Setup: projects/humo-runpod/AGENTS.md
+RUNPOD_API_KEY=             # RunPod API key (Settings -> API Keys)
+HUMO_RUNPOD_ENDPOINT_ID=    # RunPod serverless endpoint ID
+HUMO_DEFAULT_IMAGE_URL=     # Domyślny URL portretu gdy avatarId nie podany w request
 ```
 
 Tools are auto-discovered: if the env var is set and healthCheck() passes, the tool is available to the LLM planner.
@@ -196,6 +202,22 @@ docker compose -f docker-compose.mikrus.yml logs -f worker
 
 nginx port: `3080`. CI pushes to `ghcr.io/jurczykpawel/reelstack:latest` (web) + `reelstack-worker:latest` (worker).
 
+## Implementation Rules (MANDATORY)
+
+**After EVERY implementation step**, before moving to the next task, answer these questions:
+
+1. **New field added to any type/interface?** → Check it exists in: `reel-schemas.ts` (Zod), `reel-pipeline-worker.ts` (passthrough), `types.ts` (interface), `reel-schemas.test.ts` (accept + reject tests)
+2. **New file created?** → Is it exported from package `index.ts`? Did you grep for existing similar patterns first?
+3. **Copy-pasted code?** → Is this the 2nd occurrence? Extract to shared module NOW.
+4. **New function/type?** → Exported from package index?
+5. **Post-step scan**: unused imports, missing `resolveMediaUrl()`, inconsistent defaults, avoidable `as unknown as` casts
+
+**After completing a phase** (group of related steps):
+- Cross-step review: diff new files for duplicated patterns
+- Wiring trace: API schema → worker → orchestrator → types → tests
+
+Tests passing is NOT a completion signal. The checklist above IS.
+
 ## Key Architectural Decisions
 
 - **Remotion composition**: single-overlay model, held cross-transitions. See `packages/remotion/COMPOSITION.md`.
@@ -213,3 +235,16 @@ Quick summary:
 1. Create `packages/agent/src/tools/mytool-tool.ts` implementing `ProductionTool`
 2. Add env var check + instantiation in `packages/agent/src/registry/discovery.ts`
 3. Write `promptGuidelines` based on the tool's prompting documentation
+
+Istniejace narzedzia jako wzorzec: `wavespeed-tool.ts` (najprostszy), `heygen-tool.ts` (avatar + script), `humo-tool.ts` (self-hosted RunPod).
+
+## HuMo Tool (avatar-video, self-hosted)
+
+Najtańsza opcja do generowania talking-head video. Używa self-hosted RunPod endpoint z modelem HuMo 1.7B.
+
+- Tool: `packages/agent/src/tools/humo-tool.ts`
+- Serwis: `projects/humo-runpod/` (Dockerfile + handler.py)
+- Dokumentacja setupu: `projects/humo-runpod/AGENTS.md`
+- `avatarId` w `AssetGenerationRequest` = URL do zdjęcia portretu
+- Czas generowania: ~8 min (async polling przez RunPod API)
+- Włącza sie automatycznie gdy `RUNPOD_API_KEY` + `HUMO_RUNPOD_ENDPOINT_ID` ustawione

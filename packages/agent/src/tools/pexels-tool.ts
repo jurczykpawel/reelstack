@@ -56,12 +56,13 @@ export class PexelsTool implements ProductionTool {
       return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'PEXELS_API_KEY not set' };
     }
 
-    const query = request.searchQuery || request.prompt || 'abstract';
-    const isVideo = !request.searchQuery?.includes('image:');
+    const rawQuery = request.searchQuery || request.prompt || 'abstract';
+    const isVideo = !rawQuery.includes('image:');
+    const query = rawQuery.replace(/^image:\s*/, '');
 
     const url = isVideo
-      ? `${PEXELS_API}/videos/search?query=${encodeURIComponent(query)}&per_page=1&orientation=portrait`
-      : `${PEXELS_API}/v1/search?query=${encodeURIComponent(query)}&per_page=1&orientation=portrait`;
+      ? `${PEXELS_API}/videos/search?query=${encodeURIComponent(query)}&per_page=5&orientation=portrait`
+      : `${PEXELS_API}/v1/search?query=${encodeURIComponent(query)}&per_page=5&orientation=portrait`;
 
     const res = await fetch(url, {
       headers: { Authorization: apiKey },
@@ -75,13 +76,21 @@ export class PexelsTool implements ProductionTool {
     const data = await res.json();
 
     if (isVideo) {
-      const video = (data as PexelsVideoResponse).videos?.[0];
-      const file = video?.video_files
-        ?.filter((f) => f.width && f.width <= 1080)
-        .sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0]
-        ?? video?.video_files?.[0];
+      const videos = (data as PexelsVideoResponse).videos ?? [];
+      // Prefer portrait-oriented videos (height > width), then highest quality ≤1080p
+      const bestVideo = videos
+        .map((v) => {
+          const file = v.video_files
+            ?.filter((f) => f.width && f.width <= 1080)
+            .sort((a, b) => (b.width ?? 0) - (a.width ?? 0))[0]
+            ?? v.video_files?.[0];
+          const isPortrait = file && file.height && file.width ? file.height > file.width : false;
+          return { video: v, file, isPortrait };
+        })
+        .filter((r) => r.file?.link && isPublicUrl(r.file.link))
+        .sort((a, b) => (b.isPortrait ? 1 : 0) - (a.isPortrait ? 1 : 0))[0];
 
-      if (!file?.link || !isPublicUrl(file.link)) {
+      if (!bestVideo?.file?.link) {
         return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'No valid video results' };
       }
 
@@ -89,14 +98,25 @@ export class PexelsTool implements ProductionTool {
         jobId: randomUUID(),
         toolId: this.id,
         status: 'completed',
-        url: file.link,
-        durationSeconds: video?.duration,
+        url: bestVideo.file.link,
+        durationSeconds: bestVideo.video?.duration,
       };
     }
 
-    const photo = (data as PexelsPhotoResponse).photos?.[0];
-    const photoUrl = photo?.src.large2x ?? photo?.src.large;
-    if (!photoUrl || !isPublicUrl(photoUrl)) {
+    const photos = (data as PexelsPhotoResponse).photos ?? [];
+    // Prefer portrait-oriented photos, then highest resolution
+    const bestPhoto = photos
+      .filter((p) => {
+        const url = p.src.large2x ?? p.src.large;
+        return url && isPublicUrl(url);
+      })
+      .sort((a, b) => {
+        const aPortrait = a.height > a.width ? 1 : 0;
+        const bPortrait = b.height > b.width ? 1 : 0;
+        return bPortrait - aPortrait;
+      })[0];
+
+    if (!bestPhoto) {
       return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'No valid image results' };
     }
 
@@ -104,7 +124,7 @@ export class PexelsTool implements ProductionTool {
       jobId: randomUUID(),
       toolId: this.id,
       status: 'completed',
-      url: photoUrl,
+      url: bestPhoto.src.large2x ?? bestPhoto.src.large,
     };
   }
 }
@@ -117,5 +137,5 @@ interface PexelsVideoResponse {
 }
 
 interface PexelsPhotoResponse {
-  photos: Array<{ src: { large2x: string; large: string } }>;
+  photos: Array<{ src: { large2x: string; large: string }; width: number; height: number }>;
 }

@@ -27,6 +27,7 @@ function makeProps(overrides: Record<string, unknown> = {}) {
       musicVolume: 0.3,
       showProgressBar: true,
       backgroundColor: '#000000',
+      speedRamps: [],
       ...overrides,
     },
     defaultProps: {} as never,

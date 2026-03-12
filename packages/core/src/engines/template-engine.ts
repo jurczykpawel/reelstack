@@ -17,6 +17,7 @@ const ALLOWED_FONT_FAMILIES = [
   'Arial',
   'Helvetica',
   'Inter',
+  'Outfit',
   'Roboto',
   'Open Sans',
   'Montserrat',

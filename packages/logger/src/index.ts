@@ -2,12 +2,10 @@ import pino from 'pino';
 
 const isProduction = process.env.NODE_ENV === 'production';
 
+// pino-pretty uses worker threads which are incompatible with Next.js/Turbopack bundling.
+// Use JSON output everywhere; pipe through `bunx pino-pretty` in dev if needed.
 const baseLogger = pino({
   level: process.env.LOG_LEVEL || (isProduction ? 'info' : 'debug'),
-  ...(isProduction
-    ? {} // JSON output in production (machine-readable)
-    : { transport: { target: 'pino-pretty', options: { colorize: true } } }
-  ),
 });
 
 /**

@@ -1,7 +1,28 @@
 export { produce, produceComposition } from './orchestrator/production-orchestrator';
+export {
+  buildTimingReference,
+  resolvePresetConfig,
+  runTTSPipeline,
+  uploadVoiceover,
+  renderVideo,
+} from './orchestrator/base-orchestrator';
+export type { TTSPipelineResult, TTSPipelineInput, RenderResult } from './orchestrator/base-orchestrator';
+export { createVideoGenerator } from './generators/video-generator';
+export { createBestVideoGenerator } from './generators/video-generator-factory';
+export type { VideoGenerator, VideoGeneratorInput, VideoGeneratorResult, VideoGeneratorOptions } from './generators/video-generator';
+export type { VideoGeneratorFactoryOptions } from './generators/video-generator-factory';
+export { callLLM, callLLMWithSystem, detectProvider } from './llm';
+export type { LLMProvider } from './llm';
+export { produceN8nExplainer } from './orchestrator/n8n-explainer-orchestrator';
+export type { N8nExplainerRequest, N8nExplainerResult } from './orchestrator/n8n-explainer-orchestrator';
+export { produceAiTips } from './orchestrator/ai-tips-orchestrator';
+export type { AiTipsRequest, AiTipsResult } from './orchestrator/ai-tips-orchestrator';
+export { producePresenterExplainer } from './orchestrator/presenter-explainer-orchestrator';
+export type { PresenterExplainerRequest, PresenterExplainerResult } from './orchestrator/presenter-explainer-orchestrator';
 export { ToolRegistry } from './registry/tool-registry';
 export { discoverTools } from './registry/discovery';
-export { planProduction, planComposition } from './planner/production-planner';
+export { planProduction, planComposition, revisePlan } from './planner/production-planner';
+export { selectMontageProfile, buildProfileGuidelines, buildProfileSupervisorChecks } from './planner/montage-profile';
 export { generateAssets } from './orchestrator/asset-generator';
 export { assembleComposition } from './orchestrator/composition-assembler';
 export { adjustTimeline } from './orchestrator/timeline-adjuster';
@@ -27,6 +48,7 @@ export type {
   ToolManifest,
   ToolManifestEntry,
   CostTier,
+  BrandPreset,
 } from './types';
 
 /**

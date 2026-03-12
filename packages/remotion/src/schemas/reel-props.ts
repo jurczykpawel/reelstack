@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { effectSegmentSchema } from '../effects/schemas';
+import { captionCueSchema } from './caption-cue';
 
 const textCardConfigSchema = z.object({
   headline: z.string(),
@@ -17,18 +18,28 @@ const kenBurnsConfigSchema = z.object({
   endPosition: z.object({ x: z.number(), y: z.number() }).default({ x: 50, y: 50 }),
 });
 
+const mediaPanelSourceSchema = z.object({
+  url: z.string(),
+  type: z.enum(['video', 'image']),
+});
+
 const mediaSourceSchema = z.object({
   url: z.string(),
-  type: z.enum(['video', 'image', 'color', 'text-card']),
+  type: z.enum(['video', 'image', 'color', 'split-screen', 'text-card', 'multi-panel']),
   label: z.string().optional(),
   startFrom: z.number().optional(),
   endAt: z.number().optional(),
   textCard: textCardConfigSchema.optional(),
   kenBurns: kenBurnsConfigSchema.optional(),
+  panels: z.array(mediaPanelSourceSchema).min(2).max(4).optional(),
 });
 
 const bRollTransitionSchema = z.object({
-  type: z.enum(['crossfade', 'slide-left', 'slide-right', 'zoom-in', 'wipe', 'none']).default('crossfade'),
+  type: z.enum([
+    'crossfade', 'slide-left', 'slide-right', 'slide-perspective-right',
+    'zoom-in', 'wipe', 'blur-dissolve', 'flash-white', 'whip-pan',
+    'cross-zoom', 'iris-circle', 'spin', 'none',
+  ]).default('crossfade'),
   durationMs: z.number().min(0).max(2000).default(300),
 });
 
@@ -38,23 +49,7 @@ const bRollSegmentSchema = z.object({
   media: mediaSourceSchema,
   animation: z.enum(['spring-scale', 'fade', 'slide', 'none']).optional(),
   transition: bRollTransitionSchema.optional(),
-});
-
-const subtitleWordSchema = z.object({
-  text: z.string(),
-  startTime: z.number(),
-  endTime: z.number(),
-});
-
-const captionCueSchema = z.object({
-  id: z.string(),
-  startTime: z.number(),
-  endTime: z.number(),
-  text: z.string(),
-  words: z.array(subtitleWordSchema).optional(),
-  animationStyle: z
-    .enum(['none', 'word-highlight', 'word-by-word', 'karaoke', 'bounce', 'typewriter'])
-    .optional(),
+  cssFilter: z.string().optional(),
 });
 
 const captionStyleSchema = z.object({
@@ -75,7 +70,7 @@ const captionStyleSchema = z.object({
   padding: z.number(),
   highlightColor: z.string().optional(),
   upcomingColor: z.string().optional(),
-  highlightMode: z.enum(['text', 'pill']).default('text'),
+  highlightMode: z.enum(['text', 'pill', 'label', 'hormozi', 'glow', 'pop-word', 'underline-sweep', 'box-highlight']).default('text'),
   textTransform: z.enum(['none', 'uppercase']).default('none'),
   pillColor: z.string().optional(),
   pillBorderRadius: z.number().optional(),
@@ -120,7 +115,7 @@ const zoomSegmentSchema = z.object({
   endTime: z.number(),
   scale: z.number().min(1).max(3).default(1.5),
   focusPoint: z.object({ x: z.number(), y: z.number() }).default({ x: 50, y: 50 }),
-  easing: z.enum(['spring', 'smooth']).default('spring'),
+  easing: z.enum(['spring', 'smooth', 'instant']).default('spring'),
 });
 
 const highlightSegmentSchema = z.object({
@@ -135,6 +130,7 @@ const highlightSegmentSchema = z.object({
   borderRadius: z.number().default(8),
   label: z.string().optional(),
   glow: z.boolean().default(false),
+  style: z.enum(['border', 'marker']).default('border'),
 });
 
 const counterSegmentSchema = z.object({
@@ -147,6 +143,13 @@ const counterSegmentSchema = z.object({
   textColor: z.string().default('#FFFFFF'),
   fontSize: z.number().default(72),
   position: z.enum(['center', 'top', 'bottom']).default('center'),
+  mode: z.enum(['count-up', 'countdown']).default('count-up'),
+});
+
+const speedRampSegmentSchema = z.object({
+  startTime: z.number(),
+  endTime: z.number(),
+  rate: z.number().min(0.1).max(4).default(1),
 });
 
 // Re-export shared schemas for reuse by YouTubeLongForm composition
@@ -160,6 +163,7 @@ export {
   counterSegmentSchema,
   zoomSegmentSchema,
   highlightSegmentSchema,
+  speedRampSegmentSchema,
 };
 
 export const reelPropsSchema = z.object({
@@ -177,6 +181,7 @@ export const reelPropsSchema = z.object({
   counters: z.array(counterSegmentSchema).default([]),
   zoomSegments: z.array(zoomSegmentSchema).default([]),
   highlights: z.array(highlightSegmentSchema).default([]),
+  speedRamps: z.array(speedRampSegmentSchema).default([]),
 
   // Audio
   voiceoverUrl: z.string().optional(),

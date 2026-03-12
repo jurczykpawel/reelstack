@@ -1,4 +1,7 @@
-import type { ProductionPlan, GeneratedAsset, EffectPlan } from '../types';
+import type { ProductionPlan, GeneratedAsset, EffectPlan, BrandPreset } from '../types';
+import { BUILT_IN_CAPTION_PRESETS, DEFAULT_CAPTION_PRESET } from '@reelstack/types';
+import type { CaptionPreset } from '@reelstack/types';
+import { EFFECT_CATALOG, sfxIdToUrl } from '@reelstack/remotion/catalog';
 import { createLogger } from '@reelstack/logger';
 
 const log = createLogger('composition-assembler');
@@ -23,6 +26,7 @@ export interface AssembledProps {
   cues: CueEntry[];
   captionStyle?: Record<string, unknown>;
   dynamicCaptionPosition: boolean;
+  musicUrl?: string;
   musicVolume: number;
   showProgressBar: boolean;
   backgroundColor: string;
@@ -57,11 +61,16 @@ export interface AssemblyInput {
   assets: readonly GeneratedAsset[];
   cues: readonly CueEntry[];
   voiceoverFilename?: string;
-  brandPreset?: {
-    captionTemplate?: { fontFamily?: string; fontSize?: number; fontColor?: string; backgroundColor?: string };
-    highlightColor?: string;
-    backgroundColor?: string;
-  };
+  brandPreset?: BrandPreset;
+}
+
+/** Extract string from unknown, return undefined if not string */
+function str(v: unknown): string | undefined {
+  return typeof v === 'string' && v.length > 0 ? v : undefined;
+}
+/** Extract number from unknown, return undefined if not number */
+function num(v: unknown): number | undefined {
+  return typeof v === 'number' && isFinite(v) ? v : undefined;
 }
 
 /**
@@ -139,7 +148,11 @@ export function assembleComposition(input: AssemblyInput): AssembledProps {
       continue;
     }
 
-    const mediaType = asset.type === 'ai-image' || asset.type === 'stock-image' ? 'image' : 'video';
+    // Detect media type: check asset type first, then URL extension (Pexels image: prefix returns jpeg URLs with stock-video type)
+    const imageExtensions = /\.(jpe?g|png|webp|gif|avif|bmp|tiff?)(\?|$)/i;
+    const isImageByType = asset.type === 'ai-image' || asset.type === 'stock-image';
+    const isImageByUrl = imageExtensions.test(asset.url);
+    const mediaType = isImageByType || isImageByUrl ? 'image' : 'video';
 
     // Validate URL - allow http(s) and local file paths (for generated temp files)
     let validUrl = asset.url;
@@ -173,37 +186,73 @@ export function assembleComposition(input: AssemblyInput): AssembledProps {
   );
 
   // Convert effects - flatten config into top-level props (spread config first so sanitized fields can't be overridden)
-  const effects: EffectEntry[] = plan.effects.map((e) => ({
-    ...e.config,
-    type: e.type,
-    startTime: e.startTime,
-    endTime: e.endTime,
-  }));
+  // Build default SFX lookup from catalog
+  const defaultSfxMap = new Map<string, string>();
+  for (const entry of EFFECT_CATALOG) {
+    if (entry.defaultSfx) {
+      defaultSfxMap.set(entry.type, entry.defaultSfx);
+    }
+  }
 
-  // Caption style
-  const captionStyle = brandPreset
-    ? {
-        fontFamily: brandPreset.captionTemplate?.fontFamily ?? 'Outfit, sans-serif',
-        fontSize: brandPreset.captionTemplate?.fontSize ?? 64,
-        fontColor: brandPreset.captionTemplate?.fontColor ?? '#F5F5F0',
-        fontWeight: 'bold',
-        fontStyle: 'normal',
-        backgroundColor: brandPreset.captionTemplate?.backgroundColor ?? '#0E0E12',
-        backgroundOpacity: 0.85,
-        outlineColor: '#0E0E12',
-        outlineWidth: 3,
-        shadowColor: '#000000',
-        shadowBlur: 12,
-        position: 75,
-        alignment: 'center',
-        lineHeight: 1.3,
-        padding: 16,
-        highlightColor: brandPreset.highlightColor ?? '#F59E0B',
-        upcomingColor: brandPreset.captionTemplate?.fontColor ?? '#8888A0',
-        highlightMode: 'text',
-        textTransform: 'none',
+  const effects: EffectEntry[] = plan.effects.map((e) => {
+    const base: EffectEntry = {
+      ...e.config,
+      type: e.type,
+      startTime: e.startTime,
+      endTime: e.endTime,
+    };
+
+    // Resolve SFX: LLM config > default from catalog
+    const configSfx = e.config.sfx as { id?: string; volume?: number } | null | undefined;
+
+    if (configSfx === null) {
+      // LLM explicitly muted SFX — don't add any
+      delete base.sfx;
+    } else if (configSfx?.id) {
+      // LLM specified a custom SFX
+      base.sfx = { url: sfxIdToUrl(configSfx.id), volume: configSfx.volume ?? 0.7 };
+    } else {
+      // Apply default SFX from catalog if available
+      const defaultSfxId = defaultSfxMap.get(e.type);
+      if (defaultSfxId) {
+        base.sfx = { url: sfxIdToUrl(defaultSfxId), volume: 0.7 };
       }
-    : undefined;
+    }
+
+    return base;
+  });
+
+  // Resolve caption style with 3-layer priority:
+  // 1. preset defaults (lowest)
+  // 2. LLM plan.captionStyle suggestions (middle)
+  // 3. individual brandPreset overrides (highest)
+  const presetName = brandPreset?.captionPreset ?? DEFAULT_CAPTION_PRESET;
+  const preset: CaptionPreset = BUILT_IN_CAPTION_PRESETS[presetName] ?? BUILT_IN_CAPTION_PRESETS[DEFAULT_CAPTION_PRESET];
+
+  // LLM suggestions from plan (sanitized in production-planner.ts)
+  const llm = (plan.captionStyle ?? {}) as Record<string, unknown>;
+
+  const captionStyle = {
+    fontFamily: brandPreset?.fontFamily ?? str(llm.fontFamily) ?? preset.style.fontFamily,
+    fontSize: brandPreset?.fontSize ?? num(llm.fontSize) ?? preset.style.fontSize,
+    fontColor: brandPreset?.fontColor ?? str(llm.fontColor) ?? preset.style.fontColor,
+    fontWeight: brandPreset?.fontWeight ?? str(llm.fontWeight) as 'normal' | 'bold' ?? preset.style.fontWeight,
+    fontStyle: str(llm.fontStyle) as 'normal' | 'italic' ?? preset.style.fontStyle,
+    backgroundColor: str(llm.backgroundColor) ?? preset.style.backgroundColor,
+    backgroundOpacity: num(llm.backgroundOpacity) ?? preset.style.backgroundOpacity,
+    outlineColor: brandPreset?.outlineColor ?? str(llm.outlineColor) ?? preset.style.outlineColor,
+    outlineWidth: brandPreset?.outlineWidth ?? num(llm.outlineWidth) ?? preset.style.outlineWidth,
+    shadowColor: str(llm.shadowColor) ?? preset.style.shadowColor,
+    shadowBlur: num(llm.shadowBlur) ?? preset.style.shadowBlur,
+    position: brandPreset?.position ?? num(llm.position) ?? preset.style.position,
+    alignment: str(llm.alignment) as 'left' | 'center' | 'right' ?? preset.style.alignment,
+    lineHeight: num(llm.lineHeight) ?? preset.style.lineHeight,
+    padding: num(llm.padding) ?? preset.style.padding,
+    highlightColor: brandPreset?.highlightColor ?? str(llm.highlightColor) ?? preset.style.highlightColor,
+    upcomingColor: str(llm.upcomingColor) ?? '#8888A0',
+    highlightMode: str(llm.highlightMode) as 'text' | 'pill' ?? preset.style.highlightMode ?? 'text',
+    textTransform: brandPreset?.textTransform ?? str(llm.textTransform) as 'none' | 'uppercase' ?? preset.style.textTransform ?? 'none',
+  };
 
   // Map plan segments to props
   const zoomSegments = (plan.zoomSegments ?? []).map((z) => ({
@@ -261,7 +310,7 @@ export function assembleComposition(input: AssemblyInput): AssembledProps {
   }));
 
   return {
-    layout: plan.layout,
+    layout: brandPreset?.layout ?? plan.layout,
     primaryVideoUrl,
     voiceoverUrl: voiceoverFilename,
     bRollSegments,
@@ -274,9 +323,10 @@ export function assembleComposition(input: AssemblyInput): AssembledProps {
     highlights,
     cues: cues.map((c) => ({ ...c })),
     captionStyle,
-    dynamicCaptionPosition: false,
-    musicVolume: 0,
-    showProgressBar: true,
+    dynamicCaptionPosition: brandPreset?.dynamicCaptionPosition ?? preset.dynamicCaptionPosition,
+    musicUrl: brandPreset?.musicUrl,
+    musicVolume: brandPreset?.musicVolume ?? preset.musicVolume,
+    showProgressBar: brandPreset?.showProgressBar ?? preset.showProgressBar,
     backgroundColor: brandPreset?.backgroundColor ?? '#000000',
   };
 }

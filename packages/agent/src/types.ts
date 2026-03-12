@@ -175,6 +175,32 @@ export interface EffectPlan {
   readonly reason: string;
 }
 
+// ── Brand preset ─────────────────────────────────────────────
+
+export interface BrandPreset {
+  readonly captionPreset?: string;
+  readonly captionTemplate?: string;
+  readonly animationStyle?: 'none' | 'word-highlight' | 'word-by-word' | 'karaoke' | 'bounce' | 'typewriter';
+  readonly maxWordsPerCue?: number;
+  readonly maxDurationPerCue?: number;
+  readonly textTransform?: 'none' | 'uppercase';
+  readonly musicUrl?: string;
+  readonly musicVolume?: number;
+  readonly layout?: 'fullscreen' | 'split-screen' | 'picture-in-picture';
+  readonly showProgressBar?: boolean;
+  readonly dynamicCaptionPosition?: boolean;
+  readonly highlightColor?: string;
+  readonly backgroundColor?: string;
+  readonly fontSize?: number;
+  readonly fontFamily?: string;
+  readonly fontColor?: string;
+  readonly fontWeight?: 'normal' | 'bold';
+  readonly outlineWidth?: number;
+  readonly outlineColor?: string;
+  readonly position?: number;
+  readonly defaultTransition?: 'crossfade' | 'slide-left' | 'slide-right' | 'zoom-in' | 'wipe' | 'none';
+}
+
 // ── Production request / result ──────────────────────────────
 
 export interface ProductionRequest {
@@ -199,17 +225,7 @@ export interface ProductionRequest {
     readonly apiKey?: string;
   };
   /** Brand preset */
-  readonly brandPreset?: {
-    readonly captionTemplate?: {
-      readonly fontFamily?: string;
-      readonly fontSize?: number;
-      readonly fontColor?: string;
-      readonly backgroundColor?: string;
-    };
-    readonly highlightColor?: string;
-    readonly backgroundColor?: string;
-    readonly defaultTransition?: 'crossfade' | 'slide-left' | 'slide-right' | 'zoom-in' | 'wipe' | 'none';
-  };
+  readonly brandPreset?: BrandPreset;
   /** Avatar settings (for HeyGen) */
   readonly avatar?: {
     readonly avatarId?: string;
@@ -217,6 +233,8 @@ export interface ProductionRequest {
   };
   /** Output path */
   readonly outputPath?: string;
+  /** Montage profile ID (auto-selected from script if not provided) */
+  readonly montageProfile?: string;
   /** Progress callback */
   readonly onProgress?: (step: string) => void;
 }
@@ -259,7 +277,7 @@ export interface ComposeRequest {
   readonly layout?: 'fullscreen' | 'split-screen' | 'picture-in-picture';
   readonly tts?: ProductionRequest['tts'];
   readonly whisper?: ProductionRequest['whisper'];
-  readonly brandPreset?: ProductionRequest['brandPreset'];
+  readonly brandPreset?: BrandPreset;
   /** Skip TTS — use existing voiceover */
   readonly existingVoiceoverPath?: string;
   /** Pre-computed cues (skip whisper if provided along with existingVoiceoverPath) */

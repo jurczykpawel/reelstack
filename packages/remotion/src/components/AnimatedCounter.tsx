@@ -35,7 +35,10 @@ export const AnimatedCounter: React.FC<AnimatedCounterProps> = ({ segment }) => 
     textColor = '#FFFFFF',
     fontSize = 72,
     position = 'center',
+    mode = 'count-up',
   } = segment;
+
+  const isCountdown = mode === 'countdown';
 
   // Count up animation — takes 70% of duration, rest holds at final value
   const countDuration = Math.round((endFrame - startFrame) * 0.7);
@@ -55,7 +58,9 @@ export const AnimatedCounter: React.FC<AnimatedCounterProps> = ({ segment }) => 
 
   // Eased count with slight overshoot feel
   const easedCount = countProgress * countProgress * (3 - 2 * countProgress); // smoothstep
-  const currentValue = Math.round(easedCount * value);
+  const currentValue = isCountdown
+    ? Math.round((1 - easedCount) * value)
+    : Math.round(easedCount * value);
   const displayValue = `${prefix}${formatNumber(currentValue, format)}${suffix}`;
 
   // Entrance scale
@@ -101,7 +106,7 @@ export const AnimatedCounter: React.FC<AnimatedCounterProps> = ({ segment }) => 
           color: textColor,
           fontSize,
           fontWeight: 'bold',
-          fontFamily: 'Outfit, sans-serif',
+          fontFamily: isCountdown ? '"JetBrains Mono", "Fira Code", monospace' : 'Outfit, sans-serif',
           transform: `scale(${entryScale * finalScale})`,
           textShadow: '0 4px 24px rgba(0,0,0,0.5)',
         }}

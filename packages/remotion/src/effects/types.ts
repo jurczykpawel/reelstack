@@ -12,12 +12,21 @@ export type EntranceAnimation =
   | 'glitch'
   | 'bounce'
   | 'pop'
+  | 'flip-up'
+  | 'elastic'
+  | 'zoom-blur'
+  | 'flicker'
+  | 'ink-print'
   | 'none';
 
 export type ExitAnimation =
   | 'fade'
   | 'slide-down'
+  | 'slide-up'
+  | 'slide-left'
   | 'shrink'
+  | 'scale-blur'
+  | 'pop-out'
   | 'glitch'
   | 'none';
 
@@ -25,12 +34,23 @@ export type ExitAnimation =
 // Base Effect Segment
 // ==========================================
 
+export type LoopAnimation =
+  | 'pulse'
+  | 'wave'
+  | 'shake'
+  | 'swing'
+  | 'neon-pulse'
+  | 'float'
+  | 'color-cycle'
+  | 'none';
+
 export interface BaseEffectSegment {
   readonly type: string;
   readonly startTime: number;
   readonly endTime: number;
   readonly entrance?: EntranceAnimation;
   readonly exit?: ExitAnimation;
+  readonly loop?: LoopAnimation;
   readonly sfx?: { readonly url: string; readonly volume?: number };
 }
 
@@ -53,6 +73,10 @@ export interface TextEmphasisEffect extends BaseEffectSegment {
   readonly fontColor?: string;
   readonly backgroundColor?: string;
   readonly position?: 'center' | 'top' | 'bottom';
+  /** Random x/y jitter per frame in pixels (0 = off). Profile: network-chuck. */
+  readonly jitter?: number;
+  /** Neon glow color. When set, adds pulsing drop-shadow/glow effect. Profile: network-chuck. */
+  readonly neonGlow?: string;
 }
 
 export interface ScreenShakeEffect extends BaseEffectSegment {
@@ -73,6 +97,8 @@ export interface PngOverlayEffect extends BaseEffectSegment {
   readonly position?: { readonly x: number; readonly y: number };
   readonly size?: number;
   readonly opacity?: number;
+  /** Optional loop animation: 'bounce-pulse' = spring entrance + gentle scale pulsing. */
+  readonly animation?: 'none' | 'bounce-pulse';
 }
 
 export interface GifOverlayEffect extends BaseEffectSegment {
@@ -89,6 +115,12 @@ export interface BlurBackgroundEffect extends BaseEffectSegment {
   readonly overlayText?: string;
   readonly overlayFontSize?: number;
   readonly overlayColor?: string;
+  /** 'blur' (default) = blur background, 'spotlight' = dim 70% + spotlight circle on focusPoint. */
+  readonly mode?: 'blur' | 'spotlight';
+  /** Focus point for spotlight mode (percentage 0-100). */
+  readonly focusPoint?: { readonly x: number; readonly y: number };
+  /** Spotlight radius as percentage of screen width (default 20). */
+  readonly spotlightRadius?: number;
 }
 
 export interface ParallaxScreenshotEffect extends BaseEffectSegment {
@@ -97,6 +129,8 @@ export interface ParallaxScreenshotEffect extends BaseEffectSegment {
   readonly scrollDirection?: 'up' | 'down';
   readonly depth?: number;
   readonly borderRadius?: number;
+  /** 'subtle' (default 2deg tilt) or '3d' (10deg Y rotation + deep shadow). */
+  readonly tiltMode?: 'subtle' | '3d';
 }
 
 export interface SplitScreenDividerEffect extends BaseEffectSegment {
@@ -144,6 +178,72 @@ export interface RectangularPipEffect extends BaseEffectSegment {
   readonly borderWidth?: number;
   readonly borderGlow?: boolean;
   readonly borderRadius?: number;
+  /** 'rectangle' (default) or 'circle' (circular PiP with neon glow). */
+  readonly shape?: 'rectangle' | 'circle';
+}
+
+export interface StickerBurstEffect extends BaseEffectSegment {
+  readonly type: 'sticker-burst';
+  readonly side?: 'left' | 'right';
+  readonly count?: number;
+  readonly colors?: readonly string[];
+  readonly shapes?: readonly ('burst' | 'sparkle' | 'diamond' | 'star')[];
+}
+
+export interface CRTOverlayEffect extends BaseEffectSegment {
+  readonly type: 'crt-overlay';
+  readonly opacity?: number;
+  readonly scanlineSpacing?: number;
+  readonly grainIntensity?: number;
+}
+
+export interface VignetteOverlayEffect extends BaseEffectSegment {
+  readonly type: 'vignette-overlay';
+  readonly intensity?: number;
+  readonly color?: string;
+}
+
+export interface ChromaticAberrationEffect extends BaseEffectSegment {
+  readonly type: 'chromatic-aberration';
+  /** RGB split amount as percentage of frame (0.01-0.2). */
+  readonly intensity?: number;
+}
+
+export interface ProgressRingEffect extends BaseEffectSegment {
+  readonly type: 'progress-ring';
+  readonly targetPercent: number;
+  readonly size?: number;
+  readonly strokeWidth?: number;
+  readonly trackColor?: string;
+  readonly fillColor?: string;
+  readonly label?: string;
+  readonly labelFontSize?: number;
+  readonly labelColor?: string;
+  readonly position?: 'center' | 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left';
+}
+
+export interface FilmGrainEffect extends BaseEffectSegment {
+  readonly type: 'film-grain';
+  readonly intensity?: number;
+}
+
+export interface LightLeakEffect extends BaseEffectSegment {
+  readonly type: 'light-leak';
+  readonly color?: string;
+  readonly intensity?: number;
+  readonly speed?: number;
+}
+
+export interface TerminalTypingEffect extends BaseEffectSegment {
+  readonly type: 'terminal-typing';
+  readonly text: string;
+  readonly fontSize?: number;
+  readonly fontColor?: string;
+  readonly backgroundColor?: string;
+  readonly showCursor?: boolean;
+  readonly cursorChar?: string;
+  readonly prompt?: string;
+  readonly position?: 'center' | 'top' | 'bottom';
 }
 
 // ==========================================
@@ -163,4 +263,12 @@ export type EffectSegment =
   | SubscribeBannerEffect
   | GlitchTransitionEffect
   | CircularCounterEffect
-  | RectangularPipEffect;
+  | RectangularPipEffect
+  | StickerBurstEffect
+  | CRTOverlayEffect
+  | VignetteOverlayEffect
+  | ChromaticAberrationEffect
+  | ProgressRingEffect
+  | TerminalTypingEffect
+  | FilmGrainEffect
+  | LightLeakEffect;

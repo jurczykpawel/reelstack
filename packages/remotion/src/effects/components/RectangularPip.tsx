@@ -1,4 +1,4 @@
-import { OffthreadVideo } from 'remotion';
+import { OffthreadVideo, useCurrentFrame, useVideoConfig } from 'remotion';
 import { useEffectAnimation } from '../hooks/useEffectAnimation';
 import { resolveMediaUrl } from '../../utils/resolve-media-url';
 import type { RectangularPipEffect } from '../types';
@@ -10,6 +10,8 @@ interface Props {
 const MARGIN = 3; // % from edge
 
 export const RectangularPip: React.FC<Props> = ({ segment }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
   const { visible, style } = useEffectAnimation(segment);
 
   if (!visible) return null;
@@ -23,7 +25,10 @@ export const RectangularPip: React.FC<Props> = ({ segment }) => {
     borderWidth = 3,
     borderGlow = true,
     borderRadius = 12,
+    shape = 'rectangle',
   } = segment;
+
+  const isCircle = shape === 'circle';
 
   const positionStyle: React.CSSProperties = {};
   if (position.includes('top')) positionStyle.top = `${MARGIN}%`;
@@ -36,15 +41,23 @@ export const RectangularPip: React.FC<Props> = ({ segment }) => {
       style={{
         position: 'absolute',
         ...positionStyle,
-        width: `${width}%`,
-        height: `${height}%`,
-        borderRadius,
+        width: isCircle ? `${Math.min(width, height)}%` : `${width}%`,
+        height: isCircle ? '0' : `${height}%`,
+        paddingBottom: isCircle ? `${Math.min(width, height)}%` : undefined,
+        borderRadius: isCircle ? '50%' : borderRadius,
         border: `${borderWidth}px solid ${borderColor}`,
         overflow: 'hidden',
         zIndex: 22,
-        boxShadow: borderGlow
-          ? `0 0 20px ${borderColor}80, 0 4px 20px rgba(0,0,0,0.4)`
-          : '0 4px 20px rgba(0,0,0,0.4)',
+        boxShadow: (() => {
+          if (!borderGlow) return '0 4px 20px rgba(0,0,0,0.4)';
+          if (isCircle) {
+            // Pulsing neon glow for circle PiP
+            const pulse = 0.6 + 0.4 * Math.sin(frame / fps * Math.PI * 2);
+            const glowSize = Math.round(20 + pulse * 15);
+            return `0 0 ${glowSize}px ${borderColor}80, 0 0 ${glowSize * 2}px ${borderColor}40, 0 4px 20px rgba(0,0,0,0.4)`;
+          }
+          return `0 0 20px ${borderColor}80, 0 4px 20px rgba(0,0,0,0.4)`;
+        })(),
         ...style,
       }}
     >

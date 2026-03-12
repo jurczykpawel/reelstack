@@ -41,6 +41,11 @@ function buildOutlineShadow(width: number, color: string, blur: number, shadowCo
   return shadows.join(', ');
 }
 
+/**
+ * Caption overlay — renders per-word highlighted captions.
+ * Uses inline <span> elements inside a <p> tag, exactly like short-video-maker.
+ * NO display:inline-block, NO transform on word spans — just plain inline text with color changes.
+ */
 export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
   cues,
   style: styleOverride,
@@ -64,7 +69,7 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
 
   if (!visible || segments.length === 0) return null;
 
-  // Pop-in animation
+  // Pop-in animation on the whole cue container
   const cueStartFrame = Math.round(activeCue.startTime * fps);
   const cueEndFrame = Math.round(activeCue.endTime * fps);
 
@@ -96,72 +101,125 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
   const pillPad = captionStyle.pillPadding ?? 10;
 
   const isPill = highlightMode === 'pill';
+  const isLabel = highlightMode === 'label';
+  const isHormozi = highlightMode === 'hormozi';
+  const isGlow = highlightMode === 'glow';
+  const isPopWord = highlightMode === 'pop-word';
+  const isUnderline = highlightMode === 'underline-sweep';
+  const isBoxHighlight = highlightMode === 'box-highlight';
+  const hormoziColor = captionStyle.highlightColor ?? '#FFFF00';
+  const glowColor = captionStyle.highlightColor ?? '#FFFFFF';
+  const accentColor = captionStyle.highlightColor ?? '#3B82F6';
 
   return (
     <div
       style={{
         position: 'absolute',
         top: `${verticalPosition}%`,
-        left: 40,
-        right: 40,
+        left: 0,
+        right: 0,
         transform: `translateY(-50%) scale(${entryScale})`,
-        textAlign: captionStyle.alignment,
+        display: 'flex',
+        justifyContent: captionStyle.alignment === 'left' ? 'flex-start' : captionStyle.alignment === 'right' ? 'flex-end' : 'center',
+        padding: '0 40px',
         opacity: fadeOut,
       }}
     >
-      <div
+      {/* Same pattern as short-video-maker: <p> with inline <span> children and literal spaces */}
+      <p
         style={{
-          display: 'inline-block',
+          fontSize: captionStyle.fontSize,
+          fontWeight: captionStyle.fontWeight,
+          fontStyle: captionStyle.fontStyle,
+          fontFamily: captionStyle.fontFamily,
+          color: captionStyle.fontColor,
+          textAlign: 'center',
+          textShadow,
+          textTransform: textTransform as any,
+          lineHeight: captionStyle.lineHeight,
+          maxWidth: '90%',
+          margin: 0,
+          padding: `${captionStyle.padding}px ${captionStyle.padding * 2}px`,
           backgroundColor: `${captionStyle.backgroundColor}${Math.round(captionStyle.backgroundOpacity * 255)
             .toString(16)
             .padStart(2, '0')}`,
-          padding: `${captionStyle.padding}px ${captionStyle.padding * 2}px`,
           borderRadius: 16,
         }}
       >
         {segments.map((seg: WordSegment, i: number) => {
-          const showPill = isPill && seg.style === 'active';
+          const isActive = seg.style === 'active' || seg.style === 'highlighted';
+          const showPill = isPill && isActive;
           const displayText = textTransform === 'uppercase'
             ? seg.text.toUpperCase()
             : seg.text;
 
-          // In pill mode: active word keeps base font color, pill provides the highlight.
-          // In text mode: color comes from the animation renderer (seg.color).
-          const textColor = isPill
+          const showLabel = isLabel && isActive;
+          const showHormozi = isHormozi && isActive;
+
+          const showGlow = isGlow && isActive;
+          const showPopWord = isPopWord && isActive;
+
+          const textColor = (isPill || isLabel)
             ? captionStyle.fontColor
-            : (seg.color ?? captionStyle.fontColor);
+            : showHormozi
+              ? hormoziColor
+              : (seg.color ?? captionStyle.fontColor);
+
+          const activeStyle = showPill ? {
+            backgroundColor: pillColor,
+            padding: `${pillPad * 0.4}px ${pillPad}px`,
+            marginLeft: `${-pillPad}px`,
+            marginRight: `${-pillPad}px`,
+            borderRadius: pillRadius,
+          } : showLabel ? {
+            backgroundColor: pillColor,
+            padding: `${pillPad * 0.3}px ${pillPad * 0.8}px`,
+            marginLeft: `${-pillPad * 0.8}px`,
+            marginRight: `${-pillPad * 0.8}px`,
+            borderRadius: 4,
+          } : showHormozi ? {
+            display: 'inline-block' as const,
+            transform: 'scale(1.15)',
+            transformOrigin: 'center bottom',
+          } : showGlow ? {
+            textShadow: `0 0 12px ${glowColor}, 0 0 24px ${glowColor}88, 0 0 48px ${glowColor}44`,
+          } : showPopWord ? {
+            display: 'inline-block' as const,
+            transform: 'scale(1.2)',
+            transformOrigin: 'center bottom',
+            transition: 'transform 0.1s ease-out',
+          } : (isUnderline && isActive) ? {
+            display: 'inline-block' as const,
+            borderBottom: `4px solid ${accentColor}`,
+            paddingBottom: 2,
+          } : (isBoxHighlight && isActive) ? {
+            display: 'inline-block' as const,
+            backgroundColor: `${accentColor}55`,
+            padding: '2px 6px',
+            marginLeft: '-6px',
+            marginRight: '-6px',
+            borderRadius: 4,
+            borderLeft: `3px solid ${accentColor}`,
+          } : {};
 
           return (
-            <span
-              key={i}
-              style={{
-                fontSize: captionStyle.fontSize,
-                fontWeight: captionStyle.fontWeight,
-                fontStyle: captionStyle.fontStyle,
-                fontFamily: captionStyle.fontFamily,
-                color: textColor,
-                opacity: seg.opacity,
-                transform: `scale(${seg.scale}) translateY(${seg.offsetY}px)`,
-                display: 'inline-block',
-                marginRight: 8,
-                lineHeight: captionStyle.lineHeight,
-                textShadow,
-                textTransform: textTransform as any,
-                // Pill highlight: colored background behind active word
-                ...(showPill ? {
-                  backgroundColor: pillColor,
-                  padding: `${pillPad * 0.4}px ${pillPad}px`,
-                  marginLeft: -pillPad * 0.3,
-                  marginRight: -pillPad * 0.3 + 8,
-                  borderRadius: pillRadius,
-                } : {}),
-              }}
-            >
-              {displayText}
-            </span>
+            // eslint-disable-next-line react/jsx-key
+            <>
+              <span
+                key={i}
+                style={{
+                  fontWeight: 'bold',
+                  color: textColor,
+                  ...activeStyle,
+                }}
+              >
+                {displayText}
+              </span>
+              {i < segments.length - 1 ? ' ' : ''}
+            </>
           );
         })}
-      </div>
+      </p>
     </div>
   );
 };

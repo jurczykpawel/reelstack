@@ -1,6 +1,7 @@
 import { useCurrentFrame, useVideoConfig, spring, interpolate, random } from 'remotion';
 import type { CSSProperties } from 'react';
 import type { BaseEffectSegment, EntranceAnimation, ExitAnimation } from '../types';
+import { computeLoopStyle } from './useLoopAnimation';
 
 interface EffectAnimationResult {
   readonly visible: boolean;
@@ -76,6 +77,57 @@ function computeEntrance(
       };
     }
 
+    case 'flip-up':
+      return {
+        transform: `perspective(400px) rotateX(${(1 - springVal) * -90}deg)`,
+        transformOrigin: 'center bottom',
+      };
+
+    case 'elastic': {
+      const elastic = spring({
+        frame: localFrame,
+        fps,
+        config: { damping: 3, stiffness: 200, overshootClamping: false },
+      });
+      return { transform: `scaleX(${elastic}) scaleY(${springVal})` };
+    }
+
+    case 'zoom-blur': {
+      const progress = interpolate(localFrame, [0, Math.round(fps * 0.4)], [0, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      });
+      const scale = interpolate(progress, [0, 1], [3, 1]);
+      const blur = interpolate(progress, [0, 1], [10, 0]);
+      return {
+        transform: `scale(${scale})`,
+        filter: `blur(${blur}px)`,
+        opacity: progress,
+      };
+    }
+
+    case 'flicker': {
+      const flickerFrames = Math.round(fps * 0.3);
+      if (localFrame >= flickerFrames) return { opacity: 1 };
+      // Toggle opacity 0/1 rapidly
+      const flickerIndex = Math.floor(localFrame / 2);
+      return { opacity: flickerIndex % 2 === 0 ? 1 : 0 };
+    }
+
+    case 'ink-print': {
+      const progress = interpolate(localFrame, [0, Math.round(fps * 0.3)], [0, 1], {
+        extrapolateLeft: 'clamp',
+        extrapolateRight: 'clamp',
+      });
+      const blur = interpolate(progress, [0, 1], [8, 0]);
+      const scale = interpolate(progress, [0, 0.7, 1], [1.1, 1.02, 1]);
+      return {
+        transform: `scale(${scale})`,
+        filter: `blur(${blur}px)`,
+        opacity: progress,
+      };
+    }
+
     default:
       return { transform: `scale(${springVal})` };
   }
@@ -110,7 +162,24 @@ function computeExit(
       return { transform: `translateY(${exitProgress * 100}%)` };
 
     case 'shrink':
+    case 'pop-out':
       return { transform: `scale(${1 - exitProgress})` };
+
+    case 'slide-up':
+      return { transform: `translateY(${-exitProgress * 100}%)` };
+
+    case 'slide-left':
+      return { transform: `translateX(${-exitProgress * 100}%)` };
+
+    case 'scale-blur': {
+      const scale = interpolate(exitProgress, [0, 1], [1, 2]);
+      const blur = interpolate(exitProgress, [0, 1], [0, 10]);
+      return {
+        transform: `scale(${scale})`,
+        filter: `blur(${blur}px)`,
+        opacity: 1 - exitProgress,
+      };
+    }
 
     case 'glitch': {
       const seed = random(`glitch-exit-${segmentId}-${localFrame}`);
@@ -139,7 +208,7 @@ function mergeStyles(entrance: CSSProperties, exit: CSSProperties): CSSPropertie
 
   // Exit opacity overrides entrance
   if (exit.opacity !== undefined) {
-    const entranceOpacity = (entrance.opacity as number) ?? 1;
+    const entranceOpacity = typeof entrance.opacity === 'number' ? entrance.opacity : 1;
     merged.opacity = entranceOpacity * (exit.opacity as number);
   }
 
@@ -171,7 +240,8 @@ export function useEffectAnimation(segment: BaseEffectSegment): EffectAnimationR
 
   const entranceStyle = computeEntrance(localFrame, fps, entrance, segmentId);
   const exitStyle = computeExit(localFrame, durationFrames, fps, exit, segmentId);
-  const style = mergeStyles(entranceStyle, exitStyle);
+  const loopStyle = segment.loop ? computeLoopStyle(segment.loop, localFrame, fps, segmentId) : {};
+  const style = mergeStyles(mergeStyles(entranceStyle, loopStyle), exitStyle);
 
   return { visible: true, style };
 }
