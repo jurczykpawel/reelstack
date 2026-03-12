@@ -395,7 +395,7 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
  */
 function buildProductionMeta(result: import('@reelstack/agent').ProductionResult): Record<string, unknown> {
   return {
-    plan: {
+    plan: result.plan ? {
       layout: result.plan.layout,
       primarySource: result.plan.primarySource,
       reasoning: result.plan.reasoning,
@@ -410,7 +410,7 @@ function buildProductionMeta(result: import('@reelstack/agent').ProductionResult
         reason: s.reason,
       })),
       effectCount: result.plan.effects.length,
-    },
+    } : null,
     assets: result.generatedAssets.map(a => ({
       toolId: a.toolId,
       shotId: a.shotId,

@@ -297,7 +297,7 @@ export interface ComposeRequest {
 export interface ProductionResult {
   readonly outputPath: string;
   readonly durationSeconds: number;
-  readonly plan: ProductionPlan;
+  readonly plan?: ProductionPlan;
   readonly steps: readonly ProductionStep[];
   readonly generatedAssets: readonly GeneratedAsset[];
 }
