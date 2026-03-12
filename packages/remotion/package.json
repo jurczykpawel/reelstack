@@ -10,7 +10,10 @@
     "./pipeline": "./src/pipeline/index.ts",
     "./director": "./src/director/index.ts",
     "./render": "./src/render/index.ts",
-    "./catalog": "./src/schemas/catalog.ts"
+    "./catalog": "./src/schemas/catalog.ts",
+    "./schemas/video-clip-props": "./src/schemas/video-clip-props.ts",
+    "./schemas/screen-explainer-props": "./src/schemas/screen-explainer-props.ts",
+    "./schemas/presenter-explainer-props": "./src/schemas/presenter-explainer-props.ts"
   },
   "scripts": {
     "dev": "remotion studio",
