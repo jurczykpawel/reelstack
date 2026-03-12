@@ -1,5 +1,66 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildTimingReference, resolvePresetConfig } from '../base-orchestrator';
+
+// ── renderVideo: compositionId routing ───────────────────────
+// These tests guard against the bug where compositionId was ignored,
+// causing all modes to render with the default 'Reel' composition.
+
+const mockRender = vi.fn().mockResolvedValue({ durationMs: 100, sizeBytes: 1024 });
+
+vi.mock('@reelstack/remotion/render', () => ({
+  createRenderer: () => ({ render: mockRender }),
+}));
+
+vi.mock('node:crypto', () => ({
+  randomUUID: () => 'test-uuid',
+}));
+
+vi.mock('fs', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('fs')>();
+  return { ...actual, mkdirSync: vi.fn() };
+});
+
+describe('renderVideo', () => {
+  beforeEach(() => {
+    mockRender.mockClear();
+  });
+
+  it('passes compositionId from props to renderer', async () => {
+    const { renderVideo } = await import('../base-orchestrator');
+    await renderVideo({ compositionId: 'ScreenExplainer', foo: 'bar' }, '/tmp/test-out.mp4');
+    expect(mockRender).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ compositionId: 'ScreenExplainer' }),
+    );
+  });
+
+  it('passes compositionId=VideoClip to renderer', async () => {
+    const { renderVideo } = await import('../base-orchestrator');
+    await renderVideo({ compositionId: 'VideoClip' }, '/tmp/test-out.mp4');
+    expect(mockRender).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ compositionId: 'VideoClip' }),
+    );
+  });
+
+  it('passes compositionId=PresenterExplainer to renderer', async () => {
+    const { renderVideo } = await import('../base-orchestrator');
+    await renderVideo({ compositionId: 'PresenterExplainer' }, '/tmp/test-out.mp4');
+    expect(mockRender).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ compositionId: 'PresenterExplainer' }),
+    );
+  });
+
+  it('passes undefined compositionId when not in props (renderer defaults to Reel)', async () => {
+    const { renderVideo } = await import('../base-orchestrator');
+    await renderVideo({ layout: 'fullscreen' }, '/tmp/test-out.mp4');
+    expect(mockRender).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ compositionId: undefined }),
+    );
+  });
+});
 
 describe('buildTimingReference', () => {
   it('returns empty string for empty words array', () => {
