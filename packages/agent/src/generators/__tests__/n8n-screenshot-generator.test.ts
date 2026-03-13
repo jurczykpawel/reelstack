@@ -53,30 +53,34 @@ describe('computeKenBurnsParams', () => {
       boardType: 'zoom',
       highlightNodes: ['OpenAI'],
     });
-    // Should zoom more than bird-eye
-    expect(kb.startScale).toBeGreaterThan(1.2);
-    expect(kb.endScale).toBeGreaterThan(1.3);
+    // Should zoom more than bird-eye but moderate (1.3-1.35 range)
+    expect(kb.startScale).toBeGreaterThan(1.1);
+    expect(kb.endScale).toBeGreaterThan(1.2);
+    expect(kb.endScale).toBeLessThan(1.5);
     // Focus should be roughly in the center (OpenAI is middle node)
-    expect(kb.startPosition.x).toBeGreaterThan(30);
-    expect(kb.startPosition.x).toBeLessThan(70);
+    // Clamped to 35-65 range to prevent jumping
+    expect(kb.startPosition.x).toBeGreaterThan(34);
+    expect(kb.startPosition.x).toBeLessThan(66);
   });
 
-  it('zooms into first node (left side)', () => {
+  it('zooms into first node (left side, clamped)', () => {
     const kb = computeKenBurnsParams(MOCK_WORKFLOW, {
       boardType: 'zoom',
       highlightNodes: ['Webhook'],
     });
-    // Focus should be on the left side
-    expect(kb.startPosition.x).toBeLessThan(50);
+    // Focus should be on the left side (clamped to 35-65 range)
+    expect(kb.startPosition.x).toBeLessThanOrEqual(50);
+    expect(kb.startPosition.x).toBeGreaterThanOrEqual(34);
   });
 
-  it('zooms into last node (right side)', () => {
+  it('zooms into last node (right side, clamped)', () => {
     const kb = computeKenBurnsParams(MOCK_WORKFLOW, {
       boardType: 'zoom',
       highlightNodes: ['Google Drive'],
     });
-    // Focus should be on the right side
-    expect(kb.startPosition.x).toBeGreaterThan(50);
+    // Focus should be on the right side (clamped to 35-65 range)
+    expect(kb.startPosition.x).toBeGreaterThanOrEqual(50);
+    expect(kb.startPosition.x).toBeLessThanOrEqual(66);
   });
 
   it('falls back to bird-eye for empty highlights', () => {
@@ -102,8 +106,8 @@ describe('computeKenBurnsParams', () => {
       boardType: 'zoom',
       highlightNodes: ['Webhook', 'OpenAI'],
     });
-    // Wider coverage = less zoom
-    expect(kb.endScale).toBeLessThan(1.8);
+    // Wider coverage = less zoom (moderate range)
+    expect(kb.endScale).toBeLessThan(1.4);
     expect(kb.endScale).toBeGreaterThan(1.0);
   });
 });

@@ -167,9 +167,11 @@ export async function produceN8nExplainer(request: N8nExplainerRequest): Promise
 
   // ── 5. TTS + TRANSCRIPTION ─────────────────────────────────
   const fullScript = script.sections.map(s => s.text).join(' ');
+  const detectedLang = detectLanguage(request.language, request.tts?.language);
+  const ttsLang = detectedLang.includes('-') ? detectedLang : `${detectedLang}-${detectedLang.toUpperCase()}`;
   const ttsResult = await runTTSPipeline({
     script: fullScript,
-    tts: request.tts,
+    tts: { ...request.tts, language: request.tts?.language ?? ttsLang },
     whisper: request.whisper,
     brandPreset: request.brandPreset,
   }, tmpDir, onProgress);

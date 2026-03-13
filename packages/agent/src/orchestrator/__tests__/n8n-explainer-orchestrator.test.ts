@@ -84,9 +84,9 @@ describe('buildScreenExplainerProps', () => {
     expect(props.sections[0].kenBurns.startScale).toBe(1.0);
     expect(props.sections[0].kenBurns.endScale).toBe(1.05);
 
-    // Zoom sections: higher scale
-    expect(props.sections[1].kenBurns.endScale).toBeGreaterThan(1.2);
-    expect(props.sections[2].kenBurns.endScale).toBeGreaterThan(1.2);
+    // Zoom sections: moderate scale (1.15-1.35 range)
+    expect(props.sections[1].kenBurns.endScale).toBeGreaterThan(1.1);
+    expect(props.sections[2].kenBurns.endScale).toBeGreaterThan(1.1);
   });
 
   it('preserves board type from script', () => {

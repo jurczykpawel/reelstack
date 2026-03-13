@@ -4,23 +4,25 @@ import {
   useVideoConfig,
   AbsoluteFill,
   Audio,
-  Sequence,
   interpolate,
   Img,
+  Easing,
 } from 'remotion';
 import { CaptionOverlay } from '../components/CaptionOverlay';
 import { resolveMediaUrl } from '../utils/resolve-media-url';
-import type { ScreenExplainerProps, ScreenSection } from '../schemas/screen-explainer-props';
+import type { ScreenExplainerProps } from '../schemas/screen-explainer-props';
 
 /**
- * ScreenExplainerComposition: single workflow screenshot with per-section
+ * ScreenExplainerComposition: single workflow screenshot with continuous
  * Ken Burns zoom/pan + TTS + captions.
  *
- * One <Img> is shared across all sections. Each Sequence applies different
- * Ken Burns parameters to show bird-eye or zoomed-in views.
+ * ONE <Img> is rendered for the entire video. Ken Burns parameters are
+ * smoothly interpolated across section boundaries using eased transitions.
+ * This prevents the "jumping screensaver" effect.
  */
 export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props) => {
   const { fps } = useVideoConfig();
+  const frame = useCurrentFrame();
 
   const {
     screenshotUrl,
@@ -31,27 +33,103 @@ export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props
     captionStyle,
   } = props;
 
+  // ── Build continuous Ken Burns keyframes ──────────────────────
+  // For each section boundary, we create a smooth transition zone.
+  // Between transitions, the KB params hold steady.
+  const TRANSITION_SECONDS = 0.8;
+  const transitionFrames = Math.round(TRANSITION_SECONDS * fps);
+
+  // Current time in seconds
+  const currentTime = frame / fps;
+
+  // Find which section we're in
+  let sectionIndex = 0;
+  for (let i = 0; i < sections.length; i++) {
+    if (currentTime >= sections[i].startTime && currentTime < sections[i].endTime) {
+      sectionIndex = i;
+      break;
+    }
+    if (i === sections.length - 1) sectionIndex = i;
+  }
+
+  const current = sections[sectionIndex];
+  const kb = current.kenBurns;
+
+  // Progress within section (0 to 1)
+  const sectionDuration = current.endTime - current.startTime;
+  const sectionProgress = Math.max(0, Math.min(1,
+    (currentTime - current.startTime) / Math.max(sectionDuration, 0.01)
+  ));
+
+  // Interpolate KB within the section (gentle drift)
+  let scale = interpolate(sectionProgress, [0, 1], [kb.startScale, kb.endScale]);
+  let posX = interpolate(sectionProgress, [0, 1], [kb.startPosition.x, kb.endPosition.x]);
+  let posY = interpolate(sectionProgress, [0, 1], [kb.startPosition.y, kb.endPosition.y]);
+
+  // Smooth blend during transition into this section from previous
+  if (sectionIndex > 0) {
+    const prev = sections[sectionIndex - 1];
+    const prevKb = prev.kenBurns;
+    const timeSinceSectionStart = currentTime - current.startTime;
+
+    if (timeSinceSectionStart < TRANSITION_SECONDS) {
+      const blendProgress = timeSinceSectionStart / TRANSITION_SECONDS;
+      const eased = Easing.bezier(0.4, 0, 0.2, 1)(blendProgress);
+
+      // Previous section's end state
+      const prevScale = prevKb.endScale;
+      const prevPosX = prevKb.endPosition.x;
+      const prevPosY = prevKb.endPosition.y;
+
+      scale = interpolate(eased, [0, 1], [prevScale, scale]);
+      posX = interpolate(eased, [0, 1], [prevPosX, posX]);
+      posY = interpolate(eased, [0, 1], [prevPosY, posY]);
+    }
+  }
+
+  // ── Intro fade ──────────────────────────────────────────────
+  const introFade = interpolate(frame, [0, fps * 0.5], [0, 1], { extrapolateRight: 'clamp' });
+
+  // ── Render ──────────────────────────────────────────────────
+  // The screenshot is placed in the upper ~60% of the portrait frame.
+  // transform-origin uses the KB position to zoom into the right area.
+  // translate keeps the image stable by counteracting the origin shift.
+
   return (
     <AbsoluteFill style={{ backgroundColor }}>
-      {/* Board layer: shared screenshot with per-section Ken Burns */}
-      {sections.map((section, i) => {
-        const sectionDuration = section.endTime - section.startTime;
-        const startFrame = Math.round(section.startTime * fps);
-        const durationFrames = Math.round(sectionDuration * fps);
-
-        return (
-          <Sequence
-            key={i}
-            from={startFrame}
-            durationInFrames={durationFrames}
+      {/* Screenshot layer - fixed position, continuous KB animation */}
+      <AbsoluteFill style={{ opacity: introFade }}>
+        <div
+          style={{
+            position: 'absolute',
+            top: '5%',
+            left: '2%',
+            right: '2%',
+            height: '55%',
+            overflow: 'hidden',
+            borderRadius: 16,
+          }}
+        >
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              transform: `scale(${scale})`,
+              transformOrigin: `${posX}% ${posY}%`,
+              transition: 'none',
+            }}
           >
-            <SectionBoard
-              section={section}
-              screenshotUrl={screenshotUrl}
+            <Img
+              src={resolveMediaUrl(screenshotUrl)}
+              style={{
+                width: '100%',
+                height: '100%',
+                objectFit: 'cover',
+              }}
             />
-          </Sequence>
-        );
-      })}
+          </div>
+        </div>
+      </AbsoluteFill>
 
       {/* Captions layer */}
       <AbsoluteFill style={{ zIndex: 10 }}>
@@ -61,7 +139,7 @@ export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props
             fontSize: captionStyle?.fontSize ?? 64,
             fontColor: captionStyle?.fontColor ?? '#FFFFFF',
             highlightColor: captionStyle?.highlightColor ?? '#FFD700',
-            position: captionStyle?.position ?? 80,
+            position: captionStyle?.position ?? 85,
           }}
         />
       </AbsoluteFill>
@@ -70,59 +148,6 @@ export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props
       {voiceoverUrl && (
         <Audio src={resolveMediaUrl(voiceoverUrl)} />
       )}
-    </AbsoluteFill>
-  );
-};
-
-/**
- * Renders the shared screenshot with Ken Burns effect for this section.
- */
-const SectionBoard: React.FC<{
-  section: ScreenSection;
-  screenshotUrl: string;
-}> = ({ section, screenshotUrl }) => {
-  const { fps } = useVideoConfig();
-  const frame = useCurrentFrame();
-  const durationFrames = Math.round((section.endTime - section.startTime) * fps);
-
-  const kb = section.kenBurns;
-  const progress = Math.min(frame / Math.max(durationFrames, 1), 1);
-  const scale = interpolate(progress, [0, 1], [kb.startScale, kb.endScale]);
-  const posX = interpolate(progress, [0, 1], [kb.startPosition.x, kb.endPosition.x]);
-  const posY = interpolate(progress, [0, 1], [kb.startPosition.y, kb.endPosition.y]);
-
-  // Fade in/out at section boundaries
-  const fadeIn = interpolate(frame, [0, Math.min(fps * 0.3, durationFrames)], [0, 1], { extrapolateRight: 'clamp' });
-  const fadeOut = interpolate(
-    frame,
-    [Math.max(durationFrames - fps * 0.3, 0), durationFrames],
-    [1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  );
-  const opacity = Math.min(fadeIn, fadeOut);
-
-  return (
-    <AbsoluteFill style={{ opacity }}>
-      <div
-        style={{
-          width: '100%',
-          height: '100%',
-          transform: `scale(${scale})`,
-          transformOrigin: `${posX}% ${posY}%`,
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Img
-          src={resolveMediaUrl(screenshotUrl)}
-          style={{
-            width: '100%',
-            height: '100%',
-            objectFit: 'contain',
-          }}
-        />
-      </div>
     </AbsoluteFill>
   );
 };

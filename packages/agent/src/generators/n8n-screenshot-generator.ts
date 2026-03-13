@@ -43,7 +43,11 @@ export function calculateNodeLayout(workflow: N8nWorkflow): NodeLayoutEntry[] {
  * Compute Ken Burns parameters for a script section.
  *
  * - bird-eye: gentle drift across the full workflow (scale ~1.0 → 1.05)
- * - zoom: centers on highlightNodes with higher scale (1.3 → 1.5+)
+ * - zoom: centers on highlightNodes with moderate scale (1.15 → 1.3)
+ *
+ * Position values are kept close to center (35-65 range) to prevent
+ * jarring jumps between sections. The composition uses smooth eased
+ * transitions, but the source params must also be reasonable.
  *
  * Returns % positions (0-100) for CSS transform-origin.
  */
@@ -94,18 +98,19 @@ export function computeKenBurnsParams(
   const pctX = ((hCenterX - allMinX) / allW) * 100;
   const pctY = ((hCenterY - allMinY) / allH) * 100;
 
-  // Clamp to avoid edge overflow
-  const focusX = Math.max(20, Math.min(80, pctX));
-  const focusY = Math.max(20, Math.min(80, pctY));
+  // Clamp to narrow range (35-65) to prevent extreme position jumps
+  const focusX = Math.max(35, Math.min(65, pctX));
+  const focusY = Math.max(35, Math.min(65, pctY));
 
-  // Scale depends on how many nodes are highlighted vs total
+  // Moderate zoom scale - enough to highlight but not extreme
+  // Coverage: more nodes highlighted = less zoom needed
   const coverage = highlighted.length / layout.length;
-  const zoomScale = coverage > 0.5 ? 1.3 : coverage > 0.25 ? 1.5 : 1.8;
+  const zoomScale = coverage > 0.5 ? 1.15 : coverage > 0.25 ? 1.25 : 1.35;
 
   return {
-    startScale: zoomScale * 0.9,
+    startScale: zoomScale - 0.05,
     endScale: zoomScale,
-    startPosition: { x: focusX - 2, y: focusY - 2 },
-    endPosition: { x: focusX + 2, y: focusY + 2 },
+    startPosition: { x: focusX - 1, y: focusY - 1 },
+    endPosition: { x: focusX + 1, y: focusY + 1 },
   };
 }

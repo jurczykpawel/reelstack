@@ -70,13 +70,14 @@ export class N8nPublicPageProvider implements N8nScreenshotProvider {
 
       // Wait for the n8n-demo web component to render its canvas
       await page.waitForSelector('n8n-demo', { timeout: opts.timeout });
-      // Give the canvas a moment to finish rendering
-      await page.waitForTimeout(2000);
+      // Give the canvas time to fully render nodes AND connection lines
+      await page.waitForTimeout(3000);
 
       // Dismiss "Click to explore" tooltip by clicking the canvas
       const canvas = page.locator('.canvas-container');
       await canvas.click();
-      await page.waitForTimeout(500);
+      // Wait for tooltip animation to clear and connections to re-render
+      await page.waitForTimeout(1000);
 
       // Hide zoom controls, cookie banner, and any UI chrome
       // Main page CSS

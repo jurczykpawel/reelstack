@@ -111,7 +111,7 @@ export async function runTTSPipeline(
       : request.tts?.provider === 'openai'
         ? process.env.OPENAI_API_KEY
         : undefined,
-    defaultLanguage: request.tts?.language ?? 'pl-PL',
+    defaultLanguage: request.tts?.language ?? 'en-US',
   };
   const ttsProvider = createTTSProvider(ttsConfig);
   const ttsResult = await ttsProvider.synthesize(request.script, {
