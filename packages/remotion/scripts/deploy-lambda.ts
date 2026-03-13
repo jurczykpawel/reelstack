@@ -19,27 +19,54 @@ import { fileURLToPath } from 'url';
 const __dirname = import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
 const REMOTION_PKG_DIR = path.resolve(__dirname, '..');
 
-// Same webpack override as remotion.config.ts — needed for deploySite bundling
-// Uses dynamic require to find webpack in Bun's flat layout
-const webpackOverride = (config: any): any => {
-  const nodeBuiltins: Record<string, boolean> = {
-    assert: false, buffer: false, child_process: false, cluster: false,
-    console: false, constants: false, crypto: false, dgram: false,
-    dns: false, domain: false, events: false, fs: false,
-    http: false, http2: false, https: false, module: false,
-    net: false, os: false, path: false, perf_hooks: false,
-    process: false, punycode: false, querystring: false, readline: false,
-    repl: false, stream: false, string_decoder: false, sys: false,
-    timers: false, tls: false, tty: false, url: false,
-    util: false, v8: false, vm: false, worker_threads: false, zlib: false,
-  };
+// Node.js built-in list — all need to be stubbed for browser/Lambda bundle
+const NODE_BUILTINS = [
+  'assert', 'async_hooks', 'buffer', 'child_process', 'cluster', 'console',
+  'constants', 'crypto', 'dgram', 'dns', 'domain', 'events', 'fs',
+  'http', 'http2', 'https', 'inspector', 'module', 'net', 'os', 'path',
+  'perf_hooks', 'process', 'punycode', 'querystring', 'readline', 'repl',
+  'stream', 'string_decoder', 'sys', 'timers', 'tls', 'tty', 'url',
+  'util', 'v8', 'vm', 'worker_threads', 'zlib',
+];
 
-  // Use resolve.alias (more aggressive than fallback) to handle Bun's flat layout
-  const aliasMap: Record<string, false> = {};
-  for (const mod of Object.keys(nodeBuiltins)) {
-    aliasMap[mod] = false;
-    aliasMap[`node:${mod}`] = false;
+// Intercepts node: scheme modules and redirects them to the stub.
+// Uses both beforeResolve (strips prefix) AND afterResolve (overrides
+// createData.resource) because webpack's Node target handler can re-add
+// the node: prefix during resolution, causing UnhandledSchemeError at read time.
+class RewriteNodePrefixPlugin {
+  private stubPath: string;
+  constructor(stubPath: string) {
+    this.stubPath = stubPath;
   }
+  apply(compiler: any) {
+    compiler.hooks.normalModuleFactory.tap('RewriteNodePrefixPlugin', (nmf: any) => {
+      nmf.hooks.beforeResolve.tap('RewriteNodePrefixPlugin', (data: any) => {
+        if (data?.request?.startsWith('node:')) {
+          data.request = data.request.slice(5);
+        }
+      });
+      nmf.hooks.afterResolve.tap('RewriteNodePrefixPlugin', (data: any) => {
+        if (!data?.createData) return;
+        const resource: string = data.createData.resource ?? '';
+        if (resource.startsWith('node:') || resource.startsWith('\0node:')) {
+          data.createData.resource = this.stubPath;
+          data.createData.resourceResolveData = undefined;
+        }
+      });
+    });
+  }
+}
+
+// Mirrors remotion.config.ts + handles Bun flat layout + node: scheme
+const webpackOverride = (config: any): any => {
+  const stubPath = path.resolve(REMOTION_PKG_DIR, 'src/__stubs__/empty.js');
+
+  // Build alias map for bare module names (node: prefix handled by plugin above)
+  const aliasMap: Record<string, string> = {};
+  for (const mod of NODE_BUILTINS) {
+    aliasMap[mod] = stubPath;
+  }
+  aliasMap['cross-spawn'] = stubPath;
 
   return {
     ...config,
@@ -49,11 +76,11 @@ const webpackOverride = (config: any): any => {
         ...(config.resolve?.alias ?? {}),
         ...aliasMap,
       },
-      fallback: {
-        ...(config.resolve?.fallback ?? {}),
-        ...nodeBuiltins,
-      },
     },
+    plugins: [
+      ...(config.plugins ?? []),
+      new RewriteNodePrefixPlugin(stubPath),
+    ],
   };
 };
 
@@ -119,7 +146,9 @@ async function main() {
     entryPoint,
     siteName: 'reelstack',
     bucketName,
-    webpackOverride,
+    options: {
+      webpackOverride,
+    },
   });
 
   console.log(`  Site: ${siteName}`);

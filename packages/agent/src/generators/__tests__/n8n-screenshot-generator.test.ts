@@ -1,11 +1,9 @@
 import { describe, it, expect } from 'vitest';
 import {
-  generateWorkflowSvg,
+  computeKenBurnsParams,
   calculateNodeLayout,
-  type ScreenshotRequest,
 } from '../n8n-screenshot-generator';
 import type { N8nWorkflow } from '../n8n-workflow-fetcher';
-import type { N8nExplainerSection } from '../n8n-script-generator';
 
 const MOCK_WORKFLOW: N8nWorkflow = {
   id: '3121',
@@ -33,59 +31,79 @@ describe('calculateNodeLayout', () => {
 
   it('assigns x/y positions based on workflow positions', () => {
     const layout = calculateNodeLayout(MOCK_WORKFLOW);
-    // Nodes should be ordered by x position
     expect(layout[0].x).toBeLessThan(layout[1].x);
     expect(layout[1].x).toBeLessThan(layout[2].x);
   });
 });
 
-describe('generateWorkflowSvg', () => {
-  it('generates valid SVG for bird-eye view', () => {
-    const svg = generateWorkflowSvg(MOCK_WORKFLOW, {
+describe('computeKenBurnsParams', () => {
+  it('returns gentle drift for bird-eye', () => {
+    const kb = computeKenBurnsParams(MOCK_WORKFLOW, {
       boardType: 'bird-eye',
       highlightNodes: [],
-      width: 1080,
-      height: 1920,
     });
-    expect(svg).toContain('<svg');
-    expect(svg).toContain('</svg>');
-    expect(svg).toContain('Webhook');
-    expect(svg).toContain('OpenAI');
-    expect(svg).toContain('Google Drive');
+    expect(kb.startScale).toBe(1.0);
+    expect(kb.endScale).toBe(1.05);
+    expect(kb.startPosition.x).toBeCloseTo(48, 0);
+    expect(kb.endPosition.x).toBeCloseTo(52, 0);
   });
 
-  it('highlights specified nodes', () => {
-    const svg = generateWorkflowSvg(MOCK_WORKFLOW, {
+  it('zooms into highlighted node', () => {
+    const kb = computeKenBurnsParams(MOCK_WORKFLOW, {
       boardType: 'zoom',
       highlightNodes: ['OpenAI'],
-      width: 1080,
-      height: 1920,
     });
-    expect(svg).toContain('<svg');
-    // Highlighted node should have different styling
-    expect(svg).toContain('OpenAI');
+    // Should zoom more than bird-eye
+    expect(kb.startScale).toBeGreaterThan(1.2);
+    expect(kb.endScale).toBeGreaterThan(1.3);
+    // Focus should be roughly in the center (OpenAI is middle node)
+    expect(kb.startPosition.x).toBeGreaterThan(30);
+    expect(kb.startPosition.x).toBeLessThan(70);
   });
 
-  it('generates bird-eye with all nodes visible', () => {
-    const svg = generateWorkflowSvg(MOCK_WORKFLOW, {
-      boardType: 'bird-eye',
-      highlightNodes: [],
-      width: 1080,
-      height: 1920,
+  it('zooms into first node (left side)', () => {
+    const kb = computeKenBurnsParams(MOCK_WORKFLOW, {
+      boardType: 'zoom',
+      highlightNodes: ['Webhook'],
     });
-    for (const node of MOCK_WORKFLOW.nodes) {
-      expect(svg).toContain(node.name);
-    }
+    // Focus should be on the left side
+    expect(kb.startPosition.x).toBeLessThan(50);
   });
 
-  it('draws connection lines between nodes', () => {
-    const svg = generateWorkflowSvg(MOCK_WORKFLOW, {
-      boardType: 'bird-eye',
-      highlightNodes: [],
-      width: 1080,
-      height: 1920,
+  it('zooms into last node (right side)', () => {
+    const kb = computeKenBurnsParams(MOCK_WORKFLOW, {
+      boardType: 'zoom',
+      highlightNodes: ['Google Drive'],
     });
-    // Should contain path/line elements for connections
-    expect(svg).toMatch(/<(path|line)/);
+    // Focus should be on the right side
+    expect(kb.startPosition.x).toBeGreaterThan(50);
+  });
+
+  it('falls back to bird-eye for empty highlights', () => {
+    const kb = computeKenBurnsParams(MOCK_WORKFLOW, {
+      boardType: 'zoom',
+      highlightNodes: [],
+    });
+    expect(kb.startScale).toBe(1.0);
+    expect(kb.endScale).toBe(1.05);
+  });
+
+  it('falls back for non-existent node names', () => {
+    const kb = computeKenBurnsParams(MOCK_WORKFLOW, {
+      boardType: 'zoom',
+      highlightNodes: ['NonExistent'],
+    });
+    expect(kb.startScale).toBe(1.0);
+    expect(kb.endScale).toBe(1.05);
+  });
+
+  it('handles multiple highlighted nodes', () => {
+    const kb = computeKenBurnsParams(MOCK_WORKFLOW, {
+      boardType: 'zoom',
+      highlightNodes: ['Webhook', 'OpenAI'],
+    });
+    // Wider coverage = less zoom
+    expect(kb.endScale).toBeLessThan(1.8);
+    expect(kb.endScale).toBeGreaterThan(1.0);
   });
 });

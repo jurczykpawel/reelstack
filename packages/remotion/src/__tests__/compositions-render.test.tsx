@@ -58,9 +58,10 @@ const sampleReelProps = {
 };
 
 const sampleScreenExplainerProps = {
+  screenshotUrl: 'https://cdn.example.com/screenshot.png',
   sections: [
-    { text: 'Overview', startTime: 0, endTime: 5, svgContent: '<svg><rect width="100" height="100" fill="blue"/></svg>', boardType: 'bird-eye' as const },
-    { text: 'Detail', startTime: 5, endTime: 10, svgContent: '<svg><circle r="50" fill="red"/></svg>', boardType: 'zoom' as const },
+    { text: 'Overview', startTime: 0, endTime: 5, boardType: 'bird-eye' as const, kenBurns: { startScale: 1.0, endScale: 1.05, startPosition: { x: 48, y: 48 }, endPosition: { x: 52, y: 52 } } },
+    { text: 'Detail', startTime: 5, endTime: 10, boardType: 'zoom' as const, kenBurns: { startScale: 1.4, endScale: 1.5, startPosition: { x: 40, y: 48 }, endPosition: { x: 44, y: 52 } } },
   ],
   cues: sampleCues,
   voiceoverUrl: 'https://cdn.example.com/voice.mp3',
@@ -123,14 +124,13 @@ describe('Composition smoke tests (renderToString)', () => {
     )).not.toThrow();
   });
 
-  it('ScreenExplainerComposition renders SVG content into output', async () => {
+  it('ScreenExplainerComposition renders screenshot image into output', async () => {
     const { ScreenExplainerComposition } = await import('../compositions/ScreenExplainerComposition');
     const html = renderToString(
       React.createElement(ScreenExplainerComposition, sampleScreenExplainerProps as never),
     );
-    // SVG content should appear in output — verifies sections are actually rendered
-    expect(html).toContain('fill="blue"');
-    expect(html).toContain('fill="red"');
+    // Screenshot URL should appear in output — verifies the image is rendered
+    expect(html).toContain('screenshot.png');
   });
 
   it('VideoClipComposition renders video elements for clips', async () => {

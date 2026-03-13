@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { captionCueSchema } from './caption-cue';
 
+export const kenBurnsSchema = z.object({
+  startScale: z.number().default(1.0),
+  endScale: z.number().default(1.1),
+  startPosition: z.object({ x: z.number(), y: z.number() }).default({ x: 50, y: 50 }),
+  endPosition: z.object({ x: z.number(), y: z.number() }).default({ x: 50, y: 50 }),
+});
+
 const screenSectionSchema = z.object({
   /** Section narration text */
   text: z.string(),
@@ -8,21 +15,16 @@ const screenSectionSchema = z.object({
   startTime: z.number().nonnegative(),
   /** End time in seconds */
   endTime: z.number().positive(),
-  /** SVG content for this section's board image */
-  svgContent: z.string(),
   /** Board type: bird-eye (full workflow) or zoom (focused on specific nodes) */
   boardType: z.enum(['bird-eye', 'zoom']),
-  /** Ken Burns effect config */
-  kenBurns: z.object({
-    startScale: z.number().default(1.0),
-    endScale: z.number().default(1.1),
-    startPosition: z.object({ x: z.number(), y: z.number() }).default({ x: 50, y: 50 }),
-    endPosition: z.object({ x: z.number(), y: z.number() }).default({ x: 50, y: 50 }),
-  }).optional(),
+  /** Ken Burns effect config (drives zoom/pan per section) */
+  kenBurns: kenBurnsSchema,
 });
 
 export const screenExplainerPropsSchema = z.object({
-  /** Sections with SVG board images + timing */
+  /** Single high-res screenshot URL (shared across all sections) */
+  screenshotUrl: z.string(),
+  /** Sections with timing + Ken Burns config */
   sections: z.array(screenSectionSchema).min(1),
   /** Caption cues (from TTS + Whisper) */
   cues: z.array(captionCueSchema),
@@ -43,3 +45,4 @@ export const screenExplainerPropsSchema = z.object({
 
 export type ScreenExplainerProps = z.infer<typeof screenExplainerPropsSchema>;
 export type ScreenSection = z.infer<typeof screenSectionSchema>;
+export type KenBurnsParams = z.infer<typeof kenBurnsSchema>;

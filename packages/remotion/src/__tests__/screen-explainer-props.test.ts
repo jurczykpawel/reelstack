@@ -3,12 +3,18 @@ import { screenExplainerPropsSchema } from '../schemas/screen-explainer-props';
 
 describe('screenExplainerPropsSchema', () => {
   const validProps = {
+    screenshotUrl: 'https://cdn.example.com/screenshot.png',
     sections: [{
       text: 'This workflow starts with a webhook.',
       startTime: 0,
       endTime: 5,
-      svgContent: '<svg></svg>',
       boardType: 'bird-eye' as const,
+      kenBurns: {
+        startScale: 1.0,
+        endScale: 1.05,
+        startPosition: { x: 48, y: 48 },
+        endPosition: { x: 52, y: 52 },
+      },
     }],
     cues: [{
       id: '1',

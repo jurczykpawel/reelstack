@@ -1,5 +1,6 @@
 import type { CalculateMetadataFunction } from 'remotion';
 import type { ReelProps } from '../schemas/reel-props';
+import type { ScreenExplainerProps } from '../schemas/screen-explainer-props';
 
 const FPS = 30;
 const MIN_DURATION_SECONDS = 1;
@@ -66,6 +67,42 @@ export const calculateReelMetadata: CalculateMetadataFunction<ReelProps> = async
       const lastEnd = Math.max(...segments.map((s) => s.endTime));
       durations.push(lastEnd);
     }
+  }
+
+  const maxDuration =
+    durations.length > 0
+      ? Math.max(MIN_DURATION_SECONDS, ...durations)
+      : DEFAULT_DURATION_SECONDS;
+
+  return {
+    fps: FPS,
+    durationInFrames: Math.ceil(maxDuration * FPS),
+  };
+};
+
+/**
+ * Calculates ScreenExplainer duration from props:
+ * - durationSeconds (explicit)
+ * - Last section endTime
+ * - Last cue endTime
+ */
+export const calculateScreenExplainerMetadata: CalculateMetadataFunction<ScreenExplainerProps> = async ({
+  props,
+}) => {
+  const durations: number[] = [];
+
+  if (props.durationSeconds) {
+    durations.push(props.durationSeconds);
+  }
+
+  if (props.sections.length > 0) {
+    const lastEnd = Math.max(...props.sections.map((s) => s.endTime));
+    durations.push(lastEnd);
+  }
+
+  if (props.cues.length > 0) {
+    const lastCueEnd = Math.max(...props.cues.map((c) => c.endTime));
+    durations.push(lastCueEnd);
   }
 
   const maxDuration =

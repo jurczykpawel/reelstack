@@ -1,6 +1,22 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import { buildScreenExplainerProps } from '../n8n-explainer-orchestrator';
 import type { N8nExplainerScript } from '../../generators/n8n-script-generator';
+import type { N8nWorkflow } from '../../generators/n8n-workflow-fetcher';
+
+const mockWorkflow: N8nWorkflow = {
+  id: '3121',
+  name: 'AI Image Generator',
+  description: 'Generate images using AI',
+  nodes: [
+    { id: '1', name: 'Webhook', type: 'n8n-nodes-base.webhook', position: [250, 300], parameters: {} },
+    { id: '2', name: 'OpenAI', type: 'n8n-nodes-base.openAi', position: [450, 300], parameters: {} },
+    { id: '3', name: 'Google Drive', type: 'n8n-nodes-base.googleDrive', position: [650, 300], parameters: {} },
+  ],
+  connections: {
+    Webhook: { main: [[{ node: 'OpenAI', type: 'main', index: 0 }]] },
+    OpenAI: { main: [[{ node: 'Google Drive', type: 'main', index: 0 }]] },
+  },
+};
 
 describe('buildScreenExplainerProps', () => {
   const mockScript: N8nExplainerScript = {
@@ -11,12 +27,6 @@ describe('buildScreenExplainerProps', () => {
     ],
     totalDuration: 30,
   };
-
-  const mockSvgs = [
-    '<svg>bird-eye</svg>',
-    '<svg>zoom-webhook</svg>',
-    '<svg>zoom-openai</svg>',
-  ];
 
   const mockCues = [
     { id: '1', text: 'Overview of', startTime: 0, endTime: 4 },
@@ -29,13 +39,15 @@ describe('buildScreenExplainerProps', () => {
   it('builds props with correct number of sections', () => {
     const props = buildScreenExplainerProps({
       script: mockScript,
-      svgs: mockSvgs,
+      workflow: mockWorkflow,
+      screenshotUrl: 'https://cdn.example.com/screenshot.png',
       cues: mockCues,
       voiceoverUrl: 'https://cdn.example.com/voice.mp3',
       durationSeconds: 30,
     });
 
     expect(props.sections).toHaveLength(3);
+    expect(props.screenshotUrl).toBe('https://cdn.example.com/screenshot.png');
     expect(props.voiceoverUrl).toBe('https://cdn.example.com/voice.mp3');
     expect(props.durationSeconds).toBe(30);
   });
@@ -43,47 +55,45 @@ describe('buildScreenExplainerProps', () => {
   it('distributes timing evenly across sections', () => {
     const props = buildScreenExplainerProps({
       script: mockScript,
-      svgs: mockSvgs,
+      workflow: mockWorkflow,
+      screenshotUrl: 'https://cdn.example.com/screenshot.png',
       cues: mockCues,
       voiceoverUrl: 'https://cdn.example.com/voice.mp3',
       durationSeconds: 30,
     });
 
-    // Each section should have startTime < endTime
-    for (const section of props.sections) {
-      expect(section.endTime).toBeGreaterThan(section.startTime);
-    }
-
-    // First section starts at 0
     expect(props.sections[0].startTime).toBe(0);
-
-    // Last section ends at duration
     expect(props.sections[props.sections.length - 1].endTime).toBe(30);
 
-    // No gaps between sections
     for (let i = 1; i < props.sections.length; i++) {
       expect(props.sections[i].startTime).toBe(props.sections[i - 1].endTime);
     }
   });
 
-  it('assigns SVG content to each section', () => {
+  it('computes Ken Burns params per section', () => {
     const props = buildScreenExplainerProps({
       script: mockScript,
-      svgs: mockSvgs,
+      workflow: mockWorkflow,
+      screenshotUrl: 'https://cdn.example.com/screenshot.png',
       cues: mockCues,
       voiceoverUrl: 'https://cdn.example.com/voice.mp3',
       durationSeconds: 30,
     });
 
-    expect(props.sections[0].svgContent).toBe('<svg>bird-eye</svg>');
-    expect(props.sections[1].svgContent).toBe('<svg>zoom-webhook</svg>');
-    expect(props.sections[2].svgContent).toBe('<svg>zoom-openai</svg>');
+    // Bird-eye: gentle zoom
+    expect(props.sections[0].kenBurns.startScale).toBe(1.0);
+    expect(props.sections[0].kenBurns.endScale).toBe(1.05);
+
+    // Zoom sections: higher scale
+    expect(props.sections[1].kenBurns.endScale).toBeGreaterThan(1.2);
+    expect(props.sections[2].kenBurns.endScale).toBeGreaterThan(1.2);
   });
 
   it('preserves board type from script', () => {
     const props = buildScreenExplainerProps({
       script: mockScript,
-      svgs: mockSvgs,
+      workflow: mockWorkflow,
+      screenshotUrl: 'https://cdn.example.com/screenshot.png',
       cues: mockCues,
       voiceoverUrl: 'https://cdn.example.com/voice.mp3',
       durationSeconds: 30,
@@ -96,7 +106,8 @@ describe('buildScreenExplainerProps', () => {
   it('passes cues through', () => {
     const props = buildScreenExplainerProps({
       script: mockScript,
-      svgs: mockSvgs,
+      workflow: mockWorkflow,
+      screenshotUrl: 'https://cdn.example.com/screenshot.png',
       cues: mockCues,
       voiceoverUrl: 'https://cdn.example.com/voice.mp3',
       durationSeconds: 30,

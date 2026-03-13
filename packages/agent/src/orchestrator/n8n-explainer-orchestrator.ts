@@ -1,18 +1,21 @@
 /**
  * n8n-explainer orchestrator.
  *
- * Pipeline: fetch workflow → LLM script → generate SVGs → TTS → transcribe → compose props → render.
+ * Pipeline: fetch workflow → LLM script → screenshot → TTS → transcribe → compose props → render.
  *
  * Uses shared base orchestrator for TTS/transcription/render steps.
  */
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import { randomUUID } from 'node:crypto';
 import { fetchWorkflow } from '../generators/n8n-workflow-fetcher';
 import type { N8nWorkflow } from '../generators/n8n-workflow-fetcher';
 import { generateN8nScript } from '../generators/n8n-script-generator';
-import type { N8nExplainerScript, N8nExplainerSection } from '../generators/n8n-script-generator';
-import { generateWorkflowSvg } from '../generators/n8n-screenshot-generator';
+import type { N8nExplainerScript } from '../generators/n8n-script-generator';
+import { computeKenBurnsParams } from '../generators/n8n-screenshot-generator';
+import type { N8nScreenshotProvider } from '../generators/n8n-screenshot-provider';
+import { N8nPublicPageProvider } from '../generators/n8n-screenshot-provider';
 import {
   runTTSPipeline,
   uploadVoiceover,
@@ -22,6 +25,7 @@ import type { TTSPipelineResult } from './base-orchestrator';
 import type { ProductionStep, BrandPreset } from '../types';
 import type { ScreenExplainerProps } from '@reelstack/remotion/schemas/screen-explainer-props';
 import { createLogger } from '@reelstack/logger';
+import { createStorage } from '@reelstack/storage';
 import { detectLanguage } from '../utils/detect-language';
 
 const baseLog = createLogger('n8n-explainer');
@@ -44,6 +48,8 @@ export interface N8nExplainerRequest {
   brandPreset?: BrandPreset;
   /** LLM call function - injected for flexibility (use Claude, GPT, etc.) */
   llmCall: (prompt: string) => Promise<string>;
+  /** Screenshot provider - injected for swappable infra (default: n8n.io public page) */
+  screenshotProvider?: N8nScreenshotProvider;
   outputPath?: string;
   onProgress?: (step: string) => void;
 }
@@ -60,7 +66,8 @@ export interface N8nExplainerResult {
 
 export interface BuildPropsInput {
   script: N8nExplainerScript;
-  svgs: string[];
+  workflow: N8nWorkflow;
+  screenshotUrl: string;
   cues: TTSPipelineResult['cues'];
   voiceoverUrl: string;
   durationSeconds: number;
@@ -68,11 +75,11 @@ export interface BuildPropsInput {
 }
 
 /**
- * Build ScreenExplainerProps from script + SVGs + cues.
- * Distributes timing evenly across sections.
+ * Build ScreenExplainerProps from script + screenshot + cues.
+ * Computes Ken Burns params from node positions and distributes timing evenly.
  */
 export function buildScreenExplainerProps(input: BuildPropsInput): ScreenExplainerProps {
-  const { script, svgs, cues, voiceoverUrl, durationSeconds, backgroundColor } = input;
+  const { script, workflow, screenshotUrl, cues, voiceoverUrl, durationSeconds, backgroundColor } = input;
   const sectionCount = script.sections.length;
   const sectionDuration = durationSeconds / sectionCount;
 
@@ -80,17 +87,27 @@ export function buildScreenExplainerProps(input: BuildPropsInput): ScreenExplain
     text: section.text,
     startTime: i * sectionDuration,
     endTime: (i + 1) * sectionDuration,
-    svgContent: svgs[i] ?? '<svg></svg>',
     boardType: section.boardType,
+    kenBurns: computeKenBurnsParams(workflow, section),
   }));
 
   return {
+    screenshotUrl,
     sections,
     cues,
     voiceoverUrl,
     durationSeconds,
     backgroundColor: backgroundColor ?? '#1a1a2e',
   };
+}
+
+// ── Screenshot upload helper ──────────────────────────────────
+
+async function uploadScreenshot(buffer: Buffer, ttlSeconds = 7200): Promise<string> {
+  const key = `screenshots/n8n-${randomUUID()}.png`;
+  const storage = await createStorage();
+  await storage.upload(buffer, key);
+  return storage.getSignedUrl(key, ttlSeconds);
 }
 
 // ── Full pipeline ─────────────────────────────────────────────
@@ -100,6 +117,7 @@ export async function produceN8nExplainer(request: N8nExplainerRequest): Promise
   const steps: ProductionStep[] = [];
   const onProgress = request.onProgress;
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reelstack-n8n-'));
+  const screenshotProvider = request.screenshotProvider ?? new N8nPublicPageProvider();
 
   // ── 1. FETCH WORKFLOW ──────────────────────────────────────
   onProgress?.('Fetching n8n workflow...');
@@ -130,26 +148,24 @@ export async function produceN8nExplainer(request: N8nExplainerRequest): Promise
   });
   log.info({ sections: script.sections.length, totalDuration: script.totalDuration }, 'Script generated');
 
-  // ── 3. GENERATE SVG DIAGRAMS ───────────────────────────────
-  onProgress?.('Generating workflow diagrams...');
-  const svgStart = performance.now();
+  // ── 3. CAPTURE SCREENSHOT ──────────────────────────────────
+  onProgress?.('Capturing workflow screenshot...');
+  const ssStart = performance.now();
 
-  const svgs = script.sections.map(section =>
-    generateWorkflowSvg(workflow, {
-      boardType: section.boardType,
-      highlightNodes: section.highlightNodes,
-      width: 1080,
-      height: 1920,
-    }),
-  );
+  const screenshotResult = await screenshotProvider.capture(workflow.id);
 
   steps.push({
-    name: 'SVG generation',
-    durationMs: performance.now() - svgStart,
-    detail: `${svgs.length} diagrams`,
+    name: 'Screenshot capture',
+    durationMs: performance.now() - ssStart,
+    detail: `${screenshotResult.width}x${screenshotResult.height}`,
   });
+  log.info({ width: screenshotResult.width, height: screenshotResult.height }, 'Screenshot captured');
 
-  // ── 4. TTS + TRANSCRIPTION ─────────────────────────────────
+  // ── 4. UPLOAD SCREENSHOT ───────────────────────────────────
+  onProgress?.('Uploading screenshot...');
+  const screenshotUrl = await uploadScreenshot(screenshotResult.buffer);
+
+  // ── 5. TTS + TRANSCRIPTION ─────────────────────────────────
   const fullScript = script.sections.map(s => s.text).join(' ');
   const ttsResult = await runTTSPipeline({
     script: fullScript,
@@ -159,21 +175,22 @@ export async function produceN8nExplainer(request: N8nExplainerRequest): Promise
   }, tmpDir, onProgress);
   steps.push(...ttsResult.steps);
 
-  // ── 5. UPLOAD VOICEOVER ────────────────────────────────────
+  // ── 6. UPLOAD VOICEOVER ────────────────────────────────────
   onProgress?.('Uploading voiceover...');
   const voiceoverUrl = await uploadVoiceover(ttsResult.voiceoverPath);
 
-  // ── 6. ASSEMBLE COMPOSITION PROPS ──────────────────────────
+  // ── 7. ASSEMBLE COMPOSITION PROPS ──────────────────────────
   onProgress?.('Assembling composition...');
   const props = buildScreenExplainerProps({
     script,
-    svgs,
+    workflow,
+    screenshotUrl,
     cues: ttsResult.cues,
     voiceoverUrl,
     durationSeconds: ttsResult.audioDuration,
   });
 
-  // ── 7. RENDER ──────────────────────────────────────────────
+  // ── 8. RENDER ──────────────────────────────────────────────
   const { outputPath, step: renderStep } = await renderVideo(
     { ...props, compositionId: 'ScreenExplainer' } as unknown as Record<string, unknown>,
     request.outputPath,

@@ -58,6 +58,8 @@ COPY --from=builder /app/bunfig.toml ./
 RUN mkdir -p /app/apps/web/node_modules/.remotion /app/packages/remotion/public && \
     chown -R worker:worker /app/apps/web/node_modules/.remotion && \
     chown worker:worker /app/packages/remotion/public
+# Install Playwright Chromium for n8n screenshot capture (must run as root before USER switch)
+RUN bunx playwright install chromium
 
 USER worker
 CMD ["bun", "run", "--cwd", "apps/web", "worker"]

@@ -13,14 +13,17 @@ import { resolveMediaUrl } from '../utils/resolve-media-url';
 import type { ScreenExplainerProps, ScreenSection } from '../schemas/screen-explainer-props';
 
 /**
- * ScreenExplainerComposition: SVG board images with Ken Burns + TTS + captions.
- * Used for n8n-explainer mode. Simpler than ReelComposition - no B-roll overlay
- * system, just a sequence of full-screen SVG images with smooth transitions.
+ * ScreenExplainerComposition: single workflow screenshot with per-section
+ * Ken Burns zoom/pan + TTS + captions.
+ *
+ * One <Img> is shared across all sections. Each Sequence applies different
+ * Ken Burns parameters to show bird-eye or zoomed-in views.
  */
 export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props) => {
   const { fps } = useVideoConfig();
 
   const {
+    screenshotUrl,
     sections,
     cues,
     voiceoverUrl,
@@ -30,7 +33,7 @@ export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props
 
   return (
     <AbsoluteFill style={{ backgroundColor }}>
-      {/* Board images layer */}
+      {/* Board layer: shared screenshot with per-section Ken Burns */}
       {sections.map((section, i) => {
         const sectionDuration = section.endTime - section.startTime;
         const startFrame = Math.round(section.startTime * fps);
@@ -44,6 +47,7 @@ export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props
           >
             <SectionBoard
               section={section}
+              screenshotUrl={screenshotUrl}
             />
           </Sequence>
         );
@@ -71,29 +75,23 @@ export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props
 };
 
 /**
- * Renders a single section's SVG board image with Ken Burns effect.
+ * Renders the shared screenshot with Ken Burns effect for this section.
  */
 const SectionBoard: React.FC<{
   section: ScreenSection;
-}> = ({ section }) => {
+  screenshotUrl: string;
+}> = ({ section, screenshotUrl }) => {
   const { fps } = useVideoConfig();
   const frame = useCurrentFrame();
   const durationFrames = Math.round((section.endTime - section.startTime) * fps);
 
-  // Ken Burns: gentle zoom + pan over the section duration
-  const kb = section.kenBurns ?? {
-    startScale: 1.0,
-    endScale: section.boardType === 'bird-eye' ? 1.05 : 1.1,
-    startPosition: { x: 50, y: 50 },
-    endPosition: { x: 50, y: 50 },
-  };
-
+  const kb = section.kenBurns;
   const progress = Math.min(frame / Math.max(durationFrames, 1), 1);
   const scale = interpolate(progress, [0, 1], [kb.startScale, kb.endScale]);
   const posX = interpolate(progress, [0, 1], [kb.startPosition.x, kb.endPosition.x]);
   const posY = interpolate(progress, [0, 1], [kb.startPosition.y, kb.endPosition.y]);
 
-  // Fade in/out
+  // Fade in/out at section boundaries
   const fadeIn = interpolate(frame, [0, Math.min(fps * 0.3, durationFrames)], [0, 1], { extrapolateRight: 'clamp' });
   const fadeOut = interpolate(
     frame,
@@ -115,8 +113,16 @@ const SectionBoard: React.FC<{
           alignItems: 'center',
           justifyContent: 'center',
         }}
-        dangerouslySetInnerHTML={{ __html: section.svgContent }}
-      />
+      >
+        <Img
+          src={resolveMediaUrl(screenshotUrl)}
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+          }}
+        />
+      </div>
     </AbsoluteFill>
   );
 };

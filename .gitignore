@@ -42,3 +42,6 @@ priv/
 # Misc
 *.log
 *.tsbuildinfo
+piapi-clips/
+packages/remotion/public/voiceover-*.mp3
+packages/remotion/public/sfx/

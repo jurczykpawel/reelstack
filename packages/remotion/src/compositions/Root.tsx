@@ -9,7 +9,7 @@ import type { YouTubeProps } from '../schemas/youtube-props';
 import type { ScreenExplainerProps } from '../schemas/screen-explainer-props';
 import type { VideoClipProps } from '../schemas/video-clip-props';
 import type { PresenterExplainerProps } from '../schemas/presenter-explainer-props';
-import { calculateReelMetadata } from './calculate-metadata';
+import { calculateReelMetadata, calculateScreenExplainerMetadata } from './calculate-metadata';
 import { calculateYouTubeMetadata } from './calculate-youtube-metadata';
 
 const FPS = 30;
@@ -174,13 +174,15 @@ export const RemotionRoot: React.FC = () => {
         fps={FPS}
         width={1080}
         height={1920}
+        calculateMetadata={calculateScreenExplainerMetadata}
         defaultProps={{
+          screenshotUrl: 'https://via.placeholder.com/1080x1920/1a1a2e/ffffff?text=n8n+Workflow',
           sections: [{
             text: 'This workflow shows how to automate image generation.',
             startTime: 0,
             endTime: 10,
-            svgContent: '<svg xmlns="http://www.w3.org/2000/svg" width="1080" height="1920"><rect width="100%" height="100%" fill="#1a1a2e"/><text x="540" y="960" text-anchor="middle" fill="white" font-size="48">n8n Workflow</text></svg>',
             boardType: 'bird-eye' as const,
+            kenBurns: { startScale: 1.0, endScale: 1.05, startPosition: { x: 50, y: 50 }, endPosition: { x: 50, y: 50 } },
           }],
           cues: [
             { id: '1', text: 'This workflow shows', startTime: 0, endTime: 2 },

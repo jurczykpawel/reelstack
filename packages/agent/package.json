@@ -16,7 +16,8 @@
     "@reelstack/storage": "workspace:*",
     "@reelstack/transcription": "workspace:*",
     "@reelstack/tts": "workspace:*",
-    "@reelstack/types": "workspace:*"
+    "@reelstack/types": "workspace:*",
+    "playwright": "^1.58.2"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

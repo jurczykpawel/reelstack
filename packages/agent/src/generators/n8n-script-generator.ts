@@ -52,9 +52,12 @@ export function buildWorkflowSummary(workflow: N8nWorkflow): string {
   lines.push('');
   lines.push('Connections:');
   for (const [source, conn] of Object.entries(workflow.connections)) {
-    for (const outputs of conn.main) {
-      for (const target of outputs) {
-        lines.push(`  "${source}" → "${target.node}"`);
+    for (const [type, outputGroups] of Object.entries(conn)) {
+      for (const outputs of outputGroups) {
+        for (const target of outputs) {
+          const label = type === 'main' ? '' : ` [${type}]`;
+          lines.push(`  "${source}" → "${target.node}"${label}`);
+        }
       }
     }
   }
