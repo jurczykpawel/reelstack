@@ -78,26 +78,46 @@ export class N8nPublicPageProvider implements N8nScreenshotProvider {
       await canvas.click();
       await page.waitForTimeout(500);
 
-      // Hide zoom controls and cookie banner via CSS injection
+      // Hide zoom controls, cookie banner, and any UI chrome
+      // Main page CSS
       await page.addStyleTag({
         content: `
-          .workflow-viewer [class*="controls"],
-          .workflow-viewer button,
-          [class*="cookie"], [class*="consent"],
-          .canvas-container button {
+          [class*="cookie"], [class*="consent"] {
             display: none !important;
           }
         `,
       });
+      // Shadow DOM of n8n-demo: inject CSS to hide controls inside it
+      await page.evaluate(() => {
+        const demo = document.querySelector('n8n-demo');
+        if (!demo?.shadowRoot) return;
+        const style = document.createElement('style');
+        style.textContent = `
+          button, [class*="zoom"], [class*="control"],
+          [class*="Controls"], [class*="minimap"] {
+            display: none !important;
+          }
+        `;
+        demo.shadowRoot.appendChild(style);
+      });
 
-      // Screenshot just the canvas area
-      const screenshot = await canvas.screenshot({ type: 'png' });
+      // Screenshot the canvas area, clipping bottom 60px to exclude zoom controls
       const box = await canvas.boundingBox();
+      const clipHeight = Math.max(100, (box?.height ?? opts.height) - 60);
+      const screenshot = await page.screenshot({
+        type: 'png',
+        clip: {
+          x: box?.x ?? 0,
+          y: box?.y ?? 0,
+          width: box?.width ?? opts.width,
+          height: clipHeight,
+        },
+      });
 
       return {
         buffer: Buffer.from(screenshot),
         width: Math.round((box?.width ?? opts.width) * opts.deviceScaleFactor),
-        height: Math.round((box?.height ?? opts.height) * opts.deviceScaleFactor),
+        height: Math.round(clipHeight * opts.deviceScaleFactor),
       };
     } finally {
       await browser.close();
