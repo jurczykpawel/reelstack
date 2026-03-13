@@ -42,12 +42,13 @@ export function calculateNodeLayout(workflow: N8nWorkflow): NodeLayoutEntry[] {
 /**
  * Compute Ken Burns parameters for a script section.
  *
- * - bird-eye: gentle drift across the full workflow (scale ~1.0 → 1.05)
- * - zoom: centers on highlightNodes with moderate scale (1.15 → 1.3)
+ * - bird-eye: overview with gentle zoom (1.0 → 1.1)
+ * - zoom: meaningful zoom into highlighted nodes (1.6 → 2.2x)
  *
- * Position values are kept close to center (35-65 range) to prevent
- * jarring jumps between sections. The composition uses smooth eased
- * transitions, but the source params must also be reasonable.
+ * The composition uses smooth bezier-eased transitions between sections,
+ * so we can use substantial zoom differences without jumping. Position
+ * values clamped to 25-75% to stay within reasonable bounds while still
+ * allowing clear directional movement.
  *
  * Returns % positions (0-100) for CSS transform-origin.
  */
@@ -57,7 +58,7 @@ export function computeKenBurnsParams(
 ): KenBurnsParams {
   const layout = calculateNodeLayout(workflow);
   if (layout.length === 0) {
-    return { startScale: 1.0, endScale: 1.05, startPosition: { x: 50, y: 50 }, endPosition: { x: 50, y: 50 } };
+    return { startScale: 1.0, endScale: 1.1, startPosition: { x: 50, y: 50 }, endPosition: { x: 50, y: 50 } };
   }
 
   // Full workflow bounding box
@@ -69,10 +70,10 @@ export function computeKenBurnsParams(
   const allH = allMaxY - allMinY || 1;
 
   if (section.boardType === 'bird-eye' || section.highlightNodes.length === 0) {
-    // Bird-eye: gentle drift, centered
+    // Bird-eye: gentle zoom showing the full workflow
     return {
       startScale: 1.0,
-      endScale: 1.05,
+      endScale: 1.1,
       startPosition: { x: 48, y: 48 },
       endPosition: { x: 52, y: 52 },
     };
@@ -84,7 +85,7 @@ export function computeKenBurnsParams(
     // Fallback: no matching nodes found, treat as bird-eye
     return {
       startScale: 1.0,
-      endScale: 1.05,
+      endScale: 1.1,
       startPosition: { x: 50, y: 50 },
       endPosition: { x: 50, y: 50 },
     };
@@ -98,19 +99,20 @@ export function computeKenBurnsParams(
   const pctX = ((hCenterX - allMinX) / allW) * 100;
   const pctY = ((hCenterY - allMinY) / allH) * 100;
 
-  // Clamp to narrow range (35-65) to prevent extreme position jumps
-  const focusX = Math.max(35, Math.min(65, pctX));
-  const focusY = Math.max(35, Math.min(65, pctY));
+  // Clamp to 25-75% — allows meaningful directional movement while
+  // staying away from edges. Smooth transitions handle the rest.
+  const focusX = Math.max(25, Math.min(75, pctX));
+  const focusY = Math.max(25, Math.min(75, pctY));
 
-  // Moderate zoom scale - enough to highlight but not extreme
-  // Coverage: more nodes highlighted = less zoom needed
+  // Zoom scale: fewer highlighted nodes = tighter zoom
+  // Single node: 2.0-2.2x, multiple nodes: 1.6-1.8x
   const coverage = highlighted.length / layout.length;
-  const zoomScale = coverage > 0.5 ? 1.15 : coverage > 0.25 ? 1.25 : 1.35;
+  const zoomScale = coverage > 0.5 ? 1.6 : coverage > 0.25 ? 1.8 : 2.2;
 
   return {
-    startScale: zoomScale - 0.05,
+    startScale: zoomScale - 0.15,
     endScale: zoomScale,
-    startPosition: { x: focusX - 1, y: focusY - 1 },
-    endPosition: { x: focusX + 1, y: focusY + 1 },
+    startPosition: { x: focusX - 2, y: focusY - 2 },
+    endPosition: { x: focusX + 2, y: focusY + 2 },
   };
 }

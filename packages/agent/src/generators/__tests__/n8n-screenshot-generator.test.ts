@@ -43,7 +43,7 @@ describe('computeKenBurnsParams', () => {
       highlightNodes: [],
     });
     expect(kb.startScale).toBe(1.0);
-    expect(kb.endScale).toBe(1.05);
+    expect(kb.endScale).toBe(1.1);
     expect(kb.startPosition.x).toBeCloseTo(48, 0);
     expect(kb.endPosition.x).toBeCloseTo(52, 0);
   });
@@ -53,14 +53,14 @@ describe('computeKenBurnsParams', () => {
       boardType: 'zoom',
       highlightNodes: ['OpenAI'],
     });
-    // Should zoom more than bird-eye but moderate (1.3-1.35 range)
-    expect(kb.startScale).toBeGreaterThan(1.1);
-    expect(kb.endScale).toBeGreaterThan(1.2);
-    expect(kb.endScale).toBeLessThan(1.5);
+    // Single node (1/3 coverage > 0.25): zoomScale=1.8
+    expect(kb.startScale).toBeGreaterThan(1.5);
+    expect(kb.endScale).toBeGreaterThan(1.7);
+    expect(kb.endScale).toBeLessThan(2.5);
     // Focus should be roughly in the center (OpenAI is middle node)
-    // Clamped to 35-65 range to prevent jumping
-    expect(kb.startPosition.x).toBeGreaterThan(34);
-    expect(kb.startPosition.x).toBeLessThan(66);
+    // Clamped to 25-75 range
+    expect(kb.startPosition.x).toBeGreaterThan(24);
+    expect(kb.startPosition.x).toBeLessThan(76);
   });
 
   it('zooms into first node (left side, clamped)', () => {
@@ -68,9 +68,9 @@ describe('computeKenBurnsParams', () => {
       boardType: 'zoom',
       highlightNodes: ['Webhook'],
     });
-    // Focus should be on the left side (clamped to 35-65 range)
+    // Focus should be on the left side (clamped to 25, minus drift = 23)
     expect(kb.startPosition.x).toBeLessThanOrEqual(50);
-    expect(kb.startPosition.x).toBeGreaterThanOrEqual(34);
+    expect(kb.startPosition.x).toBeGreaterThanOrEqual(22);
   });
 
   it('zooms into last node (right side, clamped)', () => {
@@ -78,9 +78,9 @@ describe('computeKenBurnsParams', () => {
       boardType: 'zoom',
       highlightNodes: ['Google Drive'],
     });
-    // Focus should be on the right side (clamped to 35-65 range)
+    // Focus should be on the right side (clamped to 25-75 range)
     expect(kb.startPosition.x).toBeGreaterThanOrEqual(50);
-    expect(kb.startPosition.x).toBeLessThanOrEqual(66);
+    expect(kb.startPosition.x).toBeLessThanOrEqual(76);
   });
 
   it('falls back to bird-eye for empty highlights', () => {
@@ -89,7 +89,7 @@ describe('computeKenBurnsParams', () => {
       highlightNodes: [],
     });
     expect(kb.startScale).toBe(1.0);
-    expect(kb.endScale).toBe(1.05);
+    expect(kb.endScale).toBe(1.1);
   });
 
   it('falls back for non-existent node names', () => {
@@ -98,7 +98,7 @@ describe('computeKenBurnsParams', () => {
       highlightNodes: ['NonExistent'],
     });
     expect(kb.startScale).toBe(1.0);
-    expect(kb.endScale).toBe(1.05);
+    expect(kb.endScale).toBe(1.1);
   });
 
   it('handles multiple highlighted nodes', () => {
@@ -106,8 +106,8 @@ describe('computeKenBurnsParams', () => {
       boardType: 'zoom',
       highlightNodes: ['Webhook', 'OpenAI'],
     });
-    // Wider coverage = less zoom (moderate range)
-    expect(kb.endScale).toBeLessThan(1.4);
-    expect(kb.endScale).toBeGreaterThan(1.0);
+    // 2/3 coverage > 0.5 → 1.6x scale
+    expect(kb.endScale).toBeCloseTo(1.6, 1);
+    expect(kb.endScale).toBeGreaterThan(1.4);
   });
 });

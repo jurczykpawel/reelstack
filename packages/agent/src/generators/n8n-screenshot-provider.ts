@@ -37,9 +37,9 @@ export interface N8nScreenshotProvider {
 // ── n8n.io public page implementation ────────────────────────
 
 const DEFAULTS = {
-  width: 1280,
-  height: 960,
-  deviceScaleFactor: 2,
+  width: 1920,
+  height: 1080,
+  deviceScaleFactor: 3,
   timeout: 30_000,
 };
 
