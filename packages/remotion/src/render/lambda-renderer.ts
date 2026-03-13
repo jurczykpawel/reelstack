@@ -47,6 +47,9 @@ export class LambdaRenderer implements RemotionRenderer {
       composition: compositionId,
       codec: options.codec === 'h265' ? 'h265' : 'h264',
       inputProps: props,
+      imageFormat: 'png',
+      crf: options.crf ?? 18,
+      jpegQuality: 100,
     });
 
     // Poll for completion
