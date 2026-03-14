@@ -15,7 +15,7 @@ updates:
           - "patch"
 
   - package-ecosystem: "docker"
-    directory: "/docker"
+    directory: "/apps/image-gen-server"
     schedule:
       interval: "weekly"
 

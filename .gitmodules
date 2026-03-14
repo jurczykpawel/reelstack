@@ -1,0 +1,3 @@
+[submodule "packages/modules"]
+	path = packages/modules
+	url = /Users/pavvel/workspace/projects/reelstack-modules

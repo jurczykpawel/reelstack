@@ -106,7 +106,7 @@ async function callOpenAICompatible(
     Authorization: `Bearer ${apiKey}`,
   };
   if (isOpenRouter) {
-    headers['HTTP-Referer'] = 'https://github.com/jurczykpawel/subtitle-burner';
+    headers['HTTP-Referer'] = 'https://github.com/jurczykpawel/reelstack';
     headers['X-Title'] = 'ReelStack';
   }
 

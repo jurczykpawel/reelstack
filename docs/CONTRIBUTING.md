@@ -33,22 +33,27 @@ bun run dev
 ## Project Structure
 
 - `apps/web` — Next.js frontend and API
+- `apps/image-gen-server` — Standalone social media image generator (Docker, Hono)
 - `packages/types` — Shared TypeScript interfaces
-- `packages/core` — Engines (subtitle, template, render, playback), action system, serializer
+- `packages/core` — Caption animation renderer, template engine
 - `packages/ffmpeg` — SRT/ASS parsing and generation
 - `packages/database` — Prisma ORM and query helpers
 - `packages/queue` — Queue adapters (Inngest, BullMQ)
-- `packages/storage` — Storage adapters (Supabase, MinIO)
+- `packages/storage` — Storage adapters (Supabase, MinIO, R2)
 - `packages/transcription` — Audio extraction, Whisper transcription, word grouping
+- `packages/tts` — Text-to-speech adapters (ElevenLabs, Edge TTS)
+- `packages/remotion` — Remotion compositions (reel layouts, effects)
+- `packages/agent` — AI agent for reel planning and production
+- `packages/image-gen` — Social media image generator (Playwright + HTML/CSS templates)
+- `packages/logger` — Structured logging
 
-## State Management
+## Architecture Notes
 
-The app uses a layered architecture:
-
-1. **Engines** (`packages/core`) — Pure functions: accept state, return new state. No side effects.
-2. **Stores** (`apps/web/src/store/`) — Zustand stores hold runtime state (project, engine, timeline, UI).
-3. **Bridges** (`apps/web/src/lib/bridges/`) — React hooks that combine stores + engines into component-facing APIs.
-4. **Components** — React components consume bridges, never stores directly.
+- **Auth**: Auth.js (NextAuth v5) with Prisma adapter. Config in `apps/web/src/lib/auth.ts`.
+- **API routes**: All protected routes use `getAuthUser()` from `lib/api/auth.ts`. All DB queries filter by userId.
+- **API v1**: Public API with API key auth. Routes in `apps/web/src/app/api/v1/`.
+- **Adapter pattern**: Queue and storage auto-detect cloud vs VPS mode from env vars.
+- **State management**: Zustand stores → bridges → components. See `apps/web/src/store/` and `apps/web/src/lib/bridges/`.
 
 ## Commands
 
@@ -56,7 +61,7 @@ The app uses a layered architecture:
 |---------|-------------|
 | `bun run dev` | Start dev server |
 | `bun run build` | Production build |
-| `bun run test` | Run all tests (414 tests) |
+| `bun run test` | Run all tests |
 | `bun run lint` | Lint all packages |
 | `bun run format` | Format with Prettier |
 | `bun run format:check` | Check formatting |
@@ -76,14 +81,14 @@ Tests use Vitest for unit tests and Playwright for E2E.
 bun run test
 
 # Run specific package tests
-cd apps/web && npx vitest run
-cd packages/core && npx vitest run
-cd packages/ffmpeg && npx vitest run
-cd packages/database && npx vitest run
-cd packages/transcription && npx vitest run
+cd apps/web && bun run test
+cd packages/core && bun run test
+cd packages/ffmpeg && bun run test
+cd packages/database && bun run test
+cd packages/image-gen && bun run test
 
 # Run with watch mode
-cd apps/web && npx vitest
+cd apps/web && bun run test --watch
 ```
 
 When adding new features:
@@ -109,13 +114,5 @@ test: add store unit tests
 3. Ensure `bun run test` and `bun run build` pass.
 4. Open a PR with a clear description of changes.
 
-## Architecture Notes
-
-- **Auth**: Auth.js (NextAuth v5) with Prisma adapter. Config in `apps/web/src/lib/auth.ts`.
-- **API routes**: All protected routes use `getAuthUser()` from `lib/api/auth.ts`. All DB queries filter by userId.
-- **API v1**: Public API with API key auth. Routes in `apps/web/src/app/api/v1/`.
-- **Adapter pattern**: Queue and storage auto-detect cloud vs VPS mode from env vars.
-- **State management**: Zustand stores → bridges → components. See `apps/web/src/store/` and `apps/web/src/lib/bridges/`.
-- **Core engines**: Pure functions in `packages/core/src/engines/`. No side effects, easy to test.
 - **Client rendering**: FFmpeg.wasm in `apps/web/src/lib/ffmpeg/client-renderer.ts`.
 - **Server rendering**: Worker in `apps/web/src/lib/worker/render-worker.ts`.
