@@ -142,9 +142,17 @@ export async function produceSlideshow(request: SlideshowRequest): Promise<Slide
   }
 
   // ── 4. TTS + TRANSCRIPTION ─────────────────────────────────
+  // Bridge top-level language to TTS language if not explicitly set.
+  // E.g. language='en' → tts.language='en-US', language='pl' → tts.language='pl-PL'
+  const ttsLanguage = request.tts?.language
+    ?? (request.language === 'pl' ? 'pl-PL'
+      : request.language === 'en' ? 'en-US'
+      : request.language ? `${request.language}-${request.language.toUpperCase()}`
+      : undefined);
+
   const ttsResult = await runTTSPipeline({
     script: script.fullNarration,
-    tts: request.tts,
+    tts: { ...request.tts, language: ttsLanguage },
     whisper: request.whisper,
     brandPreset: request.brandPreset,
   }, tmpDir, onProgress);

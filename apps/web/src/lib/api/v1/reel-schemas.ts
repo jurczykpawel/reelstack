@@ -135,7 +135,7 @@ const brandPresetSchema = z.object({
 const ttsSchema = z.object({
   provider: z.enum(['edge-tts', 'elevenlabs', 'openai']).default('edge-tts'),
   voice: z.string().optional(),
-  language: z.string().default('pl-PL'),
+  language: z.string().optional(),
 }).optional();
 
 const whisperSchema = z.object({

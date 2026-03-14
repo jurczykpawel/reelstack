@@ -70,6 +70,13 @@ export const POST = withAuth(
         numberOfTips: parsed.data.numberOfTips,
         variant: parsed.data.variant,
         montageProfile: parsed.data.montageProfile,
+        // Slideshow-specific fields
+        slides: parsed.data.slides,
+        brand: parsed.data.brand,
+        template: parsed.data.template,
+        numberOfSlides: parsed.data.numberOfSlides,
+        musicUrl: parsed.data.musicUrl,
+        musicVolume: parsed.data.musicVolume,
       },
       apiKeyId: ctx.apiKeyId ?? undefined,
       creditCost: cost,

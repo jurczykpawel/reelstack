@@ -176,7 +176,7 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
 
       const baseRequest: BaseModuleRequest = {
         jobId,
-        language: (config.language as string) ?? 'pl',
+        language: (config.language as string) ?? 'en',
         tts: config.tts as BaseModuleRequest['tts'],
         whisper: config.whisper as BaseModuleRequest['whisper'],
         brandPreset: config.brandPreset as BrandPreset | undefined,
