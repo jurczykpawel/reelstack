@@ -15,7 +15,7 @@ import { generateN8nScript } from '../generators/n8n-script-generator';
 import type { N8nExplainerScript } from '../generators/n8n-script-generator';
 import { computeKenBurnsParams } from '../generators/n8n-screenshot-generator';
 import type { N8nScreenshotProvider } from '../generators/n8n-screenshot-provider';
-import { N8nPublicPageProvider } from '../generators/n8n-screenshot-provider';
+import { N8nLocalDockerProvider, N8nPublicPageProvider } from '../generators/n8n-screenshot-provider';
 import {
   runTTSPipeline,
   uploadVoiceover,
@@ -68,6 +68,8 @@ export interface BuildPropsInput {
   script: N8nExplainerScript;
   workflow: N8nWorkflow;
   screenshotUrl: string;
+  screenshotWidth: number;
+  screenshotHeight: number;
   cues: TTSPipelineResult['cues'];
   voiceoverUrl: string;
   durationSeconds: number;
@@ -79,7 +81,7 @@ export interface BuildPropsInput {
  * Computes Ken Burns params from node positions and distributes timing evenly.
  */
 export function buildScreenExplainerProps(input: BuildPropsInput): ScreenExplainerProps {
-  const { script, workflow, screenshotUrl, cues, voiceoverUrl, durationSeconds, backgroundColor } = input;
+  const { script, workflow, screenshotUrl, screenshotWidth, screenshotHeight, cues, voiceoverUrl, durationSeconds, backgroundColor } = input;
   const sectionCount = script.sections.length;
   const sectionDuration = durationSeconds / sectionCount;
 
@@ -93,12 +95,29 @@ export function buildScreenExplainerProps(input: BuildPropsInput): ScreenExplain
 
   return {
     screenshotUrl,
+    screenshotWidth,
+    screenshotHeight,
     sections,
     cues,
     voiceoverUrl,
     durationSeconds,
     backgroundColor: backgroundColor ?? '#1a1a2e',
   };
+}
+
+// ── Default screenshot provider ──────────────────────────────
+
+/**
+ * Creates the best available screenshot provider.
+ * Prefers local Docker (4K) when N8N_EMAIL + N8N_PASSWORD are set.
+ * Falls back to n8n.io public page (low-res).
+ */
+function createDefaultScreenshotProvider(): N8nScreenshotProvider {
+  if (process.env.N8N_EMAIL && process.env.N8N_PASSWORD) {
+    return new N8nLocalDockerProvider();
+  }
+  baseLog.warn('N8N_EMAIL/N8N_PASSWORD not set, falling back to low-res n8n.io public page screenshots');
+  return new N8nPublicPageProvider();
 }
 
 // ── Screenshot upload helper ──────────────────────────────────
@@ -117,7 +136,7 @@ export async function produceN8nExplainer(request: N8nExplainerRequest): Promise
   const steps: ProductionStep[] = [];
   const onProgress = request.onProgress;
   const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'reelstack-n8n-'));
-  const screenshotProvider = request.screenshotProvider ?? new N8nPublicPageProvider();
+  const screenshotProvider = request.screenshotProvider ?? createDefaultScreenshotProvider();
 
   // ── 1. FETCH WORKFLOW ──────────────────────────────────────
   onProgress?.('Fetching n8n workflow...');
@@ -152,7 +171,7 @@ export async function produceN8nExplainer(request: N8nExplainerRequest): Promise
   onProgress?.('Capturing workflow screenshot...');
   const ssStart = performance.now();
 
-  const screenshotResult = await screenshotProvider.capture(workflow.id);
+  const screenshotResult = await screenshotProvider.capture(workflow);
 
   steps.push({
     name: 'Screenshot capture',
@@ -187,6 +206,8 @@ export async function produceN8nExplainer(request: N8nExplainerRequest): Promise
     script,
     workflow,
     screenshotUrl,
+    screenshotWidth: screenshotResult.width,
+    screenshotHeight: screenshotResult.height,
     cues: ttsResult.cues,
     voiceoverUrl,
     durationSeconds: ttsResult.audioDuration,

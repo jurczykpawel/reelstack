@@ -7,10 +7,10 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
-import { CaptionOverlay } from '../components/CaptionOverlay';
-import { resolveMediaUrl } from '../utils/resolve-media-url';
-import { computeEntrance } from '../utils/compute-entrance';
-import type { VideoClipProps, VideoClip } from '../schemas/video-clip-props';
+import { CaptionOverlay } from '../../components/CaptionOverlay';
+import { resolveMediaUrl } from '../../utils/resolve-media-url';
+import { computeEntrance } from '../../utils/compute-entrance';
+import type { VideoClipProps, VideoClip } from './schema';
 
 /**
  * VideoClipComposition: stitches multiple video clips with transitions + captions.

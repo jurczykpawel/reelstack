@@ -8,24 +8,27 @@ import {
   Img,
   Easing,
 } from 'remotion';
-import { CaptionOverlay } from '../components/CaptionOverlay';
-import { resolveMediaUrl } from '../utils/resolve-media-url';
-import type { ScreenExplainerProps } from '../schemas/screen-explainer-props';
+import { CaptionOverlay } from '../../components/CaptionOverlay';
+import { resolveMediaUrl } from '../../utils/resolve-media-url';
+import type { ScreenExplainerProps } from './schema';
 
 /**
  * ScreenExplainerComposition: single workflow screenshot with continuous
  * Ken Burns zoom/pan + TTS + captions.
  *
- * ONE <Img> is rendered for the entire video. Ken Burns parameters are
- * smoothly interpolated across section boundaries using eased transitions.
- * This prevents the "jumping screensaver" effect.
+ * Image display: manual positioning with fit-to-width base.
+ * Container is full-bleed (entire video height). At scale 1.0 the full
+ * image is visible. A gradient overlay at the bottom ensures caption
+ * readability over the image.
  */
 export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props) => {
-  const { fps } = useVideoConfig();
+  const { width: videoWidth, height: videoHeight, fps } = useVideoConfig();
   const frame = useCurrentFrame();
 
   const {
     screenshotUrl,
+    screenshotWidth,
+    screenshotHeight,
     sections,
     cues,
     voiceoverUrl,
@@ -33,13 +36,16 @@ export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props
     captionStyle,
   } = props;
 
-  // ── Build continuous Ken Burns keyframes ──────────────────────
-  // For each section boundary, we create a smooth transition zone.
-  // Between transitions, the KB params hold steady.
-  const TRANSITION_SECONDS = 0.8;
-  const transitionFrames = Math.round(TRANSITION_SECONDS * fps);
+  // ── Image container: full video area ────────────────────────
+  const containerW = videoWidth;
+  const containerH = videoHeight;
 
-  // Current time in seconds
+  // Base scale: fit image to container width
+  const baseScale = containerW / screenshotWidth;
+  const imgBaseH = screenshotHeight * baseScale;
+
+  // ── Build continuous Ken Burns keyframes ──────────────────────
+  const TRANSITION_SECONDS = 0.8;
   const currentTime = frame / fps;
 
   // Find which section we're in
@@ -76,7 +82,6 @@ export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props
       const blendProgress = timeSinceSectionStart / TRANSITION_SECONDS;
       const eased = Easing.bezier(0.4, 0, 0.2, 1)(blendProgress);
 
-      // Previous section's end state
       const prevScale = prevKb.endScale;
       const prevPosX = prevKb.endPosition.x;
       const prevPosY = prevKb.endPosition.y;
@@ -87,48 +92,73 @@ export const ScreenExplainerComposition: React.FC<ScreenExplainerProps> = (props
     }
   }
 
+  // ── Manual image positioning ────────────────────────────────
+  const imgW = containerW * scale;
+  const imgH = imgBaseH * scale;
+
+  // Focal point in image coordinates (posX/posY are 0-100% of image)
+  const focalX = (posX / 100) * imgW;
+  const focalY = (posY / 100) * imgH;
+
+  // Position image so focal point is at container center
+  let imgLeft = containerW / 2 - focalX;
+  let imgTop = containerH / 2 - focalY;
+
+  // Clamp so image doesn't leave visible gaps in the container.
+  // If image is smaller than container on an axis, center it instead.
+  if (imgW >= containerW) {
+    imgLeft = Math.min(0, Math.max(containerW - imgW, imgLeft));
+  } else {
+    imgLeft = (containerW - imgW) / 2;
+  }
+  if (imgH >= containerH) {
+    imgTop = Math.min(0, Math.max(containerH - imgH, imgTop));
+  } else {
+    imgTop = (containerH - imgH) / 2;
+  }
+
   // ── Intro fade ──────────────────────────────────────────────
   const introFade = interpolate(frame, [0, fps * 0.5], [0, 1], { extrapolateRight: 'clamp' });
 
-  // ── Render ──────────────────────────────────────────────────
-  // The screenshot is placed in the upper ~60% of the portrait frame.
-  // transform-origin uses the KB position to zoom into the right area.
-  // translate keeps the image stable by counteracting the origin shift.
-
   return (
     <AbsoluteFill style={{ backgroundColor }}>
-      {/* Screenshot layer - fixed position, continuous KB animation */}
+      {/* Screenshot layer - full bleed */}
       <AbsoluteFill style={{ opacity: introFade }}>
         <div
           style={{
             position: 'absolute',
-            top: '5%',
-            left: '2%',
-            right: '2%',
-            height: '55%',
+            top: 0,
+            left: 0,
+            width: containerW,
+            height: containerH,
             overflow: 'hidden',
-            borderRadius: 16,
           }}
         >
-          <div
+          <Img
+            src={resolveMediaUrl(screenshotUrl)}
             style={{
-              width: '100%',
-              height: '100%',
-              transform: `scale(${scale})`,
-              transformOrigin: `${posX}% ${posY}%`,
-              transition: 'none',
+              position: 'absolute',
+              width: imgW,
+              height: imgH,
+              left: imgLeft,
+              top: imgTop,
+              imageRendering: 'high-quality' as React.CSSProperties['imageRendering'],
             }}
-          >
-            <Img
-              src={resolveMediaUrl(screenshotUrl)}
-              style={{
-                width: '100%',
-                height: '100%',
-                objectFit: 'cover',
-              }}
-            />
-          </div>
+          />
         </div>
+
+        {/* Gradient overlay for caption readability */}
+        <div
+          style={{
+            position: 'absolute',
+            bottom: 0,
+            left: 0,
+            right: 0,
+            height: '30%',
+            background: 'linear-gradient(transparent, rgba(26, 26, 46, 0.85) 60%, rgba(26, 26, 46, 0.95))',
+            pointerEvents: 'none',
+          }}
+        />
       </AbsoluteFill>
 
       {/* Captions layer */}

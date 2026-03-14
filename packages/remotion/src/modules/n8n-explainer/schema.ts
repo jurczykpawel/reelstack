@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { captionCueSchema } from './caption-cue';
+import { captionCueSchema } from '../../schemas/caption-cue';
 
 export const kenBurnsSchema = z.object({
   startScale: z.number().default(1.0),
@@ -24,6 +24,10 @@ const screenSectionSchema = z.object({
 export const screenExplainerPropsSchema = z.object({
   /** Single high-res screenshot URL (shared across all sections) */
   screenshotUrl: z.string(),
+  /** Screenshot pixel width (for correct aspect ratio in composition) */
+  screenshotWidth: z.number().positive(),
+  /** Screenshot pixel height */
+  screenshotHeight: z.number().positive(),
   /** Sections with timing + Ken Burns config */
   sections: z.array(screenSectionSchema).min(1),
   /** Caption cues (from TTS + Whisper) */

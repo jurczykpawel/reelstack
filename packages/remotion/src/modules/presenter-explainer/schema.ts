@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { captionCueSchema } from './caption-cue';
+import { captionCueSchema } from '../../schemas/caption-cue';
 
 const boardSectionSchema = z.object({
   /** URL of the board image (top half) */

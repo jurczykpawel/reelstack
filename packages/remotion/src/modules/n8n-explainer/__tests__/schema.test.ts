@@ -1,9 +1,11 @@
 import { describe, it, expect } from 'vitest';
-import { screenExplainerPropsSchema } from '../schemas/screen-explainer-props';
+import { screenExplainerPropsSchema } from '../schema';
 
 describe('screenExplainerPropsSchema', () => {
   const validProps = {
     screenshotUrl: 'https://cdn.example.com/screenshot.png',
+    screenshotWidth: 2837,
+    screenshotHeight: 1840,
     sections: [{
       text: 'This workflow starts with a webhook.',
       startTime: 0,

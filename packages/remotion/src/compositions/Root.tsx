@@ -1,22 +1,24 @@
 import { Composition } from 'remotion';
 import { ReelComposition } from './ReelComposition';
 import { YouTubeLongFormComposition } from './YouTubeLongFormComposition';
-import { ScreenExplainerComposition } from './ScreenExplainerComposition';
-import { VideoClipComposition } from './VideoClipComposition';
-import { PresenterExplainerComposition } from './PresenterExplainerComposition';
 import type { ReelProps } from '../schemas/reel-props';
 import type { YouTubeProps } from '../schemas/youtube-props';
-import type { ScreenExplainerProps } from '../schemas/screen-explainer-props';
-import type { VideoClipProps } from '../schemas/video-clip-props';
-import type { PresenterExplainerProps } from '../schemas/presenter-explainer-props';
-import { calculateReelMetadata, calculateScreenExplainerMetadata } from './calculate-metadata';
+import { calculateReelMetadata } from './calculate-metadata';
 import { calculateYouTubeMetadata } from './calculate-youtube-metadata';
+import { listCompositions } from './registry';
+
+// Import modules barrel to trigger self-registration
+import '../modules';
 
 const FPS = 30;
 
 export const RemotionRoot: React.FC = () => {
+  const moduleCompositions = listCompositions();
+
   return (
     <>
+      {/* ── Core compositions ──────────────────────────────────── */}
+
       {/* 9:16 Vertical Reel (TikTok, Instagram, YouTube Shorts) */}
       <Composition
         id="Reel"
@@ -140,88 +142,21 @@ export const RemotionRoot: React.FC = () => {
           backgroundColor: '#0F0F0F',
         }}
       />
-      {/* 9:16 Video Clip (ai-tips, multi-clip stitching) */}
-      <Composition
-        id="VideoClip"
-        component={VideoClipComposition}
-        durationInFrames={FPS * 30}
-        fps={FPS}
-        width={1080}
-        height={1920}
-        defaultProps={{
-          clips: [{
-            url: 'https://example.com/clip1.mp4',
-            startTime: 0,
-            endTime: 10,
-            transition: 'crossfade' as const,
-            transitionDurationMs: 300,
-          }],
-          cues: [
-            { id: '1', text: 'First tip from your toaster', startTime: 0, endTime: 3 },
-            { id: '2', text: 'Clear your temp files!', startTime: 3, endTime: 6 },
-          ],
-          durationSeconds: 30,
-          musicVolume: 0.15,
-          backgroundColor: '#000000',
-        }}
-      />
 
-      {/* 9:16 Screen Explainer (n8n workflow tutorials) */}
-      <Composition
-        id="ScreenExplainer"
-        component={ScreenExplainerComposition}
-        durationInFrames={FPS * 45}
-        fps={FPS}
-        width={1080}
-        height={1920}
-        calculateMetadata={calculateScreenExplainerMetadata}
-        defaultProps={{
-          screenshotUrl: 'https://via.placeholder.com/1080x1920/1a1a2e/ffffff?text=n8n+Workflow',
-          sections: [{
-            text: 'This workflow shows how to automate image generation.',
-            startTime: 0,
-            endTime: 10,
-            boardType: 'bird-eye' as const,
-            kenBurns: { startScale: 1.0, endScale: 1.05, startPosition: { x: 50, y: 50 }, endPosition: { x: 50, y: 50 } },
-          }],
-          cues: [
-            { id: '1', text: 'This workflow shows', startTime: 0, endTime: 2 },
-            { id: '2', text: 'how to automate', startTime: 2, endTime: 4 },
-            { id: '3', text: 'image generation', startTime: 4, endTime: 6 },
-          ],
-          voiceoverUrl: '',
-          durationSeconds: 45,
-          backgroundColor: '#1a1a2e',
-        }}
-      />
-
-      {/* 9:16 Presenter Explainer (avatar + board images) */}
-      <Composition
-        id="PresenterExplainer"
-        component={PresenterExplainerComposition}
-        durationInFrames={FPS * 60}
-        fps={FPS}
-        width={1080}
-        height={1920}
-        defaultProps={{
-          boardSections: [{
-            imageUrl: 'https://example.com/board1.png',
-            startTime: 0,
-            endTime: 30,
-            transition: 'crossfade' as const,
-            transitionDurationMs: 300,
-          }],
-          avatarVideoUrl: 'https://example.com/avatar.mp4',
-          cues: [
-            { id: '1', text: 'Welcome to this explainer', startTime: 0, endTime: 3 },
-            { id: '2', text: 'Let me show you something', startTime: 3, endTime: 6 },
-          ],
-          durationSeconds: 60,
-          musicVolume: 0.15,
-          backgroundColor: '#0a0a14',
-          boardHeightPercent: 50,
-        }}
-      />
+      {/* ── Module compositions (from registry) ────────────────── */}
+      {moduleCompositions.map((mod) => (
+        <Composition
+          key={mod.id}
+          id={mod.id}
+          component={mod.component}
+          durationInFrames={mod.defaultDurationInFrames}
+          fps={mod.fps}
+          width={mod.width}
+          height={mod.height}
+          calculateMetadata={mod.calculateMetadata}
+          defaultProps={mod.defaultProps}
+        />
+      ))}
     </>
   );
 };

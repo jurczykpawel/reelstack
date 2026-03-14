@@ -202,6 +202,16 @@ docker compose -f docker-compose.mikrus.yml logs -f worker
 
 nginx port: `3080`. CI pushes to `ghcr.io/jurczykpawel/reelstack:latest` (web) + `reelstack-worker:latest` (worker).
 
+## Master Plan (MANDATORY)
+
+**ZAWSZE trzymaj się planu w `priv/REELSTACK_MASTER_PLAN.md`.**
+
+- Przed rozpoczęciem pracy przeczytaj master plan i znajdź odpowiednią fazę/task
+- Nie wymyślaj własnej kolejności - realizuj taski w kolejności z planu
+- Po zakończeniu taska zaktualizuj jego status w planie (TODO → DONE/PARTIAL + notatki)
+- Jeśli trzeba zmienić plan (nowe odkrycia, zmiana priorytetów) - zaktualizuj plan ZANIM zaczniesz implementację
+- Plan jest single source of truth dla tego co robimy i w jakiej kolejności
+
 ## Implementation Rules (MANDATORY)
 
 **After EVERY implementation step**, before moving to the next task, answer these questions:

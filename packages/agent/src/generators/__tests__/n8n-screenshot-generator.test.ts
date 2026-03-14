@@ -37,13 +37,13 @@ describe('calculateNodeLayout', () => {
 });
 
 describe('computeKenBurnsParams', () => {
-  it('returns gentle drift for bird-eye', () => {
+  it('returns overview zoom for bird-eye', () => {
     const kb = computeKenBurnsParams(MOCK_WORKFLOW, {
       boardType: 'bird-eye',
       highlightNodes: [],
     });
-    expect(kb.startScale).toBe(1.0);
-    expect(kb.endScale).toBe(1.1);
+    expect(kb.startScale).toBe(2.6);
+    expect(kb.endScale).toBe(2.9);
     expect(kb.startPosition.x).toBeCloseTo(48, 0);
     expect(kb.endPosition.x).toBeCloseTo(52, 0);
   });
@@ -53,10 +53,10 @@ describe('computeKenBurnsParams', () => {
       boardType: 'zoom',
       highlightNodes: ['OpenAI'],
     });
-    // Single node (1/3 coverage > 0.25): zoomScale=1.8
-    expect(kb.startScale).toBeGreaterThan(1.5);
-    expect(kb.endScale).toBeGreaterThan(1.7);
-    expect(kb.endScale).toBeLessThan(2.5);
+    // Single node (1/3 coverage ~0.33, <= 0.5): startScale=3.2, endScale=3.5
+    expect(kb.startScale).toBeGreaterThan(3.0);
+    expect(kb.endScale).toBeGreaterThan(3.3);
+    expect(kb.endScale).toBeLessThan(4.0);
     // Focus should be roughly in the center (OpenAI is middle node)
     // Clamped to 25-75 range
     expect(kb.startPosition.x).toBeGreaterThan(24);
@@ -88,8 +88,8 @@ describe('computeKenBurnsParams', () => {
       boardType: 'zoom',
       highlightNodes: [],
     });
-    expect(kb.startScale).toBe(1.0);
-    expect(kb.endScale).toBe(1.1);
+    expect(kb.startScale).toBe(2.6);
+    expect(kb.endScale).toBe(2.9);
   });
 
   it('falls back for non-existent node names', () => {
@@ -97,8 +97,8 @@ describe('computeKenBurnsParams', () => {
       boardType: 'zoom',
       highlightNodes: ['NonExistent'],
     });
-    expect(kb.startScale).toBe(1.0);
-    expect(kb.endScale).toBe(1.1);
+    expect(kb.startScale).toBe(2.6);
+    expect(kb.endScale).toBe(2.9);
   });
 
   it('handles multiple highlighted nodes', () => {
@@ -106,8 +106,8 @@ describe('computeKenBurnsParams', () => {
       boardType: 'zoom',
       highlightNodes: ['Webhook', 'OpenAI'],
     });
-    // 2/3 coverage > 0.5 → 1.6x scale
-    expect(kb.endScale).toBeCloseTo(1.6, 1);
-    expect(kb.endScale).toBeGreaterThan(1.4);
+    // 2/3 coverage ~0.67 > 0.5 → startScale=2.8, endScale=3.2
+    expect(kb.endScale).toBeCloseTo(3.2, 1);
+    expect(kb.endScale).toBeGreaterThan(3.0);
   });
 });

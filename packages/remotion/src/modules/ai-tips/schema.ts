@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { captionCueSchema } from './caption-cue';
+import { captionCueSchema } from '../../schemas/caption-cue';
 
 const videoClipSchema = z.object({
   /** URL of the video clip */

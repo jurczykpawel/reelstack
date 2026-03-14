@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { presenterExplainerPropsSchema } from '../schemas/presenter-explainer-props';
+import { presenterExplainerPropsSchema } from '../schema';
 
 describe('presenterExplainerPropsSchema', () => {
   const validProps = {

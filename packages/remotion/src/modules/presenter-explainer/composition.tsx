@@ -8,10 +8,10 @@ import {
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
-import { CaptionOverlay } from '../components/CaptionOverlay';
-import { resolveMediaUrl } from '../utils/resolve-media-url';
-import { computeEntrance } from '../utils/compute-entrance';
-import type { PresenterExplainerProps, BoardSection } from '../schemas/presenter-explainer-props';
+import { CaptionOverlay } from '../../components/CaptionOverlay';
+import { resolveMediaUrl } from '../../utils/resolve-media-url';
+import { computeEntrance } from '../../utils/compute-entrance';
+import type { PresenterExplainerProps, BoardSection } from './schema';
 
 /**
  * PresenterExplainerComposition: split-screen with board images (top) + avatar (bottom) + captions (middle).

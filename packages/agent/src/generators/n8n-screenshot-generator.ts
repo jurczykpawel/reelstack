@@ -42,8 +42,8 @@ export function calculateNodeLayout(workflow: N8nWorkflow): NodeLayoutEntry[] {
 /**
  * Compute Ken Burns parameters for a script section.
  *
- * - bird-eye: overview with gentle zoom (1.0 → 1.1)
- * - zoom: meaningful zoom into highlighted nodes (1.6 → 2.2x)
+ * - bird-eye: full image visible with gentle drift (1.0 → 1.1)
+ * - zoom: meaningful zoom into highlighted nodes (1.5 → 2.5x)
  *
  * The composition uses smooth bezier-eased transitions between sections,
  * so we can use substantial zoom differences without jumping. Position
@@ -58,7 +58,7 @@ export function computeKenBurnsParams(
 ): KenBurnsParams {
   const layout = calculateNodeLayout(workflow);
   if (layout.length === 0) {
-    return { startScale: 1.0, endScale: 1.1, startPosition: { x: 50, y: 50 }, endPosition: { x: 50, y: 50 } };
+    return { startScale: 1.0, endScale: 1.05, startPosition: { x: 50, y: 50 }, endPosition: { x: 50, y: 50 } };
   }
 
   // Full workflow bounding box
@@ -70,12 +70,17 @@ export function computeKenBurnsParams(
   const allH = allMaxY - allMinY || 1;
 
   if (section.boardType === 'bird-eye' || section.highlightNodes.length === 0) {
-    // Bird-eye: gentle zoom showing the full workflow
+    // Bird-eye: overview that fills most of the portrait frame.
+    // For 3840x2160 screenshot in 1080x1920 video:
+    //   baseScale = 1080/3840 = 0.28, so imgH at scale 1.0 = 607px in 1920px frame (32%)
+    //   At 2.5x: imgH = 1519px (79%) — some background visible
+    //   At 2.8x: imgH = 1701px (89%) — almost fills frame
+    //   At 3.16x: imgH = 1920px (100%) — fills frame exactly
     return {
-      startScale: 1.0,
-      endScale: 1.1,
-      startPosition: { x: 48, y: 48 },
-      endPosition: { x: 52, y: 52 },
+      startScale: 2.6,
+      endScale: 2.9,
+      startPosition: { x: 48, y: 45 },
+      endPosition: { x: 52, y: 55 },
     };
   }
 
@@ -84,8 +89,8 @@ export function computeKenBurnsParams(
   if (highlighted.length === 0) {
     // Fallback: no matching nodes found, treat as bird-eye
     return {
-      startScale: 1.0,
-      endScale: 1.1,
+      startScale: 2.6,
+      endScale: 2.9,
       startPosition: { x: 50, y: 50 },
       endPosition: { x: 50, y: 50 },
     };
@@ -104,14 +109,30 @@ export function computeKenBurnsParams(
   const focusX = Math.max(25, Math.min(75, pctX));
   const focusY = Math.max(25, Math.min(75, pctY));
 
-  // Zoom scale: fewer highlighted nodes = tighter zoom
-  // Single node: 2.0-2.2x, multiple nodes: 1.6-1.8x
+  // Zoom scale: fewer highlighted nodes = tighter zoom.
+  // With manual positioning (fit-to-width base), these scales directly
+  // control how much of the image width is visible.
+  // For 3840x2160 in 1080x1920: baseScale=0.28, imgH_base=607px.
+  // At 3.5x: imgH=2125px (>1920, fills frame). At 3.2x: imgH=1943px (barely fills).
+  // We want imgH >= containerH (1920) so scale >= 1920/607 ≈ 3.16.
+  // All zoom scales should be >= 3.2 to avoid gaps.
   const coverage = highlighted.length / layout.length;
-  const zoomScale = coverage > 0.5 ? 1.6 : coverage > 0.25 ? 1.8 : 2.2;
+  let startScale: number;
+  let endScale: number;
+  if (coverage <= 0.25) {
+    startScale = 3.5;
+    endScale = 3.8;
+  } else if (coverage <= 0.5) {
+    startScale = 3.2;
+    endScale = 3.5;
+  } else {
+    startScale = 2.8;
+    endScale = 3.2;
+  }
 
   return {
-    startScale: zoomScale - 0.15,
-    endScale: zoomScale,
+    startScale,
+    endScale,
     startPosition: { x: focusX - 2, y: focusY - 2 },
     endPosition: { x: focusX + 2, y: focusY + 2 },
   };

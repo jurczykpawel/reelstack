@@ -41,6 +41,8 @@ describe('buildScreenExplainerProps', () => {
       script: mockScript,
       workflow: mockWorkflow,
       screenshotUrl: 'https://cdn.example.com/screenshot.png',
+      screenshotWidth: 2837,
+      screenshotHeight: 1840,
       cues: mockCues,
       voiceoverUrl: 'https://cdn.example.com/voice.mp3',
       durationSeconds: 30,
@@ -57,6 +59,8 @@ describe('buildScreenExplainerProps', () => {
       script: mockScript,
       workflow: mockWorkflow,
       screenshotUrl: 'https://cdn.example.com/screenshot.png',
+      screenshotWidth: 2837,
+      screenshotHeight: 1840,
       cues: mockCues,
       voiceoverUrl: 'https://cdn.example.com/voice.mp3',
       durationSeconds: 30,
@@ -75,18 +79,20 @@ describe('buildScreenExplainerProps', () => {
       script: mockScript,
       workflow: mockWorkflow,
       screenshotUrl: 'https://cdn.example.com/screenshot.png',
+      screenshotWidth: 2837,
+      screenshotHeight: 1840,
       cues: mockCues,
       voiceoverUrl: 'https://cdn.example.com/voice.mp3',
       durationSeconds: 30,
     });
 
-    // Bird-eye: gentle zoom
-    expect(props.sections[0].kenBurns.startScale).toBe(1.0);
-    expect(props.sections[0].kenBurns.endScale).toBe(1.1);
+    // Bird-eye: overview filling portrait frame
+    expect(props.sections[0].kenBurns.startScale).toBe(2.6);
+    expect(props.sections[0].kenBurns.endScale).toBe(2.9);
 
-    // Zoom sections: substantial scale (1.6-2.2 range)
-    expect(props.sections[1].kenBurns.endScale).toBeGreaterThan(1.5);
-    expect(props.sections[2].kenBurns.endScale).toBeGreaterThan(1.5);
+    // Zoom sections: substantial scale (3.0+ range for portrait fill)
+    expect(props.sections[1].kenBurns.endScale).toBeGreaterThan(3.0);
+    expect(props.sections[2].kenBurns.endScale).toBeGreaterThan(3.0);
   });
 
   it('preserves board type from script', () => {
@@ -94,6 +100,8 @@ describe('buildScreenExplainerProps', () => {
       script: mockScript,
       workflow: mockWorkflow,
       screenshotUrl: 'https://cdn.example.com/screenshot.png',
+      screenshotWidth: 2837,
+      screenshotHeight: 1840,
       cues: mockCues,
       voiceoverUrl: 'https://cdn.example.com/voice.mp3',
       durationSeconds: 30,
@@ -108,6 +116,8 @@ describe('buildScreenExplainerProps', () => {
       script: mockScript,
       workflow: mockWorkflow,
       screenshotUrl: 'https://cdn.example.com/screenshot.png',
+      screenshotWidth: 2837,
+      screenshotHeight: 1840,
       cues: mockCues,
       voiceoverUrl: 'https://cdn.example.com/voice.mp3',
       durationSeconds: 30,

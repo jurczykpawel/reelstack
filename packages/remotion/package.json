@@ -11,9 +11,11 @@
     "./director": "./src/director/index.ts",
     "./render": "./src/render/index.ts",
     "./catalog": "./src/schemas/catalog.ts",
-    "./schemas/video-clip-props": "./src/schemas/video-clip-props.ts",
-    "./schemas/screen-explainer-props": "./src/schemas/screen-explainer-props.ts",
-    "./schemas/presenter-explainer-props": "./src/schemas/presenter-explainer-props.ts"
+    "./schemas/caption-cue": "./src/schemas/caption-cue.ts",
+    "./schemas/video-clip-props": "./src/modules/ai-tips/schema.ts",
+    "./schemas/screen-explainer-props": "./src/modules/n8n-explainer/schema.ts",
+    "./schemas/presenter-explainer-props": "./src/modules/presenter-explainer/schema.ts",
+    "./compositions/registry": "./src/compositions/registry.ts"
   },
   "scripts": {
     "dev": "remotion studio",

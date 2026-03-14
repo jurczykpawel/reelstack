@@ -53,7 +53,10 @@ export const POST = withAuth(
         continue;
       }
 
-      const mode = reel.assets ? 'compose' : 'generate';
+      // Use explicit mode from schema. Backward compat: assets without mode = compose.
+      const mode = reel.mode === 'generate' && reel.assets
+        ? 'compose'
+        : reel.mode;
 
       const job = await createReelJob({
         userId: ctx.user.id,
@@ -68,6 +71,13 @@ export const POST = withAuth(
           assets: reel.assets,
           directorNotes: reel.directorNotes,
           avatar: reel.avatar,
+          workflowUrl: reel.workflowUrl,
+          topic: reel.topic,
+          language: reel.language,
+          persona: reel.persona,
+          numberOfTips: reel.numberOfTips,
+          variant: reel.variant,
+          montageProfile: reel.montageProfile,
         },
         apiKeyId: ctx.apiKeyId ?? undefined,
         creditCost: cost,

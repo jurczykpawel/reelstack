@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { videoClipPropsSchema } from '../schemas/video-clip-props';
+import { videoClipPropsSchema } from '../schema';
 
 describe('videoClipPropsSchema', () => {
   const validProps = {

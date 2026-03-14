@@ -1,3 +1,4 @@
+// ── Core orchestration ────────────────────────────────────────
 export { produce, produceComposition } from './orchestrator/production-orchestrator';
 export {
   buildTimingReference,
@@ -13,12 +14,6 @@ export type { VideoGenerator, VideoGeneratorInput, VideoGeneratorResult, VideoGe
 export type { VideoGeneratorFactoryOptions } from './generators/video-generator-factory';
 export { callLLM, callLLMWithSystem, detectProvider } from './llm';
 export type { LLMProvider } from './llm';
-export { produceN8nExplainer } from './orchestrator/n8n-explainer-orchestrator';
-export type { N8nExplainerRequest, N8nExplainerResult } from './orchestrator/n8n-explainer-orchestrator';
-export { produceAiTips } from './orchestrator/ai-tips-orchestrator';
-export type { AiTipsRequest, AiTipsResult } from './orchestrator/ai-tips-orchestrator';
-export { producePresenterExplainer } from './orchestrator/presenter-explainer-orchestrator';
-export type { PresenterExplainerRequest, PresenterExplainerResult } from './orchestrator/presenter-explainer-orchestrator';
 export { ToolRegistry } from './registry/tool-registry';
 export { discoverTools } from './registry/discovery';
 export { planProduction, planComposition, revisePlan } from './planner/production-planner';
@@ -29,6 +24,36 @@ export { adjustTimeline } from './orchestrator/timeline-adjuster';
 export { pollUntilDone } from './polling';
 export { AgentError, PlanningError, GenerationError } from './errors';
 
+// ── Module system ─────────────────────────────────────────────
+// Import modules/index to trigger built-in module registration.
+// When modules move to closed repos, remove this import and let
+// the consuming app import modules explicitly.
+export {
+  registerModule,
+  getModule,
+  listModules,
+  isModuleMode,
+  isCoreMode,
+  CORE_MODES,
+} from './modules';
+export type {
+  ReelModule,
+  BaseModuleRequest,
+  ModuleResult,
+  ProgressCallback,
+} from './modules';
+
+// ── Legacy direct exports (kept for backwards compatibility) ──
+// These re-export from module orchestrators directly.
+// Prefer using the module registry via getModule('n8n-explainer') etc.
+export { produceN8nExplainer } from './orchestrator/n8n-explainer-orchestrator';
+export type { N8nExplainerRequest, N8nExplainerResult } from './orchestrator/n8n-explainer-orchestrator';
+export { produceAiTips } from './orchestrator/ai-tips-orchestrator';
+export type { AiTipsRequest, AiTipsResult } from './orchestrator/ai-tips-orchestrator';
+export { producePresenterExplainer } from './orchestrator/presenter-explainer-orchestrator';
+export type { PresenterExplainerRequest, PresenterExplainerResult } from './orchestrator/presenter-explainer-orchestrator';
+
+// ── Types ─────────────────────────────────────────────────────
 export type { ProductionTool } from './registry/tool-interface';
 export type {
   ProductionRequest,
