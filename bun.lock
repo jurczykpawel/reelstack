@@ -14,6 +14,18 @@
         "typescript": "^5.9.3",
       },
     },
+    "apps/image-gen-server": {
+      "name": "image-gen-server",
+      "version": "0.0.1",
+      "dependencies": {
+        "@reelstack/image-gen": "workspace:*",
+        "hono": "^4.7.0",
+      },
+      "devDependencies": {
+        "@types/node": "^22.0.0",
+        "typescript": "^5.9.3",
+      },
+    },
     "apps/web": {
       "name": "web",
       "version": "0.1.0",
@@ -26,7 +38,9 @@
         "@reelstack/core": "workspace:*",
         "@reelstack/database": "workspace:*",
         "@reelstack/ffmpeg": "workspace:*",
+        "@reelstack/image-gen": "workspace:*",
         "@reelstack/logger": "workspace:*",
+        "@reelstack/modules": "workspace:*",
         "@reelstack/publisher": "workspace:*",
         "@reelstack/queue": "workspace:*",
         "@reelstack/remotion": "workspace:*",
@@ -128,6 +142,17 @@
         "vitest": "^3.2.4",
       },
     },
+    "packages/image-gen": {
+      "name": "@reelstack/image-gen",
+      "version": "0.0.1",
+      "dependencies": {
+        "playwright": "^1.50.0",
+      },
+      "devDependencies": {
+        "typescript": "^5.9.3",
+        "vitest": "^3.2.4",
+      },
+    },
     "packages/logger": {
       "name": "@reelstack/logger",
       "version": "0.1.0",
@@ -136,6 +161,26 @@
       },
       "devDependencies": {
         "pino-pretty": "^13.0.0",
+      },
+    },
+    "packages/modules": {
+      "name": "@reelstack/modules",
+      "version": "0.1.0",
+      "dependencies": {
+        "@reelstack/agent": "workspace:*",
+        "@reelstack/image-gen": "workspace:*",
+        "@reelstack/logger": "workspace:*",
+        "@reelstack/remotion": "workspace:*",
+        "@reelstack/storage": "workspace:*",
+        "@reelstack/types": "workspace:*",
+        "react": "19.2.4",
+        "remotion": "4.0.431",
+        "zod": "^3.23.0",
+      },
+      "devDependencies": {
+        "@types/react": "19.2.14",
+        "typescript": "^5.9.3",
+        "vitest": "^3.2.4",
       },
     },
     "packages/publisher": {
@@ -1019,7 +1064,11 @@
 
     "@reelstack/ffmpeg": ["@reelstack/ffmpeg@workspace:packages/ffmpeg"],
 
+    "@reelstack/image-gen": ["@reelstack/image-gen@workspace:packages/image-gen"],
+
     "@reelstack/logger": ["@reelstack/logger@workspace:packages/logger"],
+
+    "@reelstack/modules": ["@reelstack/modules@workspace:packages/modules"],
 
     "@reelstack/publisher": ["@reelstack/publisher@workspace:packages/publisher"],
 
@@ -2110,6 +2159,8 @@
     "ieee754": ["ieee754@1.2.1", "", {}, "sha512-dcyqhDvX1C46lXZcVqCpK+FtMRQVdIMN6/Df5js2zouUsqG7I6sFxitIC+7KYK29KdXOLHdu9zL4sFnoVQnqaA=="],
 
     "ignore": ["ignore@5.3.2", "", {}, "sha512-hsBTNUqQTDwkWtcdYI2i06Y/nUBEsNEDJKjWdigLvegy8kDuJAS8uRlpkkcQpyEXL0Z/pjDy5HBmMjRCJ2gq+g=="],
+
+    "image-gen-server": ["image-gen-server@workspace:apps/image-gen-server"],
 
     "import-fresh": ["import-fresh@3.3.1", "", { "dependencies": { "parent-module": "^1.0.0", "resolve-from": "^4.0.0" } }, "sha512-TR3KfrTZTYLPB6jUjfx6MF9WcWrHL9su5TObK4ZkYgBdWKPOFoSoQIdEuTuR82pmtxH2spWG9h6etwfr1pLBqQ=="],
 

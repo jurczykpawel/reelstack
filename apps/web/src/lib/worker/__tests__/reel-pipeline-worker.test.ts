@@ -20,6 +20,8 @@ vi.mock('@reelstack/agent', () => ({
   produceComposition: (...args: unknown[]) => mockProduceComposition(...args),
   getModule: (...args: unknown[]) => mockGetModule(...args),
   isCoreMode: (mode: string) => ['generate', 'compose', 'captions'].includes(mode),
+  registerModule: vi.fn(),
+  callLLM: vi.fn(),
 }));
 
 const mockUpload = vi.fn();

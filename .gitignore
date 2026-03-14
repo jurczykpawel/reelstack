@@ -39,6 +39,10 @@ _archive/
 # Private (local plans, notes — never committed)
 priv/
 
+# Private modules overlay (cloned separately from reelstack-modules)
+packages/modules/src/private/
+!packages/modules/src/private/.gitkeep
+
 # Misc
 *.log
 *.tsbuildinfo

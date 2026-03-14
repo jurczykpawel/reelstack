@@ -43,15 +43,7 @@ export type {
   ProgressCallback,
 } from './modules';
 
-// ── Legacy direct exports (kept for backwards compatibility) ──
-// These re-export from module orchestrators directly.
-// Prefer using the module registry via getModule('n8n-explainer') etc.
-export { produceN8nExplainer } from './orchestrator/n8n-explainer-orchestrator';
-export type { N8nExplainerRequest, N8nExplainerResult } from './orchestrator/n8n-explainer-orchestrator';
-export { produceAiTips } from './orchestrator/ai-tips-orchestrator';
-export type { AiTipsRequest, AiTipsResult } from './orchestrator/ai-tips-orchestrator';
-export { producePresenterExplainer } from './orchestrator/presenter-explainer-orchestrator';
-export type { PresenterExplainerRequest, PresenterExplainerResult } from './orchestrator/presenter-explainer-orchestrator';
+export { detectLanguage } from './utils/detect-language';
 
 // ── Types ─────────────────────────────────────────────────────
 export type { ProductionTool } from './registry/tool-interface';

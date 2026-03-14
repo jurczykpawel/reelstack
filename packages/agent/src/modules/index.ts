@@ -29,14 +29,7 @@ export type {
   ProgressCallback,
 } from './module-interface';
 
-// ── Built-in module registration ──────────────────────────────
-// These imports will be removed when modules move to closed repos.
-
-import { registerModule } from './module-registry';
-import { n8nExplainerModule } from './n8n-explainer-module';
-import { aiTipsModule } from './ai-tips-module';
-import { presenterExplainerModule } from './presenter-explainer-module';
-
-registerModule(n8nExplainerModule);
-registerModule(aiTipsModule);
-registerModule(presenterExplainerModule);
+// ── Module registration ───────────────────────────────────────
+// Modules live in @reelstack/modules (private package).
+// Registration is triggered by the consuming app (worker) importing that package:
+//   import '@reelstack/modules';

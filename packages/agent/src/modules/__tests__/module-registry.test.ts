@@ -1,8 +1,9 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import type { ReelModule } from '../module-interface';
 
-// Import from the barrel to trigger built-in registration
+// Import from the barrel to get registry API
 import {
+  registerModule,
   getModule,
   listModules,
   isModuleMode,
@@ -10,23 +11,38 @@ import {
   CORE_MODES,
 } from '..';
 
-describe('module-registry', () => {
-  it('has built-in modules registered', () => {
-    const modules = listModules();
-    expect(modules.length).toBeGreaterThanOrEqual(3);
+/**
+ * These tests verify the module registry mechanism itself.
+ * Private modules (n8n-explainer, ai-tips, presenter-explainer) live in
+ * @reelstack/modules and are NOT auto-registered here — they register
+ * themselves when the consuming app imports @reelstack/modules.
+ */
 
-    const ids = modules.map(m => m.id);
-    expect(ids).toContain('n8n-explainer');
-    expect(ids).toContain('ai-tips');
-    expect(ids).toContain('presenter-explainer');
+describe('module-registry', () => {
+  // Register a test module to verify the mechanism works
+  const TEST_MODULE: ReelModule = {
+    id: 'test-module',
+    name: 'Test Module',
+    compositionId: 'TestComposition',
+    configFields: [{ key: 'param', label: 'Param', type: 'text' }],
+    progressSteps: { 'Step 1': 50, 'Step 2': 100 },
+    orchestrate: async () => ({ outputPath: '/tmp/test.mp4', meta: {} }),
+  };
+
+  beforeAll(() => {
+    registerModule(TEST_MODULE);
   });
 
-  it('getModule returns correct module by id', () => {
-    const n8n = getModule('n8n-explainer');
-    expect(n8n).toBeDefined();
-    expect(n8n!.name).toBe('n8n Workflow Explainer');
-    expect(n8n!.compositionId).toBe('ScreenExplainer');
-    expect(n8n!.configFields.length).toBeGreaterThan(0);
+  it('registerModule adds a module to the registry', () => {
+    const mod = getModule('test-module');
+    expect(mod).toBeDefined();
+    expect(mod!.name).toBe('Test Module');
+  });
+
+  it('listModules returns registered modules', () => {
+    const modules = listModules();
+    const ids = modules.map(m => m.id);
+    expect(ids).toContain('test-module');
   });
 
   it('getModule returns undefined for unknown id', () => {
@@ -34,9 +50,7 @@ describe('module-registry', () => {
   });
 
   it('isModuleMode returns true for registered modules', () => {
-    expect(isModuleMode('n8n-explainer')).toBe(true);
-    expect(isModuleMode('ai-tips')).toBe(true);
-    expect(isModuleMode('presenter-explainer')).toBe(true);
+    expect(isModuleMode('test-module')).toBe(true);
   });
 
   it('isModuleMode returns false for core and unknown modes', () => {
@@ -49,7 +63,7 @@ describe('module-registry', () => {
     expect(isCoreMode('generate')).toBe(true);
     expect(isCoreMode('compose')).toBe(true);
     expect(isCoreMode('captions')).toBe(true);
-    expect(isCoreMode('ai-tips')).toBe(false);
+    expect(isCoreMode('test-module')).toBe(false);
     expect(isCoreMode('n8n-explainer')).toBe(false);
   });
 
@@ -57,7 +71,7 @@ describe('module-registry', () => {
     expect(CORE_MODES).toEqual(['generate', 'compose', 'captions']);
   });
 
-  it('each module has required fields', () => {
+  it('each registered module has required fields', () => {
     for (const mod of listModules()) {
       expect(mod.id).toBeTruthy();
       expect(mod.name).toBeTruthy();

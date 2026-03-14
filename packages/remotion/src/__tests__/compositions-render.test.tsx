@@ -7,7 +7,8 @@
  * required props, etc.).
  *
  * Core compositions are tested with explicit props.
- * Module compositions are tested dynamically from the composition registry.
+ * Module compositions (n8n-explainer, ai-tips, presenter-explainer) live in
+ * @reelstack/modules and are NOT tested here — they have their own test suite.
  */
 import React from 'react';
 import { renderToString } from 'react-dom/server';
@@ -37,10 +38,6 @@ vi.mock('remotion', () => ({
   Easing: { bezier: () => (t: number) => t, linear: (t: number) => t },
 }));
 
-// ── Import module barrel to trigger registration ─────────────
-import '../modules';
-import { listCompositions } from '../compositions/registry';
-
 // ── Core composition sample props ─────────────────────────────
 
 const sampleCues = [
@@ -68,29 +65,4 @@ describe('Core composition smoke tests', () => {
       React.createElement(ReelComposition, sampleReelProps as never),
     )).not.toThrow();
   });
-});
-
-describe('Module composition smoke tests (from registry)', () => {
-  const compositions = listCompositions();
-
-  it('has registered module compositions', () => {
-    expect(compositions.length).toBeGreaterThanOrEqual(3);
-    const ids = compositions.map(c => c.id);
-    expect(ids).toContain('ScreenExplainer');
-    expect(ids).toContain('VideoClip');
-    expect(ids).toContain('PresenterExplainer');
-  });
-
-  for (const mod of compositions) {
-    it(`${mod.id} renders without crashing`, () => {
-      expect(() => renderToString(
-        React.createElement(mod.component, mod.defaultProps as never),
-      )).not.toThrow();
-    });
-
-    it(`${mod.id} has valid schema`, () => {
-      const result = mod.schema.safeParse(mod.defaultProps);
-      expect(result.success).toBe(true);
-    });
-  }
 });

@@ -1,3 +1,6 @@
+// Register private modules (n8n-explainer, ai-tips, presenter-explainer)
+import '@reelstack/modules';
+
 import { createStorage } from '@reelstack/storage';
 import {
   getReelJobInternal,

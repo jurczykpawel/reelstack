@@ -9,6 +9,10 @@ const log = createLogger('local-renderer');
 
 const __dirname = import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.url));
 const REMOTION_PKG_DIR = path.resolve(__dirname, '../..');
+// Bundle entry in apps/web includes private module compositions
+const BUNDLE_ENTRY = process.env.REMOTION_ENTRY
+  ?? path.resolve(REMOTION_PKG_DIR, '../../apps/web/src/remotion-entry.ts');
+const BUNDLE_PUBLIC_DIR = path.resolve(REMOTION_PKG_DIR, 'public');
 
 export class LocalRenderer implements RemotionRenderer {
   async render(props: Record<string, unknown>, options: RenderOptions): Promise<RenderResult> {
@@ -38,8 +42,8 @@ export class LocalRenderer implements RemotionRenderer {
           rmSync(outDir, { recursive: true, force: true });
         }
         execFileSync('bunx', [
-          'remotion', 'bundle', 'src/index.ts',
-          '--public-dir', 'public',
+          'remotion', 'bundle', BUNDLE_ENTRY,
+          '--public-dir', BUNDLE_PUBLIC_DIR,
           '--out-dir', outDir,
         ], { cwd: REMOTION_PKG_DIR, stdio: 'pipe', timeout: 300_000 });
         bundlePath = outDir;

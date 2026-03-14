@@ -1,3 +1,0 @@
-[submodule "packages/modules"]
-	path = packages/modules
-	url = git@github.com:jurczykpawel/reelstack-modules.git
