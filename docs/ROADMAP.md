@@ -1,6 +1,6 @@
 # Roadmap
 
-ReelStack evolution: from subtitle burner to automated reel production engine.
+ReelStack roadmap: reel pipeline, image generation, and publishing automation.
 
 ## Status Legend
 

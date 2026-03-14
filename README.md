@@ -120,7 +120,7 @@ Edit `.env` with at minimum these two values:
 
 ```env
 AUTH_SECRET=your-random-secret-here        # Generate with: openssl rand -base64 32
-DATABASE_URL=postgresql://postgres:postgres@localhost:5432/subtitle_burner
+DATABASE_URL=postgresql://postgres:postgres@localhost:5432/reelstack
 ```
 
 **3. Start the database**
@@ -128,7 +128,7 @@ DATABASE_URL=postgresql://postgres:postgres@localhost:5432/subtitle_burner
 ```bash
 docker run -d --name sb-postgres -p 5432:5432 \
   -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=subtitle_burner postgres:16-alpine
+  -e POSTGRES_DB=reelstack postgres:16-alpine
 ```
 
 **4. Initialize database schema**

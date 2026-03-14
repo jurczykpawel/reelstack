@@ -17,7 +17,7 @@ Edit `.env`:
 
 ```env
 AUTH_SECRET=<generate with: openssl rand -base64 32>
-DATABASE_URL=postgresql://subtitle:subtitle@postgres:5432/subtitle_burner
+DATABASE_URL=postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/reelstack
 REDIS_URL=redis://redis:6379
 MINIO_ENDPOINT=minio
 MINIO_PORT=9000
@@ -106,11 +106,11 @@ docker compose -f docker-compose.prod.yml down
 ```bash
 # Database backup
 docker compose -f docker-compose.prod.yml exec postgres \
-  pg_dump -U subtitle subtitle_burner > backup.sql
+  pg_dump -U ${POSTGRES_USER} reelstack > backup.sql
 
 # Restore
 docker compose -f docker-compose.prod.yml exec -T postgres \
-  psql -U subtitle subtitle_burner < backup.sql
+  psql -U ${POSTGRES_USER} reelstack < backup.sql
 ```
 
 ## Updating
