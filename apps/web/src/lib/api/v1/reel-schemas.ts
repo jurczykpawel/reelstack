@@ -186,6 +186,7 @@ export const reelModeSchema = z.enum([
   'generate',
   'compose',
   'captions',
+  'slideshow',
   'ai-tips',
   'n8n-explainer',
   'presenter-explainer',
@@ -221,6 +222,20 @@ export const generateReelSchema = z.object({
   persona: z.string().max(500).optional(),
   /** LLM provider override (e.g. "openai", "anthropic") */
   provider: z.string().max(100).optional(),
+  /** Slideshow slides (slideshow mode — skips LLM when provided) */
+  slides: z.array(z.object({
+    title: z.string().max(200),
+    text: z.string().max(500).optional(),
+    badge: z.string().max(50).optional(),
+    num: z.string().max(10).optional(),
+    template: z.string().max(50).optional(),
+  })).min(1).max(20).optional(),
+  /** Image-gen brand CSS name (slideshow mode, default: example) */
+  brand: z.string().max(50).optional(),
+  /** Image-gen template name (slideshow mode, default: tip-card) */
+  template: z.string().max(50).optional(),
+  /** Number of slides for slideshow LLM generation */
+  numberOfSlides: z.number().int().min(2).max(10).optional(),
   /** Number of tips for ai-tips mode */
   numberOfTips: z.number().int().min(1).max(50).optional(),
   /** Target duration in seconds */
@@ -238,6 +253,7 @@ export const generateReelSchema = z.object({
   (data) => {
     const scriptModes = ['generate', 'compose', 'captions'];
     if (scriptModes.includes(data.mode ?? 'generate') && !data.script) return false;
+    if (data.mode === 'slideshow' && !data.topic) return false;
     if (data.mode === 'ai-tips' && !data.topic) return false;
     if (data.mode === 'presenter-explainer' && !data.topic) return false;
     if (data.mode === 'n8n-explainer' && !data.workflowUrl) return false;
@@ -246,7 +262,7 @@ export const generateReelSchema = z.object({
   (data) => ({
     message: data.mode === 'n8n-explainer'
       ? 'workflowUrl is required for n8n-explainer mode'
-      : ['ai-tips', 'presenter-explainer'].includes(data.mode ?? '')
+      : ['slideshow', 'ai-tips', 'presenter-explainer'].includes(data.mode ?? '')
         ? `topic is required for ${data.mode} mode`
         : 'script is required for generate/compose/captions mode',
   }),
