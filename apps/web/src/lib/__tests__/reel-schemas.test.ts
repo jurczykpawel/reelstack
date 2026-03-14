@@ -294,11 +294,11 @@ describe('generateReelSchema', () => {
     expect(result.success).toBe(false);
   });
 
-  it('defaults tts language to pl-PL', () => {
+  it('defaults tts provider to edge-tts and language is optional', () => {
     const result = generateReelSchema.safeParse({ script: 'Hello', tts: {} });
     expect(result.success).toBe(true);
     if (result.success) {
-      expect(result.data.tts?.language).toBe('pl-PL');
+      expect(result.data.tts?.language).toBeUndefined();
       expect(result.data.tts?.provider).toBe('edge-tts');
     }
   });

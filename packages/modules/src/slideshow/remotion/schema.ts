@@ -18,10 +18,17 @@ export const slideshowPropsSchema = z.object({
   durationSeconds: z.number().positive(),
   backgroundColor: z.string().default('#000000'),
   captionStyle: z.object({
-    fontSize: z.number().default(64),
+    fontSize: z.number().default(56),
     fontColor: z.string().default('#FFFFFF'),
+    fontWeight: z.enum(['normal', 'bold']).default('bold'),
     highlightColor: z.string().default('#FFD700'),
-    position: z.number().min(0).max(100).default(80),
+    position: z.number().min(0).max(100).default(78),
+    backgroundColor: z.string().default('#000000'),
+    backgroundOpacity: z.number().min(0).max(1).default(0.6),
+    padding: z.number().default(16),
+    outlineWidth: z.number().default(3),
+    outlineColor: z.string().default('#000000'),
+    shadowBlur: z.number().default(8),
   }).optional(),
 });
 

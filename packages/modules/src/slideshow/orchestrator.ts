@@ -55,6 +55,19 @@ export function buildSlideshowProps(input: BuildSlideshowPropsInput): SlideshowP
     musicVolume: musicVolume ?? 0.2,
     durationSeconds,
     backgroundColor: '#000000',
+    captionStyle: {
+      fontSize: 60,
+      fontColor: '#FFFFFF',
+      fontWeight: 'bold' as const,
+      highlightColor: '#FFD700',
+      position: 72,
+      backgroundColor: '#000000',
+      backgroundOpacity: 0.65,
+      padding: 18,
+      outlineWidth: 3,
+      outlineColor: '#000000',
+      shadowBlur: 8,
+    },
   };
 }
 
