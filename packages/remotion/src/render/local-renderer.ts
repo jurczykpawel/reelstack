@@ -11,7 +11,7 @@ const __dirname = import.meta.dirname ?? path.dirname(fileURLToPath(import.meta.
 const REMOTION_PKG_DIR = path.resolve(__dirname, '../..');
 // Bundle entry in apps/web includes private module compositions
 const BUNDLE_ENTRY = process.env.REMOTION_ENTRY
-  ?? path.resolve(REMOTION_PKG_DIR, '../../apps/web/src/remotion-entry.ts');
+  ?? path.resolve(REMOTION_PKG_DIR, '../../apps/web/remotion-entry.ts');
 const BUNDLE_PUBLIC_DIR = path.resolve(REMOTION_PKG_DIR, 'public');
 
 export class LocalRenderer implements RemotionRenderer {

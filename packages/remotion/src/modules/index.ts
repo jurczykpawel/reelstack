@@ -10,5 +10,5 @@
  */
 
 // Private module compositions are registered by the consuming app (apps/web).
-// See apps/web/src/remotion-entry.ts — it imports @reelstack/modules/remotion
+// See apps/web/remotion-entry.ts — it imports @reelstack/modules/remotion
 // which triggers self-registration before the bundle renders.
