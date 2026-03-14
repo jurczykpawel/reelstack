@@ -24,9 +24,9 @@ describe('module-registry', () => {
     id: 'test-module',
     name: 'Test Module',
     compositionId: 'TestComposition',
-    configFields: [{ key: 'param', label: 'Param', type: 'text' }],
+    configFields: [{ name: 'param', type: 'string', required: true, description: 'Test param' }],
     progressSteps: { 'Step 1': 50, 'Step 2': 100 },
-    orchestrate: async () => ({ outputPath: '/tmp/test.mp4', meta: {} }),
+    orchestrate: async () => ({ outputPath: '/tmp/test.mp4', durationSeconds: 10, meta: {} }),
   };
 
   beforeAll(() => {
