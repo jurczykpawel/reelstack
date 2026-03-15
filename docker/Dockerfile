@@ -20,6 +20,8 @@ COPY packages/tts/package.json packages/tts/
 COPY packages/publisher/package.json packages/publisher/
 COPY packages/logger/package.json packages/logger/
 COPY packages/agent/package.json packages/agent/
+COPY packages/modules/package.json packages/modules/
+COPY packages/image-gen/package.json packages/image-gen/
 RUN bun install --frozen-lockfile
 
 # Build
