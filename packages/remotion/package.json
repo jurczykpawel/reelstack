@@ -15,6 +15,7 @@
     "./compositions/registry": "./src/compositions/registry.ts",
     "./compositions/Root": "./src/compositions/Root.tsx",
     "./components/CaptionOverlay": "./src/components/CaptionOverlay.tsx",
+    "./components/highlight-modes": "./src/components/highlight-modes.ts",
     "./utils/resolve-media-url": "./src/utils/resolve-media-url.ts",
     "./utils/compute-entrance": "./src/utils/compute-entrance.ts"
   },

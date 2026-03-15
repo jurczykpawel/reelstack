@@ -295,7 +295,7 @@ export const CAPTION_PROPERTY_CATALOG: readonly CaptionPropertyCatalogEntry[] = 
   { key: 'shadowBlur', type: '0-20', description: 'Text shadow blur radius' },
   { key: 'position', type: '0-100', description: 'Vertical %, 0=top, 100=bottom, 70-80 recommended' },
   { key: 'highlightColor', type: 'hex', description: 'Color for highlighted/active word' },
-  { key: 'highlightMode', type: '"text" | "pill" | "label" | "hormozi" | "glow" | "pop-word" | "underline-sweep" | "box-highlight"', description: '"text" = color change, "pill" = rounded pill, "label" = rectangular box, "hormozi" = colored text + scale(1.15), "glow" = text-shadow glow, "pop-word" = scale(1.2) pop, "underline-sweep" = bottom border accent, "box-highlight" = semi-transparent bg + left border accent' },
+  { key: 'highlightMode', type: 'string', description: 'Highlight mode ID. Built-in: "text" = color change, "pill" = rounded pill. Additional modes available via plugins (label, hormozi, glow, pop-word, underline-sweep, box-highlight).' },
   { key: 'textTransform', type: '"none" | "uppercase"', description: 'TikTok/MrBeast style = uppercase' },
   { key: 'pillColor', type: 'hex', description: 'Background color of the pill highlight (when highlightMode="pill")' },
   { key: 'pillBorderRadius', type: 'number', description: 'Border radius of the pill highlight' },

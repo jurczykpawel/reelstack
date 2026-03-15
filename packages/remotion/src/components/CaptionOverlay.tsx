@@ -3,6 +3,7 @@ import { renderAnimatedCaption } from '@reelstack/core';
 import type { WordSegment } from '@reelstack/core';
 import type { SubtitleCue, SubtitleStyle } from '@reelstack/types';
 import { DEFAULT_SUBTITLE_STYLE } from '@reelstack/types';
+import { getHighlightMode } from './highlight-modes';
 
 interface CaptionOverlayProps {
   readonly cues: readonly SubtitleCue[];
@@ -102,16 +103,7 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
   const pillRadius = captionStyle.pillBorderRadius ?? 10;
   const pillPad = captionStyle.pillPadding ?? 10;
 
-  const isPill = highlightMode === 'pill';
-  const isLabel = highlightMode === 'label';
-  const isHormozi = highlightMode === 'hormozi';
-  const isGlow = highlightMode === 'glow';
-  const isPopWord = highlightMode === 'pop-word';
-  const isUnderline = highlightMode === 'underline-sweep';
-  const isBoxHighlight = highlightMode === 'box-highlight';
-  const hormoziColor = captionStyle.highlightColor ?? '#FFFF00';
-  const glowColor = captionStyle.highlightColor ?? '#FFFFFF';
-  const accentColor = captionStyle.highlightColor ?? '#3B82F6';
+  const modeRenderer = getHighlightMode(highlightMode) ?? getHighlightMode('text');
 
   // ── Single-word mode: show only the currently spoken word ───
   if (isSingleWord) {
@@ -202,59 +194,25 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
       >
         {segments.map((seg: WordSegment, i: number) => {
           const isActive = seg.style === 'active' || seg.style === 'highlighted';
-          const showPill = isPill && isActive;
           const displayText = textTransform === 'uppercase'
             ? seg.text.toUpperCase()
             : seg.text;
 
-          const showLabel = isLabel && isActive;
-          const showHormozi = isHormozi && isActive;
+          const activeStyle = isActive && modeRenderer
+            ? modeRenderer.activeStyle({
+                color: pillColor,
+                fontSize: captionStyle.fontSize,
+                padding: pillPad,
+                borderRadius: pillRadius,
+              })
+            : {};
 
-          const showGlow = isGlow && isActive;
-          const showPopWord = isPopWord && isActive;
-
-          const textColor = (isPill || isLabel)
+          // Modes with background (pill, label, box-highlight) keep base font color;
+          // otherwise use the segment highlight color
+          const hasBg = isActive && activeStyle && 'backgroundColor' in activeStyle;
+          const textColor = hasBg
             ? captionStyle.fontColor
-            : showHormozi
-              ? hormoziColor
-              : (seg.color ?? captionStyle.fontColor);
-
-          const activeStyle = showPill ? {
-            backgroundColor: pillColor,
-            padding: `${pillPad * 0.4}px ${pillPad}px`,
-            marginLeft: `${-pillPad}px`,
-            marginRight: `${-pillPad}px`,
-            borderRadius: pillRadius,
-          } : showLabel ? {
-            backgroundColor: pillColor,
-            padding: `${pillPad * 0.3}px ${pillPad * 0.8}px`,
-            marginLeft: `${-pillPad * 0.8}px`,
-            marginRight: `${-pillPad * 0.8}px`,
-            borderRadius: 4,
-          } : showHormozi ? {
-            display: 'inline-block' as const,
-            transform: 'scale(1.15)',
-            transformOrigin: 'center bottom',
-          } : showGlow ? {
-            textShadow: `0 0 12px ${glowColor}, 0 0 24px ${glowColor}88, 0 0 48px ${glowColor}44`,
-          } : showPopWord ? {
-            display: 'inline-block' as const,
-            transform: 'scale(1.2)',
-            transformOrigin: 'center bottom',
-            transition: 'transform 0.1s ease-out',
-          } : (isUnderline && isActive) ? {
-            display: 'inline-block' as const,
-            borderBottom: `4px solid ${accentColor}`,
-            paddingBottom: 2,
-          } : (isBoxHighlight && isActive) ? {
-            display: 'inline-block' as const,
-            backgroundColor: `${accentColor}55`,
-            padding: '2px 6px',
-            marginLeft: '-6px',
-            marginRight: '-6px',
-            borderRadius: 4,
-            borderLeft: `3px solid ${accentColor}`,
-          } : {};
+            : (seg.color ?? captionStyle.fontColor);
 
           return (
             // eslint-disable-next-line react/jsx-key

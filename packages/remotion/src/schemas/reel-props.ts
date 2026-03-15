@@ -70,7 +70,7 @@ const captionStyleSchema = z.object({
   padding: z.number(),
   highlightColor: z.string().optional(),
   upcomingColor: z.string().optional(),
-  highlightMode: z.enum(['text', 'pill', 'label', 'hormozi', 'glow', 'pop-word', 'underline-sweep', 'box-highlight']).default('text'),
+  highlightMode: z.string().default('text'),
   textTransform: z.enum(['none', 'uppercase']).default('none'),
   pillColor: z.string().optional(),
   pillBorderRadius: z.number().optional(),
