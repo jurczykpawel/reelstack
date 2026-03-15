@@ -13,12 +13,13 @@ import { resolveMediaUrl } from '@reelstack/remotion/utils/resolve-media-url';
 import type { SlideshowProps } from './schema';
 
 // Ken Burns presets — each slide gets a different motion pattern
+// Subtle Ken Burns — small enough to never clip edge content
 const KEN_BURNS_PRESETS = [
-  { startScale: 1.0, endScale: 1.15, startX: 0, endX: -2, startY: 0, endY: -1 },   // zoom in + drift left
-  { startScale: 1.12, endScale: 1.0, startX: -2, endX: 2, startY: -1, endY: 1 },    // zoom out + drift right
-  { startScale: 1.0, endScale: 1.1, startX: 1, endX: -1, startY: -1, endY: 0 },     // zoom in + drift
-  { startScale: 1.1, endScale: 1.0, startX: 0, endX: 0, startY: -2, endY: 1 },      // zoom out + vertical drift
-  { startScale: 1.0, endScale: 1.12, startX: -1, endX: 1, startY: 0, endY: -1 },    // zoom in + right drift
+  { startScale: 1.0, endScale: 1.06, startX: 0, endX: -0.5, startY: 0, endY: -0.3 },   // gentle zoom in
+  { startScale: 1.06, endScale: 1.0, startX: -0.4, endX: 0.4, startY: -0.3, endY: 0.3 }, // gentle zoom out
+  { startScale: 1.0, endScale: 1.05, startX: 0.3, endX: -0.3, startY: -0.3, endY: 0 },  // zoom in + slight drift
+  { startScale: 1.05, endScale: 1.0, startX: 0, endX: 0, startY: -0.4, endY: 0.3 },     // zoom out + vertical
+  { startScale: 1.0, endScale: 1.06, startX: -0.3, endX: 0.3, startY: 0, endY: -0.3 },  // zoom in + right drift
 ] as const;
 
 /**
@@ -38,7 +39,7 @@ const SlideImage: React.FC<{
     ? interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp', extrapolateLeft: 'clamp' })
     : 1;
   const entranceOpacity = entranceProgress;
-  const entranceScale = interpolate(entranceProgress, [0, 1], [1.05, 1], { extrapolateRight: 'clamp' });
+  const entranceScale = interpolate(entranceProgress, [0, 1], [1.02, 1], { extrapolateRight: 'clamp' });
 
   // Ken Burns: slow zoom + pan over the entire slide duration
   const kb = KEN_BURNS_PRESETS[slideIndex % KEN_BURNS_PRESETS.length]!;
