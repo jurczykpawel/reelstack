@@ -32,21 +32,23 @@ export function groupWordsIntoCues(
 
     const wouldExceedWords = currentWords.length >= maxWordsPerCue;
     const wouldExceedDuration = word.endTime - groupStart > maxDurationPerCue;
-    const isPunctuation = breakOnPunctuation && /[.!?]$/.test(word.text);
 
-    // Flush group if limits exceeded
-    if ((wouldExceedWords || wouldExceedDuration) && currentWords.length > 0) {
+    // Check if PREVIOUS word ended with punctuation — if so, flush before adding new word.
+    // This prevents "dzień. Zmiana" spanning across sentences.
+    const prevWord = currentWords.length > 0 ? currentWords[currentWords.length - 1] : null;
+    const prevEndedSentence = breakOnPunctuation && prevWord && /[.!?]$/.test(prevWord.text);
+
+    if (prevEndedSentence && currentWords.length >= 1) {
+      cues.push(createCueFromWords(currentWords, defaultAnimationStyle));
+      currentWords = [word];
+      groupStart = word.startTime;
+    } else if ((wouldExceedWords || wouldExceedDuration) && currentWords.length > 0) {
+      // Flush group if limits exceeded
       cues.push(createCueFromWords(currentWords, defaultAnimationStyle));
       currentWords = [word];
       groupStart = word.startTime;
     } else {
       currentWords.push(word);
-
-      // Break on sentence-ending punctuation (but only if we have enough words)
-      if (isPunctuation && currentWords.length >= 2) {
-        cues.push(createCueFromWords(currentWords, defaultAnimationStyle));
-        currentWords = [];
-      }
     }
   }
 

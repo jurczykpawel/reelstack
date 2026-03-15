@@ -62,6 +62,8 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
 
   if (!activeCue) return null;
 
+  const isSingleWord = captionStyle.highlightMode === 'single-word';
+
   const { segments, visible } = renderAnimatedCaption(activeCue, currentTime, {
     highlightColor: captionStyle.highlightColor,
     upcomingColor: captionStyle.upcomingColor,
@@ -110,6 +112,58 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
   const hormoziColor = captionStyle.highlightColor ?? '#FFFF00';
   const glowColor = captionStyle.highlightColor ?? '#FFFFFF';
   const accentColor = captionStyle.highlightColor ?? '#3B82F6';
+
+  // ── Single-word mode: show only the currently spoken word ───
+  if (isSingleWord) {
+    const activeWord = segments.find((s: WordSegment) => s.style === 'active' || s.style === 'highlighted');
+    if (!activeWord) return null;
+
+    const displayText = (captionStyle.textTransform ?? 'none') === 'uppercase'
+      ? activeWord.text.toUpperCase()
+      : activeWord.text;
+
+    const wordScale = spring({
+      frame: frame - cueStartFrame,
+      fps,
+      config: { damping: 10, stiffness: 180 },
+    });
+
+    return (
+      <div
+        style={{
+          position: 'absolute',
+          top: `${verticalPosition}%`,
+          left: 0,
+          right: 0,
+          transform: 'translateY(-50%)',
+          display: 'flex',
+          justifyContent: 'center',
+          padding: '0 40px',
+          opacity: fadeOut,
+        }}
+      >
+        <span
+          style={{
+            fontSize: captionStyle.fontSize * 1.4,
+            fontWeight: 'bold',
+            fontFamily: captionStyle.fontFamily,
+            color: captionStyle.highlightColor ?? '#FFD700',
+            textShadow: buildOutlineShadow(
+              captionStyle.outlineWidth + 1,
+              captionStyle.outlineColor,
+              captionStyle.shadowBlur + 4,
+              captionStyle.shadowColor,
+            ),
+            textTransform: (captionStyle.textTransform ?? 'none') as any,
+            transform: `scale(${wordScale})`,
+            display: 'inline-block',
+          }}
+        >
+          {displayText}
+        </span>
+      </div>
+    );
+  }
 
   return (
     <div

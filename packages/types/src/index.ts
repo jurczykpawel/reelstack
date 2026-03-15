@@ -30,7 +30,7 @@ export interface SubtitleCue {
 // ==========================================
 
 export type TextAlignment = 'left' | 'center' | 'right';
-export type HighlightMode = 'text' | 'pill' | 'label' | 'hormozi' | 'glow' | 'pop-word' | 'underline-sweep' | 'box-highlight';
+export type HighlightMode = 'text' | 'pill' | 'label' | 'hormozi' | 'glow' | 'pop-word' | 'underline-sweep' | 'box-highlight' | 'single-word';
 export type CaptionTextTransform = 'none' | 'uppercase';
 
 export interface SubtitleStyle {
