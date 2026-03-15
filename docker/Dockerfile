@@ -22,7 +22,7 @@ COPY packages/logger/package.json packages/logger/
 COPY packages/agent/package.json packages/agent/
 COPY packages/modules/package.json packages/modules/
 COPY packages/image-gen/package.json packages/image-gen/
-RUN bun install --frozen-lockfile
+RUN bun install
 
 # Build
 FROM base AS builder
