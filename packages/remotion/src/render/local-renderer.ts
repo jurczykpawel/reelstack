@@ -16,9 +16,7 @@ const BUNDLE_PUBLIC_DIR = path.resolve(REMOTION_PKG_DIR, 'public');
 
 export class LocalRenderer implements RemotionRenderer {
   async render(props: Record<string, unknown>, options: RenderOptions): Promise<RenderResult> {
-    // Dynamic imports - these are heavy Node.js modules, avoid bundling at top level
-    const { renderMedia, selectComposition } = await import('@remotion/renderer');
-    const { mkdirSync, statSync } = await import('fs');
+    const { mkdirSync, statSync, existsSync, rmSync, writeFileSync } = await import('fs');
 
     mkdirSync(path.dirname(options.outputPath), { recursive: true });
 
@@ -26,18 +24,12 @@ export class LocalRenderer implements RemotionRenderer {
     let bundlePath = process.env.REMOTION_BUNDLE_PATH;
 
     if (!bundlePath) {
-      // Bundle via Remotion CLI (handles monorepo resolution correctly)
-      // Use /tmp to avoid permission issues with read-only package dirs in Docker
       const { execFileSync } = await import('child_process');
-      const { existsSync, rmSync } = await import('fs');
       const outDir = path.join(os.tmpdir(), 'remotion-bundle');
       const indexHtml = path.join(outDir, 'index.html');
       if (existsSync(indexHtml)) {
-        // Reuse cached bundle from a previous run (index.html = complete bundle)
         bundlePath = outDir;
       } else {
-        // Remove incomplete bundle dirs (e.g. from a previous timed-out run)
-        // Remotion refuses to bundle into a dir that exists but has no index.html
         if (existsSync(outDir)) {
           rmSync(outDir, { recursive: true, force: true });
         }
@@ -51,52 +43,52 @@ export class LocalRenderer implements RemotionRenderer {
     }
 
     const compositionId = options.compositionId ?? 'Reel';
-    log.debug({ cwd: process.cwd() }, 'Before selectComposition');
+    const codec = options.codec === 'h265' ? 'h265' : 'h264';
 
-    const composition = await selectComposition({
-      serveUrl: bundlePath,
-      id: compositionId,
-      inputProps: props,
-    });
-
-    // Remotion uses min(nproc, os.availableParallelism()) as its max concurrency.
-    // nproc respects Docker CPU quota and may be lower than os.cpus().length.
-    // We must cap against the same value Remotion uses internally.
-    const { execFileSync: _execFileSync } = await import('child_process');
-    let remotionMaxCpus: number;
-    try {
-      remotionMaxCpus = parseInt(_execFileSync('nproc', [], { stdio: 'pipe' }).toString().trim(), 10);
-    } catch {
-      remotionMaxCpus = os.cpus().length;
-    }
-
-    // If concurrency is explicitly set, use it as-is.
-    // Only auto-selected values (from env or default) are capped to nproc.
-    const concurrency = options.concurrency
-      ?? Math.min(
-          process.env.REMOTION_CONCURRENCY
-            ? parseInt(process.env.REMOTION_CONCURRENCY, 10)
-            : Math.max(1, Math.floor(remotionMaxCpus / 2)),
-          Math.max(1, remotionMaxCpus),
-        );
-
-    log.info({ remotionMaxCpus, concurrency, cwd: process.cwd(), bundlePath }, 'Render config');
+    log.info({ compositionId, codec, cwd: process.cwd(), bundlePath }, 'Render config (CLI subprocess)');
 
     const startMs = performance.now();
 
+    // Write props to temp file to avoid shell escaping issues
+    const propsFile = path.join(os.tmpdir(), `remotion-props-${Date.now()}.json`);
+    writeFileSync(propsFile, JSON.stringify(props));
+
     try {
-    await renderMedia({
-      composition,
-      serveUrl: bundlePath,
-      codec: options.codec === 'h265' ? 'h265' : 'h264',
-      outputLocation: options.outputPath,
-      inputProps: props,
-      concurrency,
-      ...(options.crf !== undefined ? { crf: options.crf } : {}),
-    });
-    } catch (e) {
-      log.error({ err: e }, 'renderMedia error');
-      throw e;
+      // Use CLI subprocess instead of programmatic renderMedia to avoid
+      // Bun event loop deadlock when renderMedia runs inside BullMQ worker.
+      const { execFileSync } = await import('child_process');
+      const args = [
+        'remotion', 'render',
+        bundlePath,
+        compositionId,
+        `--props=${propsFile}`,
+        `--output=${options.outputPath}`,
+        `--codec=${codec}`,
+      ];
+      if (options.crf !== undefined) {
+        args.push(`--crf=${options.crf}`);
+      }
+      if (options.concurrency) {
+        args.push(`--concurrency=${options.concurrency}`);
+      } else if (process.env.REMOTION_CONCURRENCY) {
+        args.push(`--concurrency=${process.env.REMOTION_CONCURRENCY}`);
+      }
+
+      log.info({ args: args.join(' ') }, 'Spawning remotion render');
+
+      execFileSync('bunx', args, {
+        cwd: REMOTION_PKG_DIR,
+        stdio: 'pipe',
+        timeout: 600_000, // 10 min max
+      });
+    } catch (e: unknown) {
+      const execErr = e as { stderr?: Buffer; stdout?: Buffer };
+      const stderr = execErr.stderr?.toString() ?? '';
+      const stdout = execErr.stdout?.toString() ?? '';
+      log.error({ stderr: stderr.slice(-2000), stdout: stdout.slice(-500) }, 'remotion render CLI error');
+      throw new Error(`Remotion render failed: ${stderr.slice(-500)}`);
+    } finally {
+      try { (await import('fs')).unlinkSync(propsFile); } catch {}
     }
 
     const durationMs = performance.now() - startMs;

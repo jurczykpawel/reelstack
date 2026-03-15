@@ -1,20 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 const mockExecFileSync = vi.fn();
-const mockRenderMedia = vi.fn();
-const mockSelectComposition = vi.fn();
 const mockMkdirSync = vi.fn();
 const mockStatSync = vi.fn();
 const mockExistsSync = vi.fn();
 const mockRmSync = vi.fn();
+const mockWriteFileSync = vi.fn();
+const mockUnlinkSync = vi.fn();
 
 vi.mock('child_process', () => ({
   execFileSync: (...args: unknown[]) => mockExecFileSync(...args),
-}));
-
-vi.mock('@remotion/renderer', () => ({
-  renderMedia: (...args: unknown[]) => mockRenderMedia(...args),
-  selectComposition: (...args: unknown[]) => mockSelectComposition(...args),
 }));
 
 vi.mock('fs', () => ({
@@ -22,6 +17,8 @@ vi.mock('fs', () => ({
   statSync: (...args: unknown[]) => mockStatSync(...args),
   existsSync: (...args: unknown[]) => mockExistsSync(...args),
   rmSync: (...args: unknown[]) => mockRmSync(...args),
+  writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
+  unlinkSync: (...args: unknown[]) => mockUnlinkSync(...args),
 }));
 
 const { LocalRenderer } = await import('../render/local-renderer');
@@ -35,15 +32,6 @@ const minimalProps = {
   backgroundColor: '#000',
 };
 
-const mockComposition = {
-  id: 'Reel',
-  width: 1080,
-  height: 1920,
-  fps: 30,
-  durationInFrames: 150,
-  defaultProps: {},
-};
-
 describe('LocalRenderer', () => {
   const savedEnv: Record<string, string | undefined> = {};
 
@@ -52,9 +40,8 @@ describe('LocalRenderer', () => {
     savedEnv.REMOTION_BUNDLE_PATH = process.env.REMOTION_BUNDLE_PATH;
     savedEnv.REMOTION_CONCURRENCY = process.env.REMOTION_CONCURRENCY;
 
-    mockSelectComposition.mockResolvedValue(mockComposition);
-    mockRenderMedia.mockResolvedValue(undefined);
     mockStatSync.mockReturnValue({ size: 50000 });
+    mockExistsSync.mockReturnValue(true); // cached bundle exists
   });
 
   afterEach(() => {
@@ -69,37 +56,42 @@ describe('LocalRenderer', () => {
     const renderer = new LocalRenderer();
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4' });
 
-    expect(mockExecFileSync).not.toHaveBeenCalledWith(
-      'bunx',
-      expect.arrayContaining(['remotion', 'bundle']),
-      expect.anything(),
+    // Should NOT call bundle CLI
+    const bundleCalls = mockExecFileSync.mock.calls.filter(
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('bundle'),
     );
-    expect(mockSelectComposition).toHaveBeenCalledWith(
-      expect.objectContaining({ serveUrl: '/app/remotion-bundle' }),
+    expect(bundleCalls).toHaveLength(0);
+
+    // Should call render CLI with the pre-built path
+    const renderCall = mockExecFileSync.mock.calls.find(
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render'),
     );
+    expect(renderCall).toBeDefined();
+    expect((renderCall![1] as string[])[2]).toBe('/app/remotion-bundle');
   });
 
   it('bundles via CLI when REMOTION_BUNDLE_PATH not set', async () => {
     delete process.env.REMOTION_BUNDLE_PATH;
+    mockExistsSync.mockReturnValue(false); // no cached bundle
     const renderer = new LocalRenderer();
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4' });
 
-    expect(mockExecFileSync).toHaveBeenCalledWith(
-      'bunx',
-      expect.arrayContaining(['remotion', 'bundle']),
-      expect.objectContaining({ cwd: expect.any(String) }),
+    const bundleCalls = mockExecFileSync.mock.calls.filter(
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('bundle'),
     );
+    expect(bundleCalls).toHaveLength(1);
   });
 
-  it('uses explicit concurrency option', async () => {
+  it('passes concurrency option to CLI', async () => {
     delete process.env.REMOTION_CONCURRENCY;
     process.env.REMOTION_BUNDLE_PATH = '/app/bundle';
     const renderer = new LocalRenderer();
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4', concurrency: 3 });
 
-    expect(mockRenderMedia).toHaveBeenCalledWith(
-      expect.objectContaining({ concurrency: 3 }),
+    const renderCall = mockExecFileSync.mock.calls.find(
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render'),
     );
+    expect((renderCall![1] as string[])).toContain('--concurrency=3');
   });
 
   it('respects REMOTION_CONCURRENCY env var', async () => {
@@ -108,9 +100,10 @@ describe('LocalRenderer', () => {
     const renderer = new LocalRenderer();
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4' });
 
-    expect(mockRenderMedia).toHaveBeenCalledWith(
-      expect.objectContaining({ concurrency: 2 }),
+    const renderCall = mockExecFileSync.mock.calls.find(
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render'),
     );
+    expect((renderCall![1] as string[])).toContain('--concurrency=2');
   });
 
   it('selects h264 codec by default', async () => {
@@ -118,9 +111,10 @@ describe('LocalRenderer', () => {
     const renderer = new LocalRenderer();
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4' });
 
-    expect(mockRenderMedia).toHaveBeenCalledWith(
-      expect.objectContaining({ codec: 'h264' }),
+    const renderCall = mockExecFileSync.mock.calls.find(
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render'),
     );
+    expect((renderCall![1] as string[])).toContain('--codec=h264');
   });
 
   it('selects h265 when requested', async () => {
@@ -128,9 +122,10 @@ describe('LocalRenderer', () => {
     const renderer = new LocalRenderer();
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4', codec: 'h265' });
 
-    expect(mockRenderMedia).toHaveBeenCalledWith(
-      expect.objectContaining({ codec: 'h265' }),
+    const renderCall = mockExecFileSync.mock.calls.find(
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render'),
     );
+    expect((renderCall![1] as string[])).toContain('--codec=h265');
   });
 
   it('returns correct render result', async () => {
