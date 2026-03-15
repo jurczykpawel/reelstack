@@ -1,0 +1,26 @@
+{
+  "name": "@reelstack/agent",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "scripts": {
+    "test": "vitest run --passWithNoTests",
+    "lint": "tsc --noEmit",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@reelstack/logger": "workspace:*",
+    "@reelstack/remotion": "workspace:*",
+    "@reelstack/storage": "workspace:*",
+    "@reelstack/transcription": "workspace:*",
+    "@reelstack/tts": "workspace:*",
+    "@reelstack/types": "workspace:*",
+    "playwright": "^1.58.2"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^3.2.4"
+  }
+}
