@@ -23,6 +23,10 @@ import type { SlideshowProps } from './remotion/schema';
 
 const baseLog = createLogger('slideshow');
 
+/** Default background music (served from Remotion public/ dir). */
+const DEFAULT_MUSIC_PATH = 'music/bg-upbeat.mp3';
+const DEFAULT_MUSIC_VOLUME = 0.13;
+
 // ── Props builder (pure, testable) ──────────────────────────
 
 export interface BuildSlideshowPropsInput {
@@ -51,8 +55,8 @@ export function buildSlideshowProps(input: BuildSlideshowPropsInput): SlideshowP
     slides,
     cues,
     voiceoverUrl,
-    musicUrl,
-    musicVolume: musicVolume ?? 0.2,
+    musicUrl: musicUrl ?? DEFAULT_MUSIC_PATH,
+    musicVolume: musicVolume ?? DEFAULT_MUSIC_VOLUME,
     durationSeconds,
     backgroundColor: '#000000',
     captionStyle: {
