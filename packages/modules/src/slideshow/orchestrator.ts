@@ -43,12 +43,15 @@ export function buildSlideshowProps(input: BuildSlideshowPropsInput): SlideshowP
   const { imageUrls, cues, voiceoverUrl, durationSeconds, musicUrl, musicVolume } = input;
   const slideDuration = durationSeconds / imageUrls.length;
 
+  // Rotate through transition types for variety
+  const TRANSITIONS = ['crossfade', 'slide-left', 'zoom-in', 'wipe', 'slide-right'] as const;
+
   const slides = imageUrls.map((url, i) => ({
     imageUrl: url,
     startTime: i * slideDuration,
     endTime: (i + 1) * slideDuration,
-    transition: (i === 0 ? 'none' : 'crossfade') as 'none' | 'crossfade',
-    transitionDurationMs: i === 0 ? 0 : 400,
+    transition: i === 0 ? ('none' as const) : TRANSITIONS[(i - 1) % TRANSITIONS.length]!,
+    transitionDurationMs: i === 0 ? 0 : 500,
   }));
 
   return {

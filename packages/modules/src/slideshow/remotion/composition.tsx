@@ -5,6 +5,7 @@ import {
   Img,
   Sequence,
   interpolate,
+  spring,
   useCurrentFrame,
   useVideoConfig,
 } from 'remotion';
@@ -12,19 +13,63 @@ import { CaptionOverlay } from '@reelstack/remotion/components/CaptionOverlay';
 import { resolveMediaUrl } from '@reelstack/remotion/utils/resolve-media-url';
 import type { SlideshowProps } from './schema';
 
-// Ken Burns presets — each slide gets a different motion pattern
-// Subtle Ken Burns — small enough to never clip edge content
+// ── Ken Burns presets — each slide gets a unique motion ────────────
 const KEN_BURNS_PRESETS = [
-  { startScale: 1.0, endScale: 1.06, startX: 0, endX: -0.5, startY: 0, endY: -0.3 },   // gentle zoom in
-  { startScale: 1.06, endScale: 1.0, startX: -0.4, endX: 0.4, startY: -0.3, endY: 0.3 }, // gentle zoom out
-  { startScale: 1.0, endScale: 1.05, startX: 0.3, endX: -0.3, startY: -0.3, endY: 0 },  // zoom in + slight drift
-  { startScale: 1.05, endScale: 1.0, startX: 0, endX: 0, startY: -0.4, endY: 0.3 },     // zoom out + vertical
-  { startScale: 1.0, endScale: 1.06, startX: -0.3, endX: 0.3, startY: 0, endY: -0.3 },  // zoom in + right drift
+  { startScale: 1.0, endScale: 1.06, startX: 0, endX: -0.5, startY: 0, endY: -0.3 },
+  { startScale: 1.06, endScale: 1.0, startX: -0.4, endX: 0.4, startY: -0.3, endY: 0.3 },
+  { startScale: 1.0, endScale: 1.05, startX: 0.3, endX: -0.3, startY: -0.3, endY: 0 },
+  { startScale: 1.05, endScale: 1.0, startX: 0, endX: 0, startY: -0.4, endY: 0.3 },
+  { startScale: 1.0, endScale: 1.06, startX: -0.3, endX: 0.3, startY: 0, endY: -0.3 },
 ] as const;
 
-/**
- * Single slide with Ken Burns effect + entrance transition.
- */
+// ── Entrance presets — different entrance per slide ───────────────
+type EntranceType = 'fade-scale' | 'slide-up' | 'slide-left' | 'zoom-in' | 'wipe-down';
+
+const ENTRANCE_SEQUENCE: EntranceType[] = [
+  'fade-scale',   // slide 0: gentle fade + scale
+  'slide-up',     // slide 1: slides up from bottom
+  'zoom-in',      // slide 2: zooms from center
+  'slide-left',   // slide 3: slides from right
+  'wipe-down',    // slide 4: wipe from top
+];
+
+function computeEntrance(
+  progress: number, // 0→1
+  type: EntranceType,
+): { opacity: number; transform: string; clipPath?: string } {
+  const p = Math.max(0, Math.min(1, progress));
+
+  switch (type) {
+    case 'fade-scale':
+      return {
+        opacity: p,
+        transform: `scale(${interpolate(p, [0, 1], [1.04, 1])})`,
+      };
+    case 'slide-up':
+      return {
+        opacity: interpolate(p, [0, 0.3], [0, 1], { extrapolateRight: 'clamp' }),
+        transform: `translateY(${(1 - p) * 8}%)`,
+      };
+    case 'slide-left':
+      return {
+        opacity: interpolate(p, [0, 0.3], [0, 1], { extrapolateRight: 'clamp' }),
+        transform: `translateX(${(1 - p) * 8}%)`,
+      };
+    case 'zoom-in':
+      return {
+        opacity: p,
+        transform: `scale(${interpolate(p, [0, 1], [0.85, 1])})`,
+      };
+    case 'wipe-down':
+      return {
+        opacity: 1,
+        transform: 'none',
+        clipPath: `inset(0 0 ${(1 - p) * 100}% 0)`,
+      };
+  }
+}
+
+// ── Slide component ──────────────────────────────────────────────
 const SlideImage: React.FC<{
   imageUrl: string;
   transitionDurationMs: number;
@@ -34,33 +79,36 @@ const SlideImage: React.FC<{
   const { fps, durationInFrames } = useVideoConfig();
   const transitionFrames = Math.round((transitionDurationMs / 1000) * fps);
 
-  // Entrance: fade + scale from 1.05 to 1.0
+  // Entrance animation (varied per slide)
+  const entranceType = ENTRANCE_SEQUENCE[slideIndex % ENTRANCE_SEQUENCE.length]!;
   const entranceProgress = transitionFrames > 0
-    ? interpolate(frame, [0, transitionFrames], [0, 1], { extrapolateRight: 'clamp', extrapolateLeft: 'clamp' })
+    ? spring({ frame, fps, config: { damping: 18, stiffness: 80 }, durationInFrames: transitionFrames })
     : 1;
-  const entranceOpacity = entranceProgress;
-  const entranceScale = interpolate(entranceProgress, [0, 1], [1.02, 1], { extrapolateRight: 'clamp' });
+  const entrance = computeEntrance(entranceProgress, entranceType);
 
-  // Ken Burns: slow zoom + pan over the entire slide duration
+  // Ken Burns: slow zoom + pan
   const kb = KEN_BURNS_PRESETS[slideIndex % KEN_BURNS_PRESETS.length]!;
   const kbProgress = interpolate(frame, [0, durationInFrames], [0, 1], {
     extrapolateRight: 'clamp',
     extrapolateLeft: 'clamp',
   });
-  // Ease in-out for smoother motion
   const eased = 0.5 - Math.cos(kbProgress * Math.PI) / 2;
-
   const kbScale = interpolate(eased, [0, 1], [kb.startScale, kb.endScale]);
   const kbX = interpolate(eased, [0, 1], [kb.startX, kb.endX]);
   const kbY = interpolate(eased, [0, 1], [kb.startY, kb.endY]);
 
-  const totalScale = entranceScale * kbScale;
-  const transform = `scale(${totalScale}) translate(${kbX}%, ${kbY}%)`;
+  // Subtle pulse (breathing effect) — gentle scale oscillation
+  const pulsePhase = (frame / fps) * 0.8; // 0.8 Hz
+  const pulse = 1 + Math.sin(pulsePhase * Math.PI * 2) * 0.003; // ±0.3%
+
+  const imgTransform = `scale(${kbScale * pulse}) translate(${kbX}%, ${kbY}%)`;
 
   return (
     <AbsoluteFill
       style={{
-        opacity: entranceOpacity,
+        opacity: entrance.opacity,
+        transform: entrance.transform,
+        clipPath: entrance.clipPath,
         overflow: 'hidden',
       }}
     >
@@ -70,7 +118,7 @@ const SlideImage: React.FC<{
           width: '100%',
           height: '100%',
           objectFit: 'cover',
-          transform,
+          transform: imgTransform,
           transformOrigin: 'center center',
         }}
       />
@@ -78,9 +126,7 @@ const SlideImage: React.FC<{
   );
 };
 
-/**
- * Thin progress bar at the top of the reel.
- */
+// ── Progress bar ─────────────────────────────────────────────────
 const ProgressBar: React.FC<{ color?: string }> = ({ color = '#FFFFFF' }) => {
   const frame = useCurrentFrame();
   const { durationInFrames } = useVideoConfig();
@@ -106,17 +152,57 @@ const ProgressBar: React.FC<{ color?: string }> = ({ color = '#FFFFFF' }) => {
           width: `${progress}%`,
           backgroundColor: color,
           borderRadius: '0 2px 2px 0',
-          transition: 'none',
         }}
       />
     </div>
   );
 };
 
-/**
- * SlideshowComposition: branded image slides with Ken Burns effect,
- * karaoke captions, voiceover, and progress bar.
- */
+// ── Slide counter overlay ────────────────────────────────────────
+const SlideCounter: React.FC<{
+  current: number;
+  total: number;
+  accentColor?: string;
+}> = ({ current, total, accentColor = '#FFD700' }) => {
+  const frame = useCurrentFrame();
+  const { fps } = useVideoConfig();
+
+  // Bounce in on slide change
+  const scale = spring({ frame, fps, config: { damping: 12, stiffness: 120 }, durationInFrames: 15 });
+
+  return (
+    <div
+      style={{
+        position: 'absolute',
+        top: 20,
+        right: 24,
+        zIndex: 90,
+        transform: `scale(${scale})`,
+        opacity: interpolate(scale, [0, 0.5], [0, 1], { extrapolateRight: 'clamp' }),
+      }}
+    >
+      <div
+        style={{
+          background: 'rgba(0,0,0,0.5)',
+          borderRadius: 20,
+          padding: '6px 14px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: 4,
+        }}
+      >
+        <span style={{ color: accentColor, fontWeight: 700, fontSize: 18, fontFamily: 'sans-serif' }}>
+          {current}
+        </span>
+        <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, fontFamily: 'sans-serif' }}>
+          /{total}
+        </span>
+      </div>
+    </div>
+  );
+};
+
+// ── Main composition ─────────────────────────────────────────────
 export const SlideshowComposition: React.FC<SlideshowProps> = (props) => {
   const { fps } = useVideoConfig();
   const {
@@ -134,7 +220,7 @@ export const SlideshowComposition: React.FC<SlideshowProps> = (props) => {
       {/* Progress bar */}
       <ProgressBar color={captionStyle?.highlightColor ?? '#FFD700'} />
 
-      {/* Slide images with Ken Burns */}
+      {/* Slide images with Ken Burns + varied entrances */}
       {slides.map((slide, i) => {
         const startFrame = Math.round(slide.startTime * fps);
         const durationFrames = Math.round((slide.endTime - slide.startTime) * fps);
@@ -146,6 +232,12 @@ export const SlideshowComposition: React.FC<SlideshowProps> = (props) => {
               transitionDurationMs={slide.transitionDurationMs}
               slideIndex={i}
             />
+            {/* Slide counter with bounce */}
+            <SlideCounter
+              current={i + 1}
+              total={slides.length}
+              accentColor={captionStyle?.highlightColor ?? '#FFD700'}
+            />
           </Sequence>
         );
       })}
@@ -156,12 +248,12 @@ export const SlideshowComposition: React.FC<SlideshowProps> = (props) => {
         style={captionStyle}
       />
 
-      {/* Voiceover audio */}
+      {/* Voiceover */}
       {voiceoverUrl && (
         <Audio src={resolveMediaUrl(voiceoverUrl)} volume={1} />
       )}
 
-      {/* Background music */}
+      {/* Music */}
       {musicUrl && (
         <Audio src={resolveMediaUrl(musicUrl)} volume={musicVolume} />
       )}
