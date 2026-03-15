@@ -2,68 +2,66 @@ import { describe, it, expect } from 'vitest';
 import { selectMontageProfile, buildProfileGuidelines } from '../montage-profile';
 
 describe('selectMontageProfile', () => {
-  it('selects network-chuck for coding/terminal topics', () => {
-    expect(selectMontageProfile('How to use Docker containers in Linux terminal').id).toBe('network-chuck');
-    expect(selectMontageProfile('Python scripting for cybersecurity hacking').id).toBe('network-chuck');
-    expect(selectMontageProfile('DevOps pipeline z Kubernetes').id).toBe('network-chuck');
+  it('selects default profile for general topics', () => {
+    expect(selectMontageProfile('A general how-to tutorial about tips').id).toBe('default');
   });
 
-  it('selects leadgen-man for business/marketing topics', () => {
-    expect(selectMontageProfile('Jak zwiększyć sprzedaż w SaaS business').id).toBe('leadgen-man');
-    expect(selectMontageProfile('LinkedIn growth marketing strategy').id).toBe('leadgen-man');
-    expect(selectMontageProfile('Entrepreneur motivation sales funnel').id).toBe('leadgen-man');
+  it('defaults to default when no keywords match', () => {
+    expect(selectMontageProfile('Random topic about nothing specific').id).toBe('default');
   });
 
-  it('selects ai-tool-showcase for AI tool reviews', () => {
-    expect(selectMontageProfile('5 best AI tools for content creation tutorial').id).toBe('ai-tool-showcase');
-    expect(selectMontageProfile('ChatGPT vs Claude comparison review').id).toBe('ai-tool-showcase');
-    expect(selectMontageProfile('Speed-run through top software tools').id).toBe('ai-tool-showcase');
-  });
-
-  it('defaults to network-chuck when no keywords match', () => {
-    expect(selectMontageProfile('Random topic about nothing specific').id).toBe('network-chuck');
-  });
-
-  it('returns explicit profile when provided', () => {
-    expect(selectMontageProfile('Business marketing tips', 'ai-tool-showcase').id).toBe('ai-tool-showcase');
+  it('returns explicit profile when provided and it exists', () => {
+    // default always exists in the public registry
+    expect(selectMontageProfile('Something', 'default').id).toBe('default');
   });
 
   it('falls back to auto-selection for unknown explicit profile', () => {
-    const profile = selectMontageProfile('Docker containers tutorial', 'nonexistent-profile');
-    expect(profile.id).toBe('network-chuck');
+    const profile = selectMontageProfile('A how-to tutorial', 'nonexistent-profile');
+    // should not crash, returns best match or default
+    expect(profile.id).toBeTruthy();
+  });
+
+  it('picks profile with most keyword matches', () => {
+    // Default has keywords: general, tips, how-to, explainer, tutorial
+    const profile = selectMontageProfile('tutorial tips how-to explainer');
+    expect(profile.id).toBe('default');
   });
 });
 
 describe('buildProfileGuidelines', () => {
   it('includes profile name and description', () => {
-    const guidelines = buildProfileGuidelines(selectMontageProfile('Docker tutorial'));
-    expect(guidelines).toContain('network-chuck');
-    expect(guidelines).toContain('Cyber-Retro Terminal');
+    const guidelines = buildProfileGuidelines(selectMontageProfile('A general tutorial'));
+    expect(guidelines).toContain('default');
+    expect(guidelines).toContain('Dynamic General');
   });
 
   it('includes pacing and max shot duration', () => {
-    const guidelines = buildProfileGuidelines(selectMontageProfile('Docker tutorial'));
-    expect(guidelines).toContain('4');  // maxShotDurationSec
+    const guidelines = buildProfileGuidelines(selectMontageProfile('A general tutorial'));
+    expect(guidelines).toContain('4'); // maxShotDurationSec
   });
 
   it('includes allowed transitions', () => {
-    const lm = buildProfileGuidelines(selectMontageProfile('SaaS business marketing'));
-    expect(lm).toContain('crossfade');
-    expect(lm).not.toContain('"none"'); // leadgen-man forbids hard cuts
+    const guidelines = buildProfileGuidelines(selectMontageProfile('A general tutorial'));
+    expect(guidelines).toContain('crossfade');
   });
 
   it('includes SFX mapping', () => {
-    const guidelines = buildProfileGuidelines(selectMontageProfile('Docker tutorial'));
-    expect(guidelines).toContain('glitch'); // network-chuck text-appear SFX
+    const guidelines = buildProfileGuidelines(selectMontageProfile('A general tutorial'));
+    expect(guidelines).toContain('pop'); // default text-appear SFX
   });
 
   it('includes director rules', () => {
-    const guidelines = buildProfileGuidelines(selectMontageProfile('Docker tutorial'));
+    const guidelines = buildProfileGuidelines(selectMontageProfile('A general tutorial'));
     expect(guidelines).toContain('Visual change every');
   });
 
   it('includes color palette', () => {
-    const guidelines = buildProfileGuidelines(selectMontageProfile('Docker tutorial'));
-    expect(guidelines).toContain('#ff0055'); // network-chuck danger color
+    const guidelines = buildProfileGuidelines(selectMontageProfile('A general tutorial'));
+    expect(guidelines).toContain('#3B82F6'); // default accent color
+  });
+
+  it('includes arc template when present', () => {
+    const guidelines = buildProfileGuidelines(selectMontageProfile('A general tutorial'));
+    expect(guidelines).toContain('HOOK');
   });
 });

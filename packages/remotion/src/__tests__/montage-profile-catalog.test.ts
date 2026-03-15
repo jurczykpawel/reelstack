@@ -1,25 +1,65 @@
 import { describe, it, expect } from 'vitest';
 import {
+  registerMontageProfile,
+  getMontageProfile,
+  listMontageProfiles,
+  getMontageProfileCatalog,
   MONTAGE_PROFILE_CATALOG,
   type MontageProfileEntry,
   TRANSITION_CATALOG,
   SFX_CATALOG,
 } from '../schemas/catalog';
 
-describe('MONTAGE_PROFILE_CATALOG', () => {
-  it('has exactly 3 profiles', () => {
-    expect(MONTAGE_PROFILE_CATALOG).toHaveLength(3);
+describe('Montage profile registry', () => {
+  it('has at least the default profile', () => {
+    const profiles = listMontageProfiles();
+    expect(profiles.length).toBeGreaterThanOrEqual(1);
+    expect(profiles.find(p => p.id === 'default')).toBeDefined();
   });
 
-  it('has all required profiles', () => {
-    const ids = MONTAGE_PROFILE_CATALOG.map(p => p.id);
-    expect(ids).toContain('network-chuck');
-    expect(ids).toContain('leadgen-man');
-    expect(ids).toContain('ai-tool-showcase');
+  it('getMontageProfile returns default profile', () => {
+    const profile = getMontageProfile('default');
+    expect(profile).toBeDefined();
+    expect(profile!.name).toBe('Dynamic General');
+  });
+
+  it('getMontageProfile returns undefined for unknown id', () => {
+    expect(getMontageProfile('nonexistent-profile-xyz')).toBeUndefined();
+  });
+
+  it('registerMontageProfile adds a new profile', () => {
+    const testProfile: MontageProfileEntry = {
+      id: '__test-profile__',
+      name: 'Test Profile',
+      description: 'For unit tests only',
+      pacing: 'fast',
+      maxShotDurationSec: 5,
+      effectsPerThirtySec: 8,
+      allowedTransitions: ['crossfade', 'none'],
+      sfxMapping: { 'test': 'pop' },
+      directorRules: ['Test rule'],
+      topicKeywords: ['test'],
+      toolPreference: ['pexels'],
+      colorPalette: { accent: '#FF0000' },
+    };
+    registerMontageProfile(testProfile);
+    expect(getMontageProfile('__test-profile__')).toEqual(testProfile);
+  });
+
+  it('getMontageProfileCatalog returns same as listMontageProfiles', () => {
+    const list = listMontageProfiles();
+    const catalog = getMontageProfileCatalog();
+    expect(catalog).toEqual(list);
+  });
+
+  it('MONTAGE_PROFILE_CATALOG proxy works for backward compat', () => {
+    expect(MONTAGE_PROFILE_CATALOG.length).toBeGreaterThanOrEqual(1);
+    expect(MONTAGE_PROFILE_CATALOG.find(p => p.id === 'default')).toBeDefined();
+    expect(MONTAGE_PROFILE_CATALOG.map(p => p.id)).toContain('default');
   });
 
   it('each profile has required fields', () => {
-    for (const profile of MONTAGE_PROFILE_CATALOG) {
+    for (const profile of listMontageProfiles()) {
       expect(profile.id).toBeTruthy();
       expect(profile.name).toBeTruthy();
       expect(profile.description).toBeTruthy();
@@ -32,49 +72,24 @@ describe('MONTAGE_PROFILE_CATALOG', () => {
     }
   });
 
-  it('allowedTransitions reference valid transition types', () => {
+  it('default profile allowedTransitions reference valid transition types', () => {
     const validTypes = TRANSITION_CATALOG.map(t => t.type);
-    for (const profile of MONTAGE_PROFILE_CATALOG) {
-      for (const t of profile.allowedTransitions) {
-        expect(validTypes).toContain(t);
-      }
+    const defaultProfile = getMontageProfile('default')!;
+    for (const t of defaultProfile.allowedTransitions) {
+      expect(validTypes).toContain(t);
     }
   });
 
-  it('sfxMapping values reference valid SFX IDs', () => {
+  it('default profile sfxMapping values reference valid SFX IDs', () => {
     const validSfxIds = SFX_CATALOG.map(s => s.id);
-    for (const profile of MONTAGE_PROFILE_CATALOG) {
-      for (const sfxId of Object.values(profile.sfxMapping)) {
-        expect(validSfxIds).toContain(sfxId);
-      }
+    const defaultProfile = getMontageProfile('default')!;
+    for (const sfxId of Object.values(defaultProfile.sfxMapping)) {
+      expect(validSfxIds).toContain(sfxId);
     }
   });
 
-  it('network-chuck has strict pacing (max 4s shots)', () => {
-    const nc = MONTAGE_PROFILE_CATALOG.find(p => p.id === 'network-chuck')!;
-    expect(nc.maxShotDurationSec).toBeLessThanOrEqual(4);
-    expect(nc.allowedTransitions).toContain('none'); // hard cuts allowed
-  });
-
-  it('leadgen-man has faster pacing than network-chuck', () => {
-    const nc = MONTAGE_PROFILE_CATALOG.find(p => p.id === 'network-chuck')!;
-    const lm = MONTAGE_PROFILE_CATALOG.find(p => p.id === 'leadgen-man')!;
-    expect(lm.maxShotDurationSec).toBeLessThanOrEqual(nc.maxShotDurationSec);
-  });
-
-  it('leadgen-man forbids glitch transitions', () => {
-    const lm = MONTAGE_PROFILE_CATALOG.find(p => p.id === 'leadgen-man')!;
-    expect(lm.allowedTransitions).not.toContain('none');
-  });
-
-  it('ai-tool-showcase forbids glitch and hard cut transitions', () => {
-    const ats = MONTAGE_PROFILE_CATALOG.find(p => p.id === 'ai-tool-showcase')!;
-    expect(ats.allowedTransitions).not.toContain('none');
-  });
-
-  it('profiles have topic keywords for auto-selection', () => {
-    for (const profile of MONTAGE_PROFILE_CATALOG) {
-      expect(profile.topicKeywords.length).toBeGreaterThan(0);
-    }
+  it('default profile has topic keywords for auto-selection', () => {
+    const defaultProfile = getMontageProfile('default')!;
+    expect(defaultProfile.topicKeywords.length).toBeGreaterThan(0);
   });
 });

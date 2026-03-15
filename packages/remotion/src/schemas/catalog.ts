@@ -345,6 +345,7 @@ export const TRANSITION_TYPES = TRANSITION_CATALOG.map(t => t.type);
 // ── Montage profile catalog ─────────────────────────────────
 // Director style profiles that determine pacing, transitions, SFX, and rules.
 // Independent from layouts — any profile can combine with any layout.
+// Uses a Map-backed registry so private modules can register additional profiles.
 
 export interface MontageProfileEntry {
   readonly id: string;
@@ -361,103 +362,84 @@ export interface MontageProfileEntry {
   readonly colorPalette: Record<string, string>;
   /** CSS filter string auto-applied to B-roll segments (e.g. 'brightness(0.8) contrast(1.1)'). */
   readonly bRollFilter?: string;
+  /** Suggested reel arc template for the LLM director. */
+  readonly arcTemplate?: string;
 }
 
-export const MONTAGE_PROFILE_CATALOG: readonly MontageProfileEntry[] = [
+// ── Registry (Map-backed) ───────────────────────────────────
+
+const _profileRegistry = new Map<string, MontageProfileEntry>();
+
+/** Register a montage profile. Overwrites if id already exists. */
+export function registerMontageProfile(profile: MontageProfileEntry): void {
+  _profileRegistry.set(profile.id, profile);
+}
+
+/** Get a single profile by ID, or undefined if not found. */
+export function getMontageProfile(id: string): MontageProfileEntry | undefined {
+  return _profileRegistry.get(id);
+}
+
+/** Return all registered profiles as a readonly array (snapshot). */
+export function listMontageProfiles(): readonly MontageProfileEntry[] {
+  return [..._profileRegistry.values()];
+}
+
+/**
+ * Backward-compat alias: returns the same as `listMontageProfiles()`.
+ * @deprecated Use `listMontageProfiles()` instead.
+ */
+export function getMontageProfileCatalog(): readonly MontageProfileEntry[] {
+  return listMontageProfiles();
+}
+
+/** @deprecated Use `listMontageProfiles()` or `getMontageProfile()`. */
+export const MONTAGE_PROFILE_CATALOG: readonly MontageProfileEntry[] = new Proxy(
+  [] as MontageProfileEntry[],
   {
-    id: 'network-chuck',
-    name: 'Cyber-Retro Terminal',
-    description: 'Hackerski styl z glitch transitions, neon magenta/cyan, grain, tempo co 2-3s',
-    pacing: 'fast',
-    maxShotDurationSec: 4,
-    effectsPerThirtySec: 12,
-    allowedTransitions: ['none', 'wipe', 'slide-perspective-right', 'zoom-in'],
-    sfxMapping: {
-      'text-appear': 'glitch',
-      'cut': 'whoosh',
-      'code': 'keyboard',
-      'error': 'glitch',
-      'transition': 'swipe',
-      'zoom-accent': 'thud',
-    },
-    directorRules: [
-      'Visual change every 2-3s. Shot >4s without zoom/effect is an error.',
-      'Glitch transition on EVERY face-to-content switch (RGB split, 5-8 frames).',
-      'When speaker says tool/file name, show screenshot IMMEDIATELY (0ms delay).',
-      'Emotional zoom 1.2-1.4x + blur + SFX thud on words like "Look at this!", "Crazy", "Never".',
-      'No UI element static >1s. Add micro-jitter (0.5deg rotation, 3px float).',
-      'Every on-screen element MUST have SFX. No SFX = critical error.',
-      'Tech name = glitch text overlay with jitter + neon glow.',
-    ],
-    topicKeywords: ['coding', 'terminal', 'hacking', 'linux', 'cybersecurity', 'dark', 'tech', 'python', 'docker', 'devops'],
-    toolPreference: ['ai-video', 'ai-image', 'pexels'],
-    colorPalette: {
-      danger: '#ff0055',
-      accent: '#00f2ff',
-      background: '#0a0a14',
-    },
-    bRollFilter: 'contrast(1.1) saturate(0.8)',
-  },
-  {
-    id: 'leadgen-man',
-    name: 'Clean-Corporate-Dynamic',
-    description: 'Korporacyjny styl, jasne tla, Hormozi-style captions, tempo co 1-1.5s',
-    pacing: 'very-fast',
-    maxShotDurationSec: 3,
-    effectsPerThirtySec: 15,
-    allowedTransitions: ['crossfade', 'slide-left', 'zoom-in', 'blur-dissolve'],
-    sfxMapping: {
-      'text-appear': 'pop',
-      'cut': 'whoosh',
-      'click': 'click',
-      'error': 'ding',
-      'transition': 'swipe',
-    },
-    directorRules: [
-      'Hormozi-Style Captions: central, UPPERCASE, Montserrat Black. Active word = YELLOW + scale(1.15). Spring bounce entrance.',
-      'B-Roll First: when text allows illustration ("System", "Growth", "Client"), full-screen stock over face.',
-      'Word-to-Visual: "Money" = money rain/dollar icon. "People" = crowd/office. Map nouns to concrete visuals.',
-      'Floating UI (3D Perspective): screenshots NEVER flat. borderRadius:24px, deep shadow, rotateY(-10deg).',
-      'Emoji Sprinkling: colorful emoji "pop" next to key words, shake 0.5s.',
-      'SFX on every movement: text appear = pop, screen = swoosh, transition = deep whoosh.',
-    ],
-    topicKeywords: ['business', 'marketing', 'saas', 'motivational', 'linkedin', 'growth', 'luxury', 'sales', 'entrepreneur'],
-    toolPreference: ['pexels', 'ai-image', 'ai-video'],
-    colorPalette: {
-      highlight: '#FFFF00',
-      text: '#FFFFFF',
-      background: '#FAFAFA',
-    },
-    bRollFilter: 'brightness(0.85) contrast(1.1)',
-  },
-  {
-    id: 'ai-tool-showcase',
-    name: 'Speed Review',
-    description: 'Szybki przeglad narzedzi AI, duzo ikon/logo, label-style napisy, tempo 1-2s',
-    pacing: 'extreme',
-    maxShotDurationSec: 3,
-    effectsPerThirtySec: 18,
-    allowedTransitions: ['slide-left', 'slide-right', 'crossfade', 'blur-dissolve'],
-    sfxMapping: {
-      'logo-appear': 'pop',
-      'tool-switch': 'swipe',
-      'click': 'click',
-      'achievement': 'ding',
-      'transition': 'whoosh',
-    },
-    directorRules: [
-      'PNG Logic: when tool name is mentioned (ChatGPT, Claude, etc.), IMMEDIATELY show logo/icon with bounce + SFX pop. Icons pulse scale 1.0-1.1.',
-      'Screen-to-Face: on "Look at this tool", face shrinks to corner PiP, screen recording slides in. Smooth morph.',
-      'Subtitles Label Style: captions with backgroundColor + padding around each word/phrase (readable on bright screens).',
-      'Speed-run pacing: each tool gets max 3-5s (name + 1 screenshot + 1 feature), then next.',
-      'Clearbit/logo matching: fetch tool logo by name (cheaper than stocks).',
-    ],
-    topicKeywords: ['ai-tool', 'tutorial', 'speed-run', 'tool-list', 'website-review', 'review', 'comparison', 'software'],
-    toolPreference: ['logo-png', 'screenshot', 'ai-image', 'pexels'],
-    colorPalette: {
-      highlight: '#FFFF00',
-      text: '#FFFFFF',
-      label: '#000000',
+    get(_target, prop) {
+      const arr = [..._profileRegistry.values()];
+      if (prop === 'length') return arr.length;
+      if (prop === Symbol.iterator) return arr[Symbol.iterator].bind(arr);
+      if (typeof prop === 'string' && !isNaN(Number(prop))) return arr[Number(prop)];
+      // Forward array methods (find, map, filter, etc.)
+      const val = (arr as any)[prop];
+      return typeof val === 'function' ? val.bind(arr) : val;
     },
   },
-];
+) as any;
+
+// ── Default profile (generic, no creator references) ────────
+
+registerMontageProfile({
+  id: 'default',
+  name: 'Dynamic General',
+  description: 'Versatile fast-paced montage style. Works for any topic.',
+  pacing: 'fast',
+  maxShotDurationSec: 4,
+  effectsPerThirtySec: 10,
+  allowedTransitions: ['crossfade', 'slide-left', 'zoom-in', 'blur-dissolve', 'none'],
+  sfxMapping: {
+    'text-appear': 'pop',
+    'cut': 'whoosh',
+    'transition': 'swipe',
+    'highlight': 'ding',
+  },
+  directorRules: [
+    'Visual change every 3-4s. Shots without zoom/effect should not exceed max duration.',
+    'Use text-emphasis for key terms and numbers.',
+    'Pair counters with "rise" SFX for statistics.',
+    'Subscribe banner near the end, max 1 per reel.',
+  ],
+  topicKeywords: ['general', 'tips', 'how-to', 'explainer', 'tutorial'],
+  toolPreference: ['pexels', 'ai-image', 'ai-video'],
+  colorPalette: {
+    accent: '#3B82F6',
+    text: '#FFFFFF',
+    background: '#0F172A',
+  },
+  arcTemplate: `0-2s: HOOK - attention-grabbing text + zoom + SFX
+2-8s: SETUP - introduce the topic, B-roll illustrations
+8-20s: BODY - main content, fast cuts between visuals and face
+20s+: CTA - call to action, subscribe banner`,
+});

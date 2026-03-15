@@ -275,7 +275,7 @@ describe('generateReelSchema', () => {
     }
   });
 
-  it('accepts montageProfile field', () => {
+  it('accepts montageProfile field with any string', () => {
     const result = generateReelSchema.safeParse({
       script: 'Docker containers tutorial',
       montageProfile: 'network-chuck',
@@ -286,10 +286,21 @@ describe('generateReelSchema', () => {
     }
   });
 
-  it('rejects invalid montageProfile', () => {
+  it('accepts montageProfile with custom profile id', () => {
     const result = generateReelSchema.safeParse({
       script: 'Test',
-      montageProfile: 'nonexistent-profile',
+      montageProfile: 'my-custom-profile',
+    });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.montageProfile).toBe('my-custom-profile');
+    }
+  });
+
+  it('rejects montageProfile over 50 chars', () => {
+    const result = generateReelSchema.safeParse({
+      script: 'Test',
+      montageProfile: 'a'.repeat(51),
     });
     expect(result.success).toBe(false);
   });

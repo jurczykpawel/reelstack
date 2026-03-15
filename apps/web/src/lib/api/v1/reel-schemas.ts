@@ -247,7 +247,7 @@ export const generateReelSchema = z.object({
   /** Reel variant / visual style */
   variant: z.enum(['multi-object', 'single-object', 'cutaway-demo']).optional(),
   /** Montage profile ID (auto-selected from script if not provided) */
-  montageProfile: z.enum(['network-chuck', 'leadgen-man', 'ai-tool-showcase']).optional(),
+  montageProfile: z.string().max(50).optional(),
   callbackUrl: callbackUrlSchema.optional(),
 }).refine(
   (data) => {

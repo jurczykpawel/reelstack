@@ -5,7 +5,8 @@
  * Generates per-profile prompt guidelines for the LLM planner.
  */
 import {
-  MONTAGE_PROFILE_CATALOG,
+  listMontageProfiles,
+  getMontageProfile,
   type MontageProfileEntry,
 } from '@reelstack/remotion/catalog';
 
@@ -15,7 +16,7 @@ import {
  * If `explicitProfileId` is provided and valid, returns that profile.
  * Otherwise, scores each profile by counting topic keyword matches
  * in the script text and returns the highest-scoring profile.
- * Falls back to the first profile (network-chuck) if no keywords match.
+ * Falls back to the "default" profile if no keywords match.
  */
 export function selectMontageProfile(
   scriptOrTopic: string,
@@ -23,16 +24,17 @@ export function selectMontageProfile(
 ): MontageProfileEntry {
   // Explicit override
   if (explicitProfileId) {
-    const found = MONTAGE_PROFILE_CATALOG.find(p => p.id === explicitProfileId);
+    const found = getMontageProfile(explicitProfileId);
     if (found) return found;
   }
 
+  const profiles = listMontageProfiles();
   const text = scriptOrTopic.toLowerCase();
 
-  let bestProfile = MONTAGE_PROFILE_CATALOG[0];
+  let bestProfile = getMontageProfile('default') ?? profiles[0];
   let bestScore = 0;
 
-  for (const profile of MONTAGE_PROFILE_CATALOG) {
+  for (const profile of profiles) {
     let score = 0;
     for (const keyword of profile.topicKeywords) {
       if (text.includes(keyword)) {
@@ -101,7 +103,7 @@ ${colorLines}
 ${profile.toolPreference.map((t, i) => `  ${i + 1}. ${t}`).join('\n')}
 
 ### Reel Arc Template (suggested structure)
-${REEL_ARC_TEMPLATES[profile.id] ?? 'No specific arc template.'}
+${profile.arcTemplate ?? 'No specific arc template.'}
 
 ### B-Roll CSS Filter
 ${profile.bRollFilter ? `Apply cssFilter: "${profile.bRollFilter}" to ALL bRollSegments for this profile's look.` : 'No default B-roll filter.'}
@@ -110,25 +112,6 @@ ${profile.bRollFilter ? `Apply cssFilter: "${profile.bRollFilter}" to ALL bRollS
 Tag EVERY shot with one of: HOOK, DEMO, PROBLEM, SOLUTION, PROOF, TOOL_REVIEW, CTA.
 Add "segmentType" field to each shot's "reason" field (e.g., "[HOOK] Strong opening with text emphasis").`;
 }
-
-/** Per-profile reel arc templates — suggested structure for the LLM director. */
-const REEL_ARC_TEMPLATES: Record<string, string> = {
-  'network-chuck': `0-2s: HOOK — zoom 1.4x + big glitch text on center + glitch SFX
-2-7s: DEMO — screen recording (terminal/code), pan/zoom on typed text
-7-12s: SPLIT/OVERLAY — face at bottom (PiP circle), content on top. Hard cut transitions.
-12-20s: B-ROLL — fast cuts between different content (UI, files, code). Floating UI.
-20s+: FAST CUTS + CTA — very fast cuts, climax, subscribe banner`,
-
-  'leadgen-man': `0-1.5s: HOOK — stock B-roll (office/city) + big UPPERCASE text with yellow highlight + whoosh
-1.5-5s: PROBLEM — face zoom + emoji bounce, abstract concepts illustrated with stocks
-5-15s: SOLUTION — floating UI screenshots (3D tilt), tool icons bounce-in
-15-25s: PROOF — counters, statistics, social proof. Fast stock+face cuts.
-25s+: CTA — fullscreen face, subscribe/follow, final text emphasis`,
-
-  'ai-tool-showcase': `0-2s: HOOK — "X tools you NEED" text + logo bounce + pop SFX
-Per tool (3-5s each): TOOL REVIEW — logo bounce-in → screenshot 3D tilt → 1 feature highlight → next
-Last 3s: CTA — "Follow for more" + subscribe banner`,
-};
 
 /**
  * Build profile-specific supervisor review checks.
