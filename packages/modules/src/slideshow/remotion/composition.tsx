@@ -97,11 +97,7 @@ const SlideImage: React.FC<{
   const kbX = interpolate(eased, [0, 1], [kb.startX, kb.endX]);
   const kbY = interpolate(eased, [0, 1], [kb.startY, kb.endY]);
 
-  // Subtle pulse (breathing effect) — gentle scale oscillation
-  const pulsePhase = (frame / fps) * 0.8; // 0.8 Hz
-  const pulse = 1 + Math.sin(pulsePhase * Math.PI * 2) * 0.003; // ±0.3%
-
-  const imgTransform = `scale(${kbScale * pulse}) translate(${kbX}%, ${kbY}%)`;
+  const imgTransform = `scale(${kbScale}) translate(${kbX}%, ${kbY}%)`;
 
   return (
     <AbsoluteFill
