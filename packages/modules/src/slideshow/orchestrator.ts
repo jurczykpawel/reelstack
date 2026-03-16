@@ -276,11 +276,13 @@ export async function produceSlideshow(request: SlideshowRequest): Promise<Slide
   const totalDuration = cumulativeDuration;
 
   // Group combined words into cues
+  // Slideshow uses larger cue groups than default (3) to avoid
+  // splitting phrases like "Tap the camera icon." into two cues.
   const cues = groupWordsIntoCues(
     allWords,
     {
-      maxWordsPerCue: presetConfig.maxWordsPerCue,
-      maxDurationPerCue: presetConfig.maxDurationPerCue,
+      maxWordsPerCue: Math.max(presetConfig.maxWordsPerCue, 6),
+      maxDurationPerCue: Math.max(presetConfig.maxDurationPerCue, 4),
       breakOnPunctuation: true,
     },
     presetConfig.animationStyle
