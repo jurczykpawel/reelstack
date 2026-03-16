@@ -1,7 +1,7 @@
 /**
  * Slideshow orchestrator.
  *
- * Pipeline: [LLM script | manual slides] → image-gen PNGs → TTS → whisper → compose → render.
+ * Pipeline: [LLM script | manual slides] → image-gen PNGs → per-slide TTS → whisper → compose → render.
  *
  * Zero external API keys required: uses @reelstack/image-gen (Playwright) + edge-tts (free).
  */
@@ -9,8 +9,16 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { renderToFile } from '@reelstack/image-gen';
-import { runTTSPipeline, uploadVoiceover, renderVideo } from '@reelstack/agent';
+import { uploadVoiceover, renderVideo, resolvePresetConfig } from '@reelstack/agent';
 import type { ProductionStep } from '@reelstack/agent';
+import { createTTSProvider } from '@reelstack/tts';
+import type { TTSConfig } from '@reelstack/tts';
+import { groupWordsIntoCues, alignWordsWithScript } from '@reelstack/transcription';
+import {
+  normalizeAudioForWhisper,
+  getAudioDuration,
+  transcribeAudio,
+} from '@reelstack/remotion/pipeline';
 import { createStorage } from '@reelstack/storage';
 import { createLogger } from '@reelstack/logger';
 import { generateSlideshowScript, wrapManualSlides } from './script-generator';
@@ -35,86 +43,23 @@ export interface BuildSlideshowPropsInput {
     endTime: number;
     words?: Array<{ text: string; startTime: number; endTime: number }>;
   }>;
-  /** All word-level timestamps from transcription (for slide boundary detection). */
-  words: Array<{ text: string; startTime: number; endTime: number }>;
+  /** Exact per-slide boundary times (cumulative durations). Length = slides + 1. */
+  slideBoundaries: number[];
   voiceoverUrl: string;
   durationSeconds: number;
   musicUrl?: string;
   musicVolume?: number;
 }
 
-/**
- * Find slide transition times from actual word timestamps.
- * Matches each slide's text to words in the timeline to find
- * when narration moves from one slide to the next.
- */
-function findSlideBoundaries(
-  slides: Array<{ title?: string; text?: string }>,
-  words: Array<{ text: string; startTime: number; endTime: number }>,
-  totalDuration: number
-): number[] {
-  if (words.length === 0 || slides.length === 0) return [];
-
-  // Build per-slide word lists from the narration
-  // The narration is: "slide1_text. slide2_text. slide3_text."
-  // We find where each slide's FIRST unique word appears in the word timeline.
-  const boundaries: number[] = [0]; // slide 0 always starts at 0
-
-  let wordCursor = 0;
-  for (let s = 1; s < slides.length; s++) {
-    const slideText = `${slides[s].title ?? ''} ${slides[s].text ?? ''}`.trim().toLowerCase();
-    const slideFirstWords = slideText.split(/\s+/).slice(0, 3); // first 3 words of this slide
-
-    if (slideFirstWords.length === 0) {
-      boundaries.push(boundaries[boundaries.length - 1]);
-      continue;
-    }
-
-    // Search forward in word timeline for the first word of this slide
-    let found = false;
-    for (let w = wordCursor; w < words.length; w++) {
-      const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
-      if (clean(words[w].text) === clean(slideFirstWords[0])) {
-        // Check if next words also match (avoid false positives)
-        let match = true;
-        for (let k = 1; k < Math.min(slideFirstWords.length, 2); k++) {
-          if (w + k < words.length && clean(words[w + k].text) !== clean(slideFirstWords[k])) {
-            match = false;
-            break;
-          }
-        }
-        if (match) {
-          boundaries.push(words[w].startTime);
-          wordCursor = w;
-          found = true;
-          break;
-        }
-      }
-    }
-
-    if (!found) {
-      // Fallback: proportional
-      const proportion = s / slides.length;
-      boundaries.push(totalDuration * proportion);
-    }
-  }
-
-  boundaries.push(totalDuration); // end marker
-  return boundaries;
-}
-
 export function buildSlideshowProps(input: BuildSlideshowPropsInput): SlideshowProps {
-  const { script, imageUrls, cues, words, voiceoverUrl, durationSeconds, musicUrl, musicVolume } =
+  const { imageUrls, cues, slideBoundaries, voiceoverUrl, durationSeconds, musicUrl, musicVolume } =
     input;
 
   const TRANSITIONS = ['crossfade', 'slide-left', 'zoom-in', 'wipe', 'slide-right'] as const;
 
-  // Find actual slide boundaries from word timestamps
-  const boundaries = findSlideBoundaries(script.slides, words, durationSeconds);
-
   const slides = imageUrls.map((url, i) => {
-    const startTime = boundaries[i] ?? (durationSeconds * i) / imageUrls.length;
-    const endTime = boundaries[i + 1] ?? durationSeconds;
+    const startTime = slideBoundaries[i] ?? (durationSeconds * i) / imageUrls.length;
+    const endTime = slideBoundaries[i + 1] ?? durationSeconds;
     return {
       imageUrl: url,
       startTime,
@@ -231,9 +176,10 @@ export async function produceSlideshow(request: SlideshowRequest): Promise<Slide
     imageUrls.push(url);
   }
 
-  // ── 4. TTS + TRANSCRIPTION ─────────────────────────────────
-  // Bridge top-level language to TTS language if not explicitly set.
-  // E.g. language='en' → tts.language='en-US', language='pl' → tts.language='pl-PL'
+  // ── 4. PER-SLIDE TTS + TRANSCRIPTION ────────────────────────
+  // Generate TTS audio separately for each slide, then concatenate.
+  // This gives exact slide-to-audio synchronization instead of heuristic matching.
+
   const ttsLanguage =
     request.tts?.language ??
     (request.language === 'pl'
@@ -244,31 +190,124 @@ export async function produceSlideshow(request: SlideshowRequest): Promise<Slide
           ? `${request.language}-${request.language.toUpperCase()}`
           : undefined);
 
-  const ttsResult = await runTTSPipeline(
+  const ttsConfig: TTSConfig = {
+    provider: request.tts?.provider ?? 'edge-tts',
+    apiKey:
+      request.tts?.provider === 'elevenlabs'
+        ? process.env.ELEVENLABS_API_KEY
+        : request.tts?.provider === 'openai'
+          ? process.env.OPENAI_API_KEY
+          : undefined,
+    defaultLanguage: ttsLanguage ?? 'en-US',
+  };
+  const ttsProvider = createTTSProvider(ttsConfig);
+
+  const WHISPER_OFFSET = 0.12; // seconds - tuned empirically with edge-tts
+  const presetConfig = resolvePresetConfig(request.brandPreset);
+  const whisperLang = ttsLanguage?.split('-')[0];
+
+  const segmentBuffers: Buffer[] = [];
+  const allWords: Array<{ text: string; startTime: number; endTime: number }> = [];
+  const slideBoundaries: number[] = [0];
+  let cumulativeDuration = 0;
+  let totalTtsMs = 0;
+  let totalWhisperMs = 0;
+  let totalWordCount = 0;
+
+  for (let i = 0; i < script.slides.length; i++) {
+    const slide = script.slides[i]!;
+    const slideText = slide.text || slide.title;
+    onProgress?.(`TTS slide ${i + 1}/${script.slides.length}...`);
+
+    // TTS for this slide
+    const ttsStart = performance.now();
+    const ttsResult = await ttsProvider.synthesize(slideText, {
+      voice: request.tts?.voice,
+      language: ttsLanguage,
+    });
+    totalTtsMs += performance.now() - ttsStart;
+
+    // Get duration & normalize for whisper
+    const segmentDuration = getAudioDuration(ttsResult.audioBuffer, ttsResult.format);
+    const wavBuffer = normalizeAudioForWhisper(ttsResult.audioBuffer, ttsResult.format);
+
+    // Transcribe this segment
+    const whisperStart = performance.now();
+    const transcription = await transcribeAudio(wavBuffer, {
+      apiKey: request.whisper?.apiKey,
+      language: whisperLang,
+      text: slideText,
+      durationSeconds: segmentDuration,
+    });
+    totalWhisperMs += performance.now() - whisperStart;
+    totalWordCount += transcription.words.length;
+
+    // Align whisper output with original slide text
+    const alignedWords = alignWordsWithScript(transcription.words, slideText);
+
+    // Offset timestamps by cumulative duration + whisper correction
+    const offsetWords = alignedWords.map((w) => ({
+      text: w.text,
+      startTime: w.startTime + WHISPER_OFFSET + cumulativeDuration,
+      endTime: w.endTime + WHISPER_OFFSET + cumulativeDuration,
+    }));
+
+    allWords.push(...offsetWords);
+    segmentBuffers.push(ttsResult.audioBuffer);
+    cumulativeDuration += segmentDuration;
+    slideBoundaries.push(cumulativeDuration);
+  }
+
+  steps.push({
+    name: 'TTS (per-slide)',
+    durationMs: totalTtsMs,
+    detail: `${ttsProvider.name}, ${script.slides.length} segments`,
+  });
+  steps.push({
+    name: 'Whisper transcription (per-slide)',
+    durationMs: totalWhisperMs,
+    detail: `${totalWordCount} words across ${script.slides.length} segments`,
+  });
+
+  // Concatenate MP3 buffers into one file
+  const combinedBuffer = Buffer.concat(segmentBuffers);
+  const voiceoverPath = path.join(tmpDir, 'voiceover.mp3');
+  fs.writeFileSync(voiceoverPath, combinedBuffer);
+  const totalDuration = cumulativeDuration;
+
+  // Group combined words into cues
+  const cues = groupWordsIntoCues(
+    allWords,
     {
-      script: script.fullNarration,
-      tts: { ...request.tts, language: ttsLanguage },
-      whisper: request.whisper,
-      brandPreset: request.brandPreset,
+      maxWordsPerCue: presetConfig.maxWordsPerCue,
+      maxDurationPerCue: presetConfig.maxDurationPerCue,
+      breakOnPunctuation: true,
     },
-    tmpDir,
-    onProgress
+    presetConfig.animationStyle
   );
-  steps.push(...ttsResult.steps);
+
+  const formattedCues = cues.map((c) => ({
+    id: c.id,
+    text: c.text,
+    startTime: c.startTime,
+    endTime: c.endTime,
+    words: c.words?.map((w) => ({ text: w.text, startTime: w.startTime, endTime: w.endTime })),
+    animationStyle: c.animationStyle,
+  }));
 
   // ── 5. UPLOAD VOICEOVER ────────────────────────────────────
   onProgress?.('Uploading voiceover...');
-  const voiceoverUrl = await uploadVoiceover(ttsResult.voiceoverPath);
+  const voiceoverUrl = await uploadVoiceover(voiceoverPath);
 
   // ── 6. ASSEMBLE COMPOSITION PROPS ──────────────────────────
   onProgress?.('Assembling composition...');
   const props = buildSlideshowProps({
     script,
     imageUrls,
-    cues: ttsResult.cues,
-    words: ttsResult.transcriptionWords,
+    cues: formattedCues,
+    slideBoundaries,
     voiceoverUrl,
-    durationSeconds: ttsResult.audioDuration,
+    durationSeconds: totalDuration,
     musicUrl: request.musicUrl,
     musicVolume: request.musicVolume,
   });
@@ -293,7 +332,7 @@ export async function produceSlideshow(request: SlideshowRequest): Promise<Slide
 
   return {
     outputPath,
-    durationSeconds: ttsResult.audioDuration,
+    durationSeconds: totalDuration,
     script,
     steps,
   };
