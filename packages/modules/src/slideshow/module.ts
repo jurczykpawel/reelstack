@@ -17,10 +17,30 @@ export const slideshowModule: ReelModule = {
 
   configFields: [
     { name: 'topic', type: 'string', required: true, description: 'Topic for slide generation' },
-    { name: 'slides', type: 'array', required: false, description: 'Manual slides [{title, text, badge}] — skips LLM' },
-    { name: 'numberOfSlides', type: 'number', required: false, description: 'Number of slides (default: 5)' },
-    { name: 'template', type: 'string', required: false, description: 'image-gen template (default: tip-card)' },
-    { name: 'brand', type: 'string', required: false, description: 'image-gen brand CSS (default: example)' },
+    {
+      name: 'slides',
+      type: 'array',
+      required: false,
+      description: 'Manual slides [{title, text, badge}] — skips LLM',
+    },
+    {
+      name: 'numberOfSlides',
+      type: 'number',
+      required: false,
+      description: 'Number of slides (default: 5)',
+    },
+    {
+      name: 'template',
+      type: 'string',
+      required: false,
+      description: 'image-gen template (default: tip-card)',
+    },
+    {
+      name: 'brand',
+      type: 'string',
+      required: false,
+      description: 'image-gen brand CSS (default: example)',
+    },
   ],
 
   progressSteps: {
@@ -35,7 +55,7 @@ export const slideshowModule: ReelModule = {
 
   async orchestrate(
     base: BaseModuleRequest,
-    config: Record<string, unknown>,
+    config: Record<string, unknown>
   ): Promise<ModuleResult> {
     const result = await produceSlideshow({
       jobId: base.jobId,
@@ -50,6 +70,7 @@ export const slideshowModule: ReelModule = {
       brandPreset: base.brandPreset,
       musicUrl: base.musicUrl,
       musicVolume: base.musicVolume,
+      highlightMode: config.highlightMode as string | undefined,
       llmCall: callLLM,
       onProgress: base.onProgress,
     });

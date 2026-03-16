@@ -1,6 +1,11 @@
 import { NextRequest } from 'next/server';
 import { API_SCOPES } from '@reelstack/types';
-import { createReelJob, consumeCredits, getCreditCost, updateReelJobStatus } from '@reelstack/database';
+import {
+  createReelJob,
+  consumeCredits,
+  getCreditCost,
+  updateReelJobStatus,
+} from '@reelstack/database';
 import { getTierLimits } from '@/lib/api/validation';
 import { createQueue } from '@reelstack/queue';
 import { withAuth, successResponse, errorResponse } from '@/lib/api/v1/middleware';
@@ -29,7 +34,7 @@ export const POST = withAuth(
       return errorResponse(
         'VALIDATION_ERROR',
         parsed.error.issues.map((i) => i.message).join(', '),
-        400,
+        400
       );
     }
 
@@ -40,15 +45,14 @@ export const POST = withAuth(
       return errorResponse(
         'QUOTA_EXCEEDED',
         'Monthly render limit reached and no tokens available. Upgrade or purchase tokens.',
-        429,
+        429
       );
     }
 
     // Use explicit mode from schema (defaults to 'generate').
     // Backward compat: if assets provided but mode not explicitly set, treat as compose.
-    const mode = parsed.data.mode === 'generate' && parsed.data.assets
-      ? 'compose'
-      : parsed.data.mode;
+    const mode =
+      parsed.data.mode === 'generate' && parsed.data.assets ? 'compose' : parsed.data.mode;
 
     const job = await createReelJob({
       userId: ctx.user.id,
@@ -77,6 +81,7 @@ export const POST = withAuth(
         numberOfSlides: parsed.data.numberOfSlides,
         musicUrl: parsed.data.musicUrl,
         musicVolume: parsed.data.musicVolume,
+        highlightMode: parsed.data.highlightMode,
       },
       apiKeyId: ctx.apiKeyId ?? undefined,
       creditCost: cost,
@@ -87,7 +92,9 @@ export const POST = withAuth(
       const queue = await createQueue();
       await queue.enqueue(job.id, { jobId: job.id }, 'reel-render');
     } catch {
-      await updateReelJobStatus(job.id, { status: 'FAILED', error: 'Queue unavailable' }).catch(() => {});
+      await updateReelJobStatus(job.id, { status: 'FAILED', error: 'Queue unavailable' }).catch(
+        () => {}
+      );
       return errorResponse('SERVICE_UNAVAILABLE', 'Reel render queue unavailable', 503);
     }
 
@@ -99,7 +106,7 @@ export const POST = withAuth(
         creditSource: source,
         pollUrl: `/api/v1/reel/render/${job.id}`,
       },
-      201,
+      201
     );
-  },
+  }
 );

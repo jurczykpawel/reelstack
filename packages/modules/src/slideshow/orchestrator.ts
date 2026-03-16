@@ -49,11 +49,20 @@ export interface BuildSlideshowPropsInput {
   durationSeconds: number;
   musicUrl?: string;
   musicVolume?: number;
+  highlightMode?: string;
 }
 
 export function buildSlideshowProps(input: BuildSlideshowPropsInput): SlideshowProps {
-  const { imageUrls, cues, slideBoundaries, voiceoverUrl, durationSeconds, musicUrl, musicVolume } =
-    input;
+  const {
+    imageUrls,
+    cues,
+    slideBoundaries,
+    voiceoverUrl,
+    durationSeconds,
+    musicUrl,
+    musicVolume,
+    highlightMode,
+  } = input;
 
   const TRANSITIONS = ['crossfade', 'slide-left', 'zoom-in', 'wipe', 'slide-right'] as const;
 
@@ -81,6 +90,7 @@ export function buildSlideshowProps(input: BuildSlideshowPropsInput): SlideshowP
       fontSize: 60,
       fontColor: '#FFFFFF',
       fontWeight: 'bold' as const,
+      ...(highlightMode ? { highlightMode } : {}),
       highlightColor: '#FFD700',
       position: 72,
       backgroundColor: '#000000',
@@ -312,6 +322,7 @@ export async function produceSlideshow(request: SlideshowRequest): Promise<Slide
     durationSeconds: totalDuration,
     musicUrl: request.musicUrl,
     musicVolume: request.musicVolume,
+    highlightMode: request.highlightMode,
   });
 
   // ── 7. RENDER ──────────────────────────────────────────────

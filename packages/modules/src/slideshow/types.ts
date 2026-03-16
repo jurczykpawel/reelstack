@@ -23,6 +23,7 @@ export interface SlideshowRequest {
   numberOfSlides?: number;
   template?: string;
   brand?: string;
+  highlightMode?: string;
   language?: string;
   tts?: {
     provider?: 'edge-tts' | 'elevenlabs' | 'openai';

@@ -13,7 +13,12 @@ function isPrivateHost(hostname: string): boolean {
   const host = hostname.replace(/^\[|\]$/g, '');
 
   // Block known internal hostnames
-  const blocked = ['localhost', 'metadata.google.internal', 'metadata.google', 'kubernetes.default'];
+  const blocked = [
+    'localhost',
+    'metadata.google.internal',
+    'metadata.google',
+    'kubernetes.default',
+  ];
   if (blocked.some((b) => host === b || host.endsWith(`.${b}`))) return true;
 
   // IPv6 checks (::1, fe80::, fc00::, fd00::, ::ffff:x.x.x.x mapped)
@@ -60,12 +65,12 @@ function isPrivateIPv4(ip: string): boolean {
 }
 
 function checkPrivateOctets(a: number, b: number): boolean {
-  if (a === 127) return true;                         // 127.0.0.0/8
-  if (a === 10) return true;                          // 10.0.0.0/8
-  if (a === 172 && b >= 16 && b <= 31) return true;   // 172.16.0.0/12
-  if (a === 192 && b === 168) return true;             // 192.168.0.0/16
-  if (a === 169 && b === 254) return true;             // 169.254.0.0/16
-  if (a === 0) return true;                            // 0.0.0.0/8
+  if (a === 127) return true; // 127.0.0.0/8
+  if (a === 10) return true; // 10.0.0.0/8
+  if (a === 172 && b >= 16 && b <= 31) return true; // 172.16.0.0/12
+  if (a === 192 && b === 168) return true; // 192.168.0.0/16
+  if (a === 169 && b === 254) return true; // 169.254.0.0/16
+  if (a === 0) return true; // 0.0.0.0/8
   return false;
 }
 
@@ -76,76 +81,101 @@ function isPublicHttpUrl(url: string): boolean {
     if (parsed.username || parsed.password) return false;
     if (isPrivateHost(parsed.hostname)) return false;
     return true;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
-const callbackUrlSchema = z.string().url().max(2048).refine(
-  (url) => {
-    try {
-      const parsed = new URL(url);
-      if (!['http:', 'https:'].includes(parsed.protocol)) return false;
-      if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') return false;
-      if (parsed.username || parsed.password) return false;
-      if (isPrivateHost(parsed.hostname)) return false;
-      return true;
-    } catch { return false; }
-  },
-  { message: 'Callback URL must be a valid public HTTPS URL' },
-);
+const callbackUrlSchema = z
+  .string()
+  .url()
+  .max(2048)
+  .refine(
+    (url) => {
+      try {
+        const parsed = new URL(url);
+        if (!['http:', 'https:'].includes(parsed.protocol)) return false;
+        if (process.env.NODE_ENV === 'production' && parsed.protocol !== 'https:') return false;
+        if (parsed.username || parsed.password) return false;
+        if (isPrivateHost(parsed.hostname)) return false;
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    { message: 'Callback URL must be a valid public HTTPS URL' }
+  );
 
-const assetUrlSchema = z.string().url().max(2048).refine(
-  isPublicHttpUrl,
-  { message: 'Asset URL must be a valid public HTTP(S) URL' },
-);
+const assetUrlSchema = z
+  .string()
+  .url()
+  .max(2048)
+  .refine(isPublicHttpUrl, { message: 'Asset URL must be a valid public HTTP(S) URL' });
 
 // ── Shared sub-schemas ────────────────────────────────────────
 
-const brandPresetSchema = z.object({
-  // Caption preset (bundles style + animation + word grouping)
-  captionPreset: z.enum(['tiktok', 'mrbeast', 'cinematic', 'minimal', 'neon', 'classic']).optional(),
-  // Template ID (e.g. "builtin-neon") - overrides preset style
-  captionTemplate: z.string().optional(),
-  // Animation style override
-  animationStyle: z.enum(['none', 'word-highlight', 'word-by-word', 'karaoke', 'bounce', 'typewriter']).optional(),
-  // Word grouping overrides
-  maxWordsPerCue: z.number().min(1).max(10).optional(),
-  maxDurationPerCue: z.number().min(0.5).max(10).optional(),
-  textTransform: z.enum(['none', 'uppercase']).optional(),
-  // Music
-  musicUrl: z.string().url().optional(),
-  musicVolume: z.number().min(0).max(1).optional(),
-  // Layout & display
-  layout: z.enum(['fullscreen', 'split-screen', 'picture-in-picture']).optional(),
-  showProgressBar: z.boolean().optional(),
-  dynamicCaptionPosition: z.boolean().optional(),
-  // Style overrides (applied on top of preset/template)
-  highlightColor: z.string().optional(),
-  backgroundColor: z.string().optional(),
-  fontSize: z.number().min(8).max(120).optional(),
-  fontFamily: z.string().optional(),
-  fontColor: z.string().optional(),
-  fontWeight: z.enum(['normal', 'bold']).optional(),
-  outlineWidth: z.number().min(0).max(20).optional(),
-  outlineColor: z.string().optional(),
-  position: z.number().min(0).max(100).optional(),
-  // Transition
-  defaultTransition: z.enum(['crossfade', 'slide-left', 'slide-right', 'zoom-in', 'wipe', 'none']).optional(),
-}).optional();
+const brandPresetSchema = z
+  .object({
+    // Caption preset (bundles style + animation + word grouping)
+    captionPreset: z
+      .enum(['tiktok', 'mrbeast', 'cinematic', 'minimal', 'neon', 'classic'])
+      .optional(),
+    // Template ID (e.g. "builtin-neon") - overrides preset style
+    captionTemplate: z.string().optional(),
+    // Animation style override
+    animationStyle: z
+      .enum(['none', 'word-highlight', 'word-by-word', 'karaoke', 'bounce', 'typewriter'])
+      .optional(),
+    // Word grouping overrides
+    maxWordsPerCue: z.number().min(1).max(10).optional(),
+    maxDurationPerCue: z.number().min(0.5).max(10).optional(),
+    textTransform: z.enum(['none', 'uppercase']).optional(),
+    // Music
+    musicUrl: z.string().url().optional(),
+    musicVolume: z.number().min(0).max(1).optional(),
+    // Layout & display
+    layout: z.enum(['fullscreen', 'split-screen', 'picture-in-picture']).optional(),
+    showProgressBar: z.boolean().optional(),
+    dynamicCaptionPosition: z.boolean().optional(),
+    // Style overrides (applied on top of preset/template)
+    highlightColor: z.string().optional(),
+    backgroundColor: z.string().optional(),
+    fontSize: z.number().min(8).max(120).optional(),
+    fontFamily: z.string().optional(),
+    fontColor: z.string().optional(),
+    fontWeight: z.enum(['normal', 'bold']).optional(),
+    outlineWidth: z.number().min(0).max(20).optional(),
+    outlineColor: z.string().optional(),
+    position: z.number().min(0).max(100).optional(),
+    // Transition
+    defaultTransition: z
+      .enum(['crossfade', 'slide-left', 'slide-right', 'zoom-in', 'wipe', 'none'])
+      .optional(),
+  })
+  .optional();
 
-const ttsSchema = z.object({
-  provider: z.enum(['edge-tts', 'elevenlabs', 'openai']).default('edge-tts'),
-  voice: z.string().optional(),
-  language: z.string().optional(),
-}).optional();
+const ttsSchema = z
+  .object({
+    provider: z.enum(['edge-tts', 'elevenlabs', 'openai']).default('edge-tts'),
+    voice: z.string().optional(),
+    language: z.string().optional(),
+  })
+  .optional();
 
-const whisperSchema = z.object({
-  provider: z.enum(['openrouter', 'cloudflare', 'ollama']).optional(),
-  apiKey: z.string().optional(),
-}).optional();
+const whisperSchema = z
+  .object({
+    provider: z.enum(['openrouter', 'cloudflare', 'ollama']).optional(),
+    apiKey: z.string().optional(),
+  })
+  .optional();
 
 const userAssetSchema = z.object({
   /** Unique ID referenced by the LLM composer */
-  id: z.string().min(1).max(100).regex(/^[a-zA-Z0-9_-]+$/, 'Asset ID must be alphanumeric'),
+  id: z
+    .string()
+    .min(1)
+    .max(100)
+    .regex(/^[a-zA-Z0-9_-]+$/, 'Asset ID must be alphanumeric'),
   url: assetUrlSchema,
   type: z.enum(['video', 'image']),
   /** Human description for the LLM (e.g. "Talking head — mówię do kamery") */
@@ -160,17 +190,48 @@ const cueSchema = z.object({
   text: z.string(),
   startTime: z.number().nonnegative(),
   endTime: z.number().positive(),
-  words: z.array(z.object({
-    text: z.string(),
-    startTime: z.number().nonnegative(),
-    endTime: z.number().positive(),
-  })).optional(),
+  words: z
+    .array(
+      z.object({
+        text: z.string(),
+        startTime: z.number().nonnegative(),
+        endTime: z.number().positive(),
+      })
+    )
+    .optional(),
 });
 
 const SUPPORTED_LANGUAGES = [
-  'pl', 'en', 'es', 'de', 'fr', 'it', 'pt', 'nl', 'ru', 'uk', 'cs', 'sk',
-  'ja', 'ko', 'zh', 'ar', 'hi', 'sv', 'da', 'no', 'fi', 'hu', 'ro', 'bg',
-  'hr', 'sr', 'sl', 'tr', 'vi', 'th',
+  'pl',
+  'en',
+  'es',
+  'de',
+  'fr',
+  'it',
+  'pt',
+  'nl',
+  'ru',
+  'uk',
+  'cs',
+  'sk',
+  'ja',
+  'ko',
+  'zh',
+  'ar',
+  'hi',
+  'sv',
+  'da',
+  'no',
+  'fi',
+  'hu',
+  'ro',
+  'bg',
+  'hr',
+  'sr',
+  'sl',
+  'tr',
+  'vi',
+  'th',
 ] as const;
 
 // ── Primary schemas ───────────────────────────────────────────
@@ -194,79 +255,92 @@ export const reelModeSchema = z.enum([
 
 export type ReelMode = z.infer<typeof reelModeSchema>;
 
-export const generateReelSchema = z.object({
-  mode: reelModeSchema.optional().default('generate'),
-  /** Required for generate/compose/captions modes. Auto-generated for n8n-explainer/ai-tips/presenter-explainer. */
-  script: z.string().min(1).max(50000).optional(),
-  style: z.enum(['dynamic', 'calm', 'cinematic', 'educational']).optional(),
-  layout: z.enum(['fullscreen', 'split-screen', 'picture-in-picture']).default('fullscreen'),
-  tts: ttsSchema.optional(),
-  whisper: whisperSchema.optional(),
-  brandPreset: brandPresetSchema,
-  /** User-provided materials. When present, triggers compose mode. */
-  assets: z.array(userAssetSchema).min(1).max(20).optional(),
-  /** Extra instructions for the LLM composer (compose mode only) */
-  directorNotes: z.string().max(1000).optional(),
-  /** Avatar settings (full auto mode, when HeyGen is available) */
-  avatar: z.object({
-    avatarId: z.string().optional(),
-    voice: z.string().optional(),
-  }).optional(),
-  /** n8n workflow URL or ID (n8n-explainer mode) */
-  workflowUrl: z.string().max(500).optional(),
-  /** Topic for AI generation (ai-tips, presenter-explainer modes) */
-  topic: z.string().min(1).max(1000).optional(),
-  /** Language for script generation (default: from tts.language or 'pl') */
-  language: z.string().max(10).optional(),
-  /** Persona for presenter-explainer mode (e.g. "senior developer", "tech reviewer") */
-  persona: z.string().max(500).optional(),
-  /** LLM provider override (e.g. "openai", "anthropic") */
-  provider: z.string().max(100).optional(),
-  /** Slideshow slides (slideshow mode — skips LLM when provided) */
-  slides: z.array(z.object({
-    title: z.string().max(200),
-    text: z.string().max(500).optional(),
-    badge: z.string().max(50).optional(),
-    num: z.string().max(10).optional(),
+export const generateReelSchema = z
+  .object({
+    mode: reelModeSchema.optional().default('generate'),
+    /** Required for generate/compose/captions modes. Auto-generated for n8n-explainer/ai-tips/presenter-explainer. */
+    script: z.string().min(1).max(50000).optional(),
+    style: z.enum(['dynamic', 'calm', 'cinematic', 'educational']).optional(),
+    layout: z.enum(['fullscreen', 'split-screen', 'picture-in-picture']).default('fullscreen'),
+    tts: ttsSchema.optional(),
+    whisper: whisperSchema.optional(),
+    brandPreset: brandPresetSchema,
+    /** User-provided materials. When present, triggers compose mode. */
+    assets: z.array(userAssetSchema).min(1).max(20).optional(),
+    /** Extra instructions for the LLM composer (compose mode only) */
+    directorNotes: z.string().max(1000).optional(),
+    /** Avatar settings (full auto mode, when HeyGen is available) */
+    avatar: z
+      .object({
+        avatarId: z.string().optional(),
+        voice: z.string().optional(),
+      })
+      .optional(),
+    /** n8n workflow URL or ID (n8n-explainer mode) */
+    workflowUrl: z.string().max(500).optional(),
+    /** Topic for AI generation (ai-tips, presenter-explainer modes) */
+    topic: z.string().min(1).max(1000).optional(),
+    /** Language for script generation (default: from tts.language or 'pl') */
+    language: z.string().max(10).optional(),
+    /** Persona for presenter-explainer mode (e.g. "senior developer", "tech reviewer") */
+    persona: z.string().max(500).optional(),
+    /** LLM provider override (e.g. "openai", "anthropic") */
+    provider: z.string().max(100).optional(),
+    /** Slideshow slides (slideshow mode — skips LLM when provided) */
+    slides: z
+      .array(
+        z.object({
+          title: z.string().max(200),
+          text: z.string().max(500).optional(),
+          badge: z.string().max(50).optional(),
+          num: z.string().max(10).optional(),
+          template: z.string().max(50).optional(),
+        })
+      )
+      .min(1)
+      .max(20)
+      .optional(),
+    /** Image-gen brand CSS name (slideshow mode, default: example) */
+    brand: z.string().max(50).optional(),
+    /** Image-gen template name (slideshow mode, default: tip-card) */
     template: z.string().max(50).optional(),
-  })).min(1).max(20).optional(),
-  /** Image-gen brand CSS name (slideshow mode, default: example) */
-  brand: z.string().max(50).optional(),
-  /** Image-gen template name (slideshow mode, default: tip-card) */
-  template: z.string().max(50).optional(),
-  /** Number of slides for slideshow LLM generation */
-  numberOfSlides: z.number().int().min(2).max(10).optional(),
-  /** Number of tips for ai-tips mode */
-  numberOfTips: z.number().int().min(1).max(50).optional(),
-  /** Target duration in seconds */
-  targetDuration: z.number().positive().max(600).optional(),
-  /** Background music URL */
-  musicUrl: z.string().url().max(2048).optional(),
-  /** Background music volume (0 = mute, 1 = full) */
-  musicVolume: z.number().min(0).max(1).optional(),
-  /** Reel variant / visual style */
-  variant: z.enum(['multi-object', 'single-object', 'cutaway-demo']).optional(),
-  /** Montage profile ID (auto-selected from script if not provided) */
-  montageProfile: z.string().max(50).optional(),
-  callbackUrl: callbackUrlSchema.optional(),
-}).refine(
-  (data) => {
-    const scriptModes = ['generate', 'compose', 'captions'];
-    if (scriptModes.includes(data.mode ?? 'generate') && !data.script) return false;
-    if (data.mode === 'slideshow' && !data.topic) return false;
-    if (data.mode === 'ai-tips' && !data.topic) return false;
-    if (data.mode === 'presenter-explainer' && !data.topic) return false;
-    if (data.mode === 'n8n-explainer' && !data.workflowUrl) return false;
-    return true;
-  },
-  (data) => ({
-    message: data.mode === 'n8n-explainer'
-      ? 'workflowUrl is required for n8n-explainer mode'
-      : ['slideshow', 'ai-tips', 'presenter-explainer'].includes(data.mode ?? '')
-        ? `topic is required for ${data.mode} mode`
-        : 'script is required for generate/compose/captions mode',
-  }),
-);
+    /** Caption highlight mode (text = karaoke phrase, single-word = one word at a time, pill = colored pill) */
+    highlightMode: z.string().max(30).optional(),
+    /** Number of slides for slideshow LLM generation */
+    numberOfSlides: z.number().int().min(2).max(10).optional(),
+    /** Number of tips for ai-tips mode */
+    numberOfTips: z.number().int().min(1).max(50).optional(),
+    /** Target duration in seconds */
+    targetDuration: z.number().positive().max(600).optional(),
+    /** Background music URL */
+    musicUrl: z.string().url().max(2048).optional(),
+    /** Background music volume (0 = mute, 1 = full) */
+    musicVolume: z.number().min(0).max(1).optional(),
+    /** Reel variant / visual style */
+    variant: z.enum(['multi-object', 'single-object', 'cutaway-demo']).optional(),
+    /** Montage profile ID (auto-selected from script if not provided) */
+    montageProfile: z.string().max(50).optional(),
+    callbackUrl: callbackUrlSchema.optional(),
+  })
+  .refine(
+    (data) => {
+      const scriptModes = ['generate', 'compose', 'captions'];
+      if (scriptModes.includes(data.mode ?? 'generate') && !data.script) return false;
+      if (data.mode === 'slideshow' && !data.topic) return false;
+      if (data.mode === 'ai-tips' && !data.topic) return false;
+      if (data.mode === 'presenter-explainer' && !data.topic) return false;
+      if (data.mode === 'n8n-explainer' && !data.workflowUrl) return false;
+      return true;
+    },
+    (data) => ({
+      message:
+        data.mode === 'n8n-explainer'
+          ? 'workflowUrl is required for n8n-explainer mode'
+          : ['slideshow', 'ai-tips', 'presenter-explainer'].includes(data.mode ?? '')
+            ? `topic is required for ${data.mode} mode`
+            : 'script is required for generate/compose/captions mode',
+    })
+  );
 
 /**
  * POST /api/v1/reel/captions
@@ -275,21 +349,22 @@ export const generateReelSchema = z.object({
  * - With `script`: TTS → transcribe → burn captions
  * - With `cues`: burn pre-computed captions directly (no TTS)
  */
-export const captionsReelSchema = z.object({
-  /** URL of the existing video to caption */
-  videoUrl: assetUrlSchema,
-  /** Script text — TTS will generate audio, Whisper will transcribe for captions */
-  script: z.string().min(1).max(50000).optional(),
-  /** Pre-computed subtitle cues — skip TTS and transcription entirely */
-  cues: z.array(cueSchema).min(1).max(500).optional(),
-  style: z.enum(['dynamic', 'calm', 'cinematic', 'educational']).optional(),
-  tts: ttsSchema,
-  brandPreset: brandPresetSchema,
-  callbackUrl: callbackUrlSchema.optional(),
-}).refine(
-  (data) => !!(data.script || data.cues),
-  { message: 'Provide either script (for TTS + transcription) or cues (pre-computed subtitles)' },
-);
+export const captionsReelSchema = z
+  .object({
+    /** URL of the existing video to caption */
+    videoUrl: assetUrlSchema,
+    /** Script text — TTS will generate audio, Whisper will transcribe for captions */
+    script: z.string().min(1).max(50000).optional(),
+    /** Pre-computed subtitle cues — skip TTS and transcription entirely */
+    cues: z.array(cueSchema).min(1).max(500).optional(),
+    style: z.enum(['dynamic', 'calm', 'cinematic', 'educational']).optional(),
+    tts: ttsSchema,
+    brandPreset: brandPresetSchema,
+    callbackUrl: callbackUrlSchema.optional(),
+  })
+  .refine((data) => !!(data.script || data.cues), {
+    message: 'Provide either script (for TTS + transcription) or cues (pre-computed subtitles)',
+  });
 
 /** Batch reel generation - up to 20 reels per request */
 export const batchGenerateSchema = z.object({
@@ -301,21 +376,30 @@ export const batchGenerateSchema = z.object({
 export const multiLangReelSchema = z.object({
   script: z.string().min(1).max(10000),
   sourceLanguage: z.enum(SUPPORTED_LANGUAGES).default('pl'),
-  targetLanguages: z.array(z.enum(SUPPORTED_LANGUAGES)).min(1).max(10)
-    .refine((arr) => new Set(arr).size === arr.length, { message: 'Duplicate languages not allowed' }),
+  targetLanguages: z
+    .array(z.enum(SUPPORTED_LANGUAGES))
+    .min(1)
+    .max(10)
+    .refine((arr) => new Set(arr).size === arr.length, {
+      message: 'Duplicate languages not allowed',
+    }),
   layout: z.enum(['split-screen', 'fullscreen', 'picture-in-picture']).default('fullscreen'),
   style: z.enum(['dynamic', 'calm', 'cinematic', 'educational']).optional(),
-  tts: z.object({
-    provider: z.enum(['edge-tts', 'elevenlabs', 'openai']).default('edge-tts'),
-    voice: z.string().optional(),
-  }).optional(),
+  tts: z
+    .object({
+      provider: z.enum(['edge-tts', 'elevenlabs', 'openai']).default('edge-tts'),
+      voice: z.string().optional(),
+    })
+    .optional(),
   brandPreset: brandPresetSchema,
   callbackUrl: callbackUrlSchema.optional(),
 });
 
 export const publishReelSchema = z.object({
   reelId: z.string().uuid(),
-  platforms: z.array(z.enum(['tiktok', 'instagram', 'youtube-shorts', 'facebook', 'linkedin', 'x'])).min(1),
+  platforms: z
+    .array(z.enum(['tiktok', 'instagram', 'youtube-shorts', 'facebook', 'linkedin', 'x']))
+    .min(1),
   caption: z.string().min(1).max(5000),
   hashtags: z.array(z.string()).max(30).optional(),
   scheduleDate: z.string().datetime().optional(),
