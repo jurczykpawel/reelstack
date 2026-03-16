@@ -9,18 +9,17 @@
 import '../slideshow/remotion/index';
 
 // Private compositions (optional)
-// Uses IIFE — Remotion bundler (esbuild for chrome85) doesn't support top-level await
-(async () => {
-  try {
-    const fs = await import('fs');
-    const path = await import('path');
-    const { fileURLToPath } = await import('url');
-    const __dirname = path.dirname(fileURLToPath(import.meta.url));
-    const privateEntry = path.join(__dirname, '..', 'private', 'remotion', 'index.ts');
-    if (fs.existsSync(privateEntry)) {
-      await import(privateEntry);
-    }
-  } catch {
-    // Private compositions not available
+// Synchronous check + require — works in both bun runtime and Remotion webpack bundler
+try {
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const fs = require('fs');
+  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  const path = require('path');
+  const pkgDir = path.dirname(require.resolve('@reelstack/modules/package.json'));
+  const privateEntry = path.join(pkgDir, 'src', 'private', 'remotion', 'index.ts');
+  if (fs.existsSync(privateEntry)) {
+    require(privateEntry);
   }
-})();
+} catch {
+  // Private compositions not available
+}

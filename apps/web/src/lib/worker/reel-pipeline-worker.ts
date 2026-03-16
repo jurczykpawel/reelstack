@@ -10,12 +10,24 @@ import {
 } from '@reelstack/database';
 import { createLogger } from '@reelstack/logger';
 import { reelJobsTotal, reelRenderDuration } from '@/lib/metrics';
-import { produce as agentProduce, produceComposition, getModule, isCoreMode } from '@reelstack/agent';
+import {
+  produce as agentProduce,
+  produceComposition,
+  getModule,
+  isCoreMode,
+} from '@reelstack/agent';
 import type { UserAsset, ComposeRequest, BrandPreset, BaseModuleRequest } from '@reelstack/agent';
 import { readFile, unlink } from 'fs/promises';
 import crypto from 'crypto';
 
 const log = createLogger('reel-pipeline');
+
+function extractErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  if (typeof err === 'object' && err !== null && 'message' in err)
+    return String((err as Record<string, unknown>).message);
+  return String(err);
+}
 
 /**
  * Deliver webhook callback to client URL.
@@ -26,7 +38,7 @@ const log = createLogger('reel-pipeline');
 async function deliverCallback(
   jobId: string,
   callbackUrl: string,
-  payload: Record<string, unknown>,
+  payload: Record<string, unknown>
 ): Promise<void> {
   const secret = process.env.WEBHOOK_CALLBACK_SECRET;
   if (!secret) {
@@ -76,7 +88,9 @@ function makeProgressCallback(jobId: string, progressMap: Record<string, number>
   return (step: string) => {
     for (const [prefix, progress] of Object.entries(progressMap)) {
       if (step.startsWith(prefix)) {
-        updateReelJobStatus(jobId, { progress }).catch(err => log.warn({ jobId, err }, 'Progress update failed'));
+        updateReelJobStatus(jobId, { progress }).catch((err) =>
+          log.warn({ jobId, err }, 'Progress update failed')
+        );
         break;
       }
     }
@@ -121,9 +135,10 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
         style: config.style as ComposeRequest['style'],
         tts: config.tts as ComposeRequest['tts'],
         brandPreset: config.brandPreset as ComposeRequest['brandPreset'],
-        existingCues: config.captionsMode === 'cues'
-          ? (config.cues as ComposeRequest['existingCues'])
-          : undefined,
+        existingCues:
+          config.captionsMode === 'cues'
+            ? (config.cues as ComposeRequest['existingCues'])
+            : undefined,
         onProgress: makeProgressCallback(jobId, {
           'Transcribing audio...': 30,
           'Assembling composition...': 60,
@@ -134,7 +149,6 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
       const result = await produceComposition(composeRequest);
       outputPath = result.outputPath;
       log.info({ jobId }, 'Captions pipeline complete');
-
     } else if (mode === 'compose') {
       // ── Compose path (user assets + LLM arrangement) ─────────
       log.info({ jobId }, 'Running compose pipeline');
@@ -164,15 +178,22 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
       const result = await produceComposition(composeRequest);
       outputPath = result.outputPath;
       log.info({ jobId, steps: result.steps.length }, 'Compose pipeline complete');
-
     } else if (!isCoreMode(mode)) {
       // ── Module-based path (ai-tips, n8n-explainer, presenter-explainer, etc.) ──
       const reelModule = getModule(mode);
       if (!reelModule) {
-        throw new Error(`Unknown reel mode: "${mode}". Available modules: ${(await import('@reelstack/agent')).listModules().map(m => m.id).join(', ')}`);
+        throw new Error(
+          `Unknown reel mode: "${mode}". Available modules: ${(await import('@reelstack/agent'))
+            .listModules()
+            .map((m) => m.id)
+            .join(', ')}`
+        );
       }
 
-      log.info({ jobId, moduleId: reelModule.id, moduleName: reelModule.name }, 'Running module pipeline');
+      log.info(
+        { jobId, moduleId: reelModule.id, moduleName: reelModule.name },
+        'Running module pipeline'
+      );
 
       const baseRequest: BaseModuleRequest = {
         jobId,
@@ -189,7 +210,6 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
 
       outputPath = result.outputPath;
       log.info({ jobId, moduleId: reelModule.id, meta: result.meta }, 'Module pipeline complete');
-
     } else {
       // ── Full auto path (generate mode) ───────────────────────
       log.info({ jobId }, 'Running full auto pipeline');
@@ -199,8 +219,12 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
         script: job.script ?? '',
         layout: config.layout as 'fullscreen' | 'split-screen' | 'picture-in-picture' | undefined,
         style: config.style as 'dynamic' | 'calm' | 'cinematic' | 'educational' | undefined,
-        tts: config.tts as { provider?: 'edge-tts' | 'elevenlabs' | 'openai'; voice?: string; language?: string } | undefined,
-        whisper: config.whisper as { provider?: 'openrouter' | 'cloudflare' | 'ollama'; apiKey?: string } | undefined,
+        tts: config.tts as
+          | { provider?: 'edge-tts' | 'elevenlabs' | 'openai'; voice?: string; language?: string }
+          | undefined,
+        whisper: config.whisper as
+          | { provider?: 'openrouter' | 'cloudflare' | 'ollama'; apiKey?: string }
+          | undefined,
         brandPreset: config.brandPreset as BrandPreset | undefined,
         avatar: config.avatar as { avatarId?: string; voice?: string } | undefined,
         montageProfile: config.montageProfile as string | undefined,
@@ -221,9 +245,12 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
       // Save production metadata to DB for debugging and traceability
       await updateReelJobStatus(jobId, {
         productionMeta: buildProductionMeta(agentResult),
-      }).catch(err => log.warn({ jobId, err }, 'Failed to save production meta'));
+      }).catch((err) => log.warn({ jobId, err }, 'Failed to save production meta'));
 
-      log.info({ jobId, steps: agentResult.steps.length, assets: agentResult.generatedAssets.length }, 'Auto pipeline complete');
+      log.info(
+        { jobId, steps: agentResult.steps.length, assets: agentResult.generatedAssets.length },
+        'Auto pipeline complete'
+      );
     }
 
     // Upload rendered MP4 to storage
@@ -234,7 +261,7 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
     const outputUrl = await storage.getSignedUrl(outputKey, 86400);
 
     // Clean up local file
-    await unlink(outputPath).catch(err => log.warn({ jobId, err }, 'Cleanup failed'));
+    await unlink(outputPath).catch((err) => log.warn({ jobId, err }, 'Cleanup failed'));
 
     reelJobsTotal.inc({ status: 'completed' });
     reelRenderDuration.observe({ step: 'total' }, (Date.now() - pipelineStart) / 1000);
@@ -265,7 +292,7 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
     log.error({ jobId, err }, 'Pipeline failed');
     await updateReelJobStatus(jobId, {
       status: 'FAILED',
-      error: err instanceof Error ? err.message : 'Unknown error',
+      error: extractErrorMessage(err),
       completedAt: new Date(),
     });
 
@@ -293,32 +320,36 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
  * - Generated assets (toolId, URL, type)
  * - Pipeline steps with durations
  */
-function buildProductionMeta(result: import('@reelstack/agent').ProductionResult): Record<string, unknown> {
+function buildProductionMeta(
+  result: import('@reelstack/agent').ProductionResult
+): Record<string, unknown> {
   return {
-    plan: result.plan ? {
-      layout: result.plan.layout,
-      primarySource: result.plan.primarySource,
-      reasoning: result.plan.reasoning,
-      shots: result.plan.shots.map(s => ({
-        id: s.id,
-        startTime: s.startTime,
-        endTime: s.endTime,
-        visualType: s.visual.type,
-        toolId: 'toolId' in s.visual ? s.visual.toolId : undefined,
-        prompt: 'prompt' in s.visual ? s.visual.prompt : undefined,
-        searchQuery: 'searchQuery' in s.visual ? s.visual.searchQuery : undefined,
-        reason: s.reason,
-      })),
-      effectCount: result.plan.effects.length,
-    } : null,
-    assets: result.generatedAssets.map(a => ({
+    plan: result.plan
+      ? {
+          layout: result.plan.layout,
+          primarySource: result.plan.primarySource,
+          reasoning: result.plan.reasoning,
+          shots: result.plan.shots.map((s) => ({
+            id: s.id,
+            startTime: s.startTime,
+            endTime: s.endTime,
+            visualType: s.visual.type,
+            toolId: 'toolId' in s.visual ? s.visual.toolId : undefined,
+            prompt: 'prompt' in s.visual ? s.visual.prompt : undefined,
+            searchQuery: 'searchQuery' in s.visual ? s.visual.searchQuery : undefined,
+            reason: s.reason,
+          })),
+          effectCount: result.plan.effects.length,
+        }
+      : null,
+    assets: result.generatedAssets.map((a) => ({
       toolId: a.toolId,
       shotId: a.shotId,
       type: a.type,
       url: a.url,
       durationSeconds: a.durationSeconds,
     })),
-    steps: result.steps.map(s => ({
+    steps: result.steps.map((s) => ({
       name: s.name,
       durationMs: Math.round(s.durationMs),
       detail: s.detail,

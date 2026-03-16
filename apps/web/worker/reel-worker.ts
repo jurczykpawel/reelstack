@@ -1,3 +1,8 @@
+import { loadEnvConfig } from '@next/env';
+import path from 'path';
+// Load .env from monorepo root (two levels up from apps/web/worker/)
+loadEnvConfig(path.resolve(import.meta.dirname ?? __dirname, '../../..'));
+
 import * as Sentry from '@sentry/node';
 
 Sentry.init({
@@ -36,7 +41,7 @@ const renderWorker = new Worker(
     // Render pipeline can take 3-5min (TTS + Remotion bundle + render)
     // Default lockDuration is 30s - must be longer than the longest blocking operation
     lockDuration: 360_000, // 6 minutes
-  },
+  }
 );
 
 // Reel publish worker - concurrency 5 (lightweight HTTP calls)
@@ -52,7 +57,7 @@ const publishWorker = new Worker(
     concurrency: 5,
     // Publish jobs make network calls that could be slow
     lockDuration: 60_000, // 1 minute
-  },
+  }
 );
 
 renderWorker.on('failed', (job, err) => {
