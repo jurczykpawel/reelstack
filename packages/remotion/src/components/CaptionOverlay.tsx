@@ -140,15 +140,7 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({ cues, style: sty
 
   if (!visible || segments.length === 0) return null;
 
-  // Pop-in animation on the whole cue container
-  const cueStartFrame = Math.round(activeCue.startTime * fps);
   const cueEndFrame = Math.round(activeCue.endTime * fps);
-
-  const entryScale = spring({
-    frame: frame - cueStartFrame,
-    fps,
-    config: { damping: 12, stiffness: 200 },
-  });
 
   const fadeOut = interpolate(frame, [cueEndFrame - 10, cueEndFrame], [1, 0], {
     extrapolateLeft: 'clamp',
@@ -178,7 +170,7 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({ cues, style: sty
         top: `${verticalPosition}%`,
         left: 0,
         right: 0,
-        transform: `translateY(-50%) scale(${entryScale})`,
+        transform: 'translateY(-50%)',
         display: 'flex',
         justifyContent:
           captionStyle.alignment === 'left'
