@@ -14,7 +14,12 @@ interface CaptionOverlayProps {
  * Builds a multi-layer text-shadow that acts as a solid outline.
  * Much better than WebkitTextStroke which eats into letterforms.
  */
-function buildOutlineShadow(width: number, color: string, blur: number, shadowColor: string): string {
+function buildOutlineShadow(
+  width: number,
+  color: string,
+  blur: number,
+  shadowColor: string
+): string {
   if (width <= 0 && blur <= 0) return 'none';
 
   const shadows: string[] = [];
@@ -30,7 +35,7 @@ function buildOutlineShadow(width: number, color: string, blur: number, shadowCo
       `${d}px ${d}px 0 ${color}`,
       `${-d}px ${d}px 0 ${color}`,
       `${d}px ${-d}px 0 ${color}`,
-      `${-d}px ${-d}px 0 ${color}`,
+      `${-d}px ${-d}px 0 ${color}`
     );
   }
 
@@ -47,10 +52,7 @@ function buildOutlineShadow(width: number, color: string, blur: number, shadowCo
  * Uses inline <span> elements inside a <p> tag, exactly like short-video-maker.
  * NO display:inline-block, NO transform on word spans — just plain inline text with color changes.
  */
-export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
-  cues,
-  style: styleOverride,
-}) => {
+export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({ cues, style: styleOverride }) => {
   const frame = useCurrentFrame();
   const { fps } = useVideoConfig();
   const currentTime = frame / fps;
@@ -60,7 +62,7 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
 
   // ── Single-word mode: bypass cue system, use global word timeline ───
   if (isSingleWord) {
-    const allWords = cues.flatMap(c => c.words ?? []);
+    const allWords = cues.flatMap((c) => c.words ?? []);
     if (allWords.length === 0) return null;
 
     const MIN_DISPLAY = 0.3;
@@ -84,10 +86,12 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
     // Only show if we're past the first word's start
     if (currentTime < effectiveStart[0]) return null;
 
-    const activeWordText = allWords[wordIndex].text;
-    const displayText = (captionStyle.textTransform ?? 'none') === 'uppercase'
-      ? activeWordText.toUpperCase()
-      : activeWordText;
+    // Strip trailing punctuation — "edible." looks wrong as a single big word
+    const activeWordText = allWords[wordIndex].text.replace(/[.,!?;:]+$/, '');
+    const displayText =
+      (captionStyle.textTransform ?? 'none') === 'uppercase'
+        ? activeWordText.toUpperCase()
+        : activeWordText;
 
     const verticalPosition = captionStyle.position;
 
@@ -114,7 +118,7 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
               captionStyle.outlineWidth + 1,
               captionStyle.outlineColor,
               captionStyle.shadowBlur + 4,
-              captionStyle.shadowColor,
+              captionStyle.shadowColor
             ),
             textTransform: (captionStyle.textTransform ?? 'none') as any,
           }}
@@ -125,9 +129,7 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
     );
   }
 
-  const activeCue = cues.find(
-    (c) => currentTime >= c.startTime && currentTime < c.endTime,
-  );
+  const activeCue = cues.find((c) => currentTime >= c.startTime && currentTime < c.endTime);
 
   if (!activeCue) return null;
 
@@ -148,19 +150,17 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
     config: { damping: 12, stiffness: 200 },
   });
 
-  const fadeOut = interpolate(
-    frame,
-    [cueEndFrame - 10, cueEndFrame],
-    [1, 0],
-    { extrapolateLeft: 'clamp', extrapolateRight: 'clamp' },
-  );
+  const fadeOut = interpolate(frame, [cueEndFrame - 10, cueEndFrame], [1, 0], {
+    extrapolateLeft: 'clamp',
+    extrapolateRight: 'clamp',
+  });
 
   const verticalPosition = captionStyle.position;
   const textShadow = buildOutlineShadow(
     captionStyle.outlineWidth,
     captionStyle.outlineColor,
     captionStyle.shadowBlur,
-    captionStyle.shadowColor,
+    captionStyle.shadowColor
   );
 
   const highlightMode = captionStyle.highlightMode ?? 'text';
@@ -171,8 +171,6 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
 
   const modeRenderer = getHighlightMode(highlightMode) ?? getHighlightMode('text');
 
-
-
   return (
     <div
       style={{
@@ -182,7 +180,12 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
         right: 0,
         transform: `translateY(-50%) scale(${entryScale})`,
         display: 'flex',
-        justifyContent: captionStyle.alignment === 'left' ? 'flex-start' : captionStyle.alignment === 'right' ? 'flex-end' : 'center',
+        justifyContent:
+          captionStyle.alignment === 'left'
+            ? 'flex-start'
+            : captionStyle.alignment === 'right'
+              ? 'flex-end'
+              : 'center',
         padding: '0 40px',
         opacity: fadeOut,
       }}
@@ -202,7 +205,9 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
           maxWidth: '90%',
           margin: 0,
           padding: `${captionStyle.padding}px ${captionStyle.padding * 2}px`,
-          backgroundColor: `${captionStyle.backgroundColor}${Math.round(captionStyle.backgroundOpacity * 255)
+          backgroundColor: `${captionStyle.backgroundColor}${Math.round(
+            captionStyle.backgroundOpacity * 255
+          )
             .toString(16)
             .padStart(2, '0')}`,
           borderRadius: 16,
@@ -210,25 +215,22 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({
       >
         {segments.map((seg: WordSegment, i: number) => {
           const isActive = seg.style === 'active' || seg.style === 'highlighted';
-          const displayText = textTransform === 'uppercase'
-            ? seg.text.toUpperCase()
-            : seg.text;
+          const displayText = textTransform === 'uppercase' ? seg.text.toUpperCase() : seg.text;
 
-          const activeStyle = isActive && modeRenderer
-            ? modeRenderer.activeStyle({
-                color: pillColor,
-                fontSize: captionStyle.fontSize,
-                padding: pillPad,
-                borderRadius: pillRadius,
-              })
-            : {};
+          const activeStyle =
+            isActive && modeRenderer
+              ? modeRenderer.activeStyle({
+                  color: pillColor,
+                  fontSize: captionStyle.fontSize,
+                  padding: pillPad,
+                  borderRadius: pillRadius,
+                })
+              : {};
 
           // Modes with background (pill) keep base font color;
           // otherwise use the segment highlight color
           const hasBg = isActive && activeStyle && 'backgroundColor' in activeStyle;
-          const textColor = hasBg
-            ? captionStyle.fontColor
-            : (seg.color ?? captionStyle.fontColor);
+          const textColor = hasBg ? captionStyle.fontColor : (seg.color ?? captionStyle.fontColor);
 
           return (
             // eslint-disable-next-line react/jsx-key
