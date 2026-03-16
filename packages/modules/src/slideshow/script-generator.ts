@@ -44,7 +44,10 @@ Return valid JSON only (no markdown, no code fences):
 }`;
 
   const raw = await llmCall(prompt);
-  const cleaned = raw.replace(/```json\s*/g, '').replace(/```\s*/g, '').trim();
+  const cleaned = raw
+    .replace(/```json\s*/g, '')
+    .replace(/```\s*/g, '')
+    .trim();
 
   let parsed: { hook: string; slides: Slide[]; cta: string; fullNarration: string };
   try {
@@ -85,15 +88,13 @@ export function wrapManualSlides(topic: string, slides: Slide[]): SlideshowScrip
     num: `${i + 1}`,
   }));
 
-  const narration = numbered
-    .map((s) => s.text || s.title)
-    .join('. ');
+  const narration = numbered.map((s) => s.text || s.title).join('. ');
 
   return {
     topic,
     hook: topic,
     slides: numbered,
     cta: '',
-    fullNarration: `${topic}. ${narration}`,
+    fullNarration: narration,
   };
 }
