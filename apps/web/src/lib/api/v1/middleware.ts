@@ -64,7 +64,9 @@ async function authenticateApiKey(
   }
 
   // Touch usage stats (fire-and-forget)
-  touchApiKey(record.id, ip !== 'unknown' ? ip : undefined).catch(err => log.warn({ keyId: record.id, err }, 'Failed to touch API key'));
+  touchApiKey(record.id, ip !== 'unknown' ? ip : undefined).catch((err) =>
+    log.warn({ keyId: record.id, err }, 'Failed to touch API key')
+  );
 
   const scopes = (Array.isArray(record.scopes) ? record.scopes : ['*']) as ApiScope[];
 
@@ -108,10 +110,7 @@ export function hasScope(ctx: AuthContext, requiredScope: ApiScope): boolean {
 // Handler wrapper with auth + rate limiting
 // ==========================================
 
-type HandlerFn = (
-  req: NextRequest,
-  ctx: AuthContext
-) => Promise<NextResponse>;
+type HandlerFn = (req: NextRequest, ctx: AuthContext) => Promise<NextResponse>;
 
 interface WithAuthOptions {
   /** Required scope for this endpoint */
@@ -145,28 +144,26 @@ export function withAuth(
 
     // 2. Check scope
     if (options.scope && !hasScope(ctx, options.scope)) {
-      const response = errorResponse(
-        'FORBIDDEN',
-        `Missing required scope: ${options.scope}`,
-        403
-      );
+      const response = errorResponse('FORBIDDEN', `Missing required scope: ${options.scope}`, 403);
       httpRequestsTotal.inc({ method: req.method, route, status: '403' });
       httpRequestDuration.observe({ method: req.method, route }, (Date.now() - startTime) / 1000);
       return response;
     }
 
-    // 3. Rate limit
-    const rateLimitKey = ctx.apiKeyId ?? ctx.user.id;
-    const rateLimitConfig = options.rateLimit ?? {
-      maxRequests: ctx.apiKeyId ? 60 : 100,
-      windowMs: 60_000,
-    };
-    const rl = await rateLimit(`v1:${rateLimitKey}`, rateLimitConfig);
-    if (!rl.success) {
-      const response = errorResponse('RATE_LIMITED', 'Too many requests', 429);
-      httpRequestsTotal.inc({ method: req.method, route, status: '429' });
-      httpRequestDuration.observe({ method: req.method, route }, (Date.now() - startTime) / 1000);
-      return response;
+    // 3. Rate limit (skipped in development for easier testing)
+    if (process.env.NODE_ENV !== 'development') {
+      const rateLimitKey = ctx.apiKeyId ?? ctx.user.id;
+      const rateLimitConfig = options.rateLimit ?? {
+        maxRequests: ctx.apiKeyId ? 60 : 100,
+        windowMs: 60_000,
+      };
+      const rl = await rateLimit(`v1:${rateLimitKey}`, rateLimitConfig);
+      if (!rl.success) {
+        const response = errorResponse('RATE_LIMITED', 'Too many requests', 429);
+        httpRequestsTotal.inc({ method: req.method, route, status: '429' });
+        httpRequestDuration.observe({ method: req.method, route }, (Date.now() - startTime) / 1000);
+        return response;
+      }
     }
 
     // 4. Execute handler
@@ -182,11 +179,7 @@ export function withAuth(
       if (err instanceof AppError) {
         httpRequestsTotal.inc({ method: req.method, route, status: err.statusCode.toString() });
         httpRequestDuration.observe({ method: req.method, route }, duration);
-        return errorResponse(
-          err.code as ApiV1Error['error']['code'],
-          err.message,
-          err.statusCode,
-        );
+        return errorResponse(err.code as ApiV1Error['error']['code'], err.message, err.statusCode);
       }
 
       httpRequestsTotal.inc({ method: req.method, route, status: '500' });
@@ -203,9 +196,7 @@ export function withAuth(
 // ==========================================
 
 export function successResponse<T>(data: T, status = 200): NextResponse {
-  return addSecurityHeaders(
-    NextResponse.json({ data } satisfies ApiV1Success<T>, { status })
-  );
+  return addSecurityHeaders(NextResponse.json({ data } satisfies ApiV1Success<T>, { status }));
 }
 
 export function errorResponse(
