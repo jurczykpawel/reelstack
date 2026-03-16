@@ -12,14 +12,18 @@ vi.mock('child_process', () => ({
   execFileSync: (...args: unknown[]) => mockExecFileSync(...args),
 }));
 
-vi.mock('fs', () => ({
-  mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
-  statSync: (...args: unknown[]) => mockStatSync(...args),
-  existsSync: (...args: unknown[]) => mockExistsSync(...args),
-  rmSync: (...args: unknown[]) => mockRmSync(...args),
-  writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
-  unlinkSync: (...args: unknown[]) => mockUnlinkSync(...args),
-}));
+vi.mock('fs', () => {
+  const fsMock = {
+    mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
+    statSync: (...args: unknown[]) => mockStatSync(...args),
+    existsSync: (...args: unknown[]) => mockExistsSync(...args),
+    rmSync: (...args: unknown[]) => mockRmSync(...args),
+    writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
+    unlinkSync: (...args: unknown[]) => mockUnlinkSync(...args),
+    readFileSync: () => '',
+  };
+  return { ...fsMock, default: fsMock };
+});
 
 const { LocalRenderer } = await import('../render/local-renderer');
 
@@ -58,13 +62,13 @@ describe('LocalRenderer', () => {
 
     // Should NOT call bundle CLI
     const bundleCalls = mockExecFileSync.mock.calls.filter(
-      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('bundle'),
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('bundle')
     );
     expect(bundleCalls).toHaveLength(0);
 
     // Should call render CLI with the pre-built path
     const renderCall = mockExecFileSync.mock.calls.find(
-      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render'),
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render')
     );
     expect(renderCall).toBeDefined();
     expect((renderCall![1] as string[])[2]).toBe('/app/remotion-bundle');
@@ -77,7 +81,7 @@ describe('LocalRenderer', () => {
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4' });
 
     const bundleCalls = mockExecFileSync.mock.calls.filter(
-      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('bundle'),
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('bundle')
     );
     expect(bundleCalls).toHaveLength(1);
   });
@@ -89,9 +93,9 @@ describe('LocalRenderer', () => {
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4', concurrency: 3 });
 
     const renderCall = mockExecFileSync.mock.calls.find(
-      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render'),
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render')
     );
-    expect((renderCall![1] as string[])).toContain('--concurrency=3');
+    expect(renderCall![1] as string[]).toContain('--concurrency=3');
   });
 
   it('respects REMOTION_CONCURRENCY env var', async () => {
@@ -101,9 +105,9 @@ describe('LocalRenderer', () => {
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4' });
 
     const renderCall = mockExecFileSync.mock.calls.find(
-      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render'),
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render')
     );
-    expect((renderCall![1] as string[])).toContain('--concurrency=2');
+    expect(renderCall![1] as string[]).toContain('--concurrency=2');
   });
 
   it('selects h264 codec by default', async () => {
@@ -112,9 +116,9 @@ describe('LocalRenderer', () => {
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4' });
 
     const renderCall = mockExecFileSync.mock.calls.find(
-      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render'),
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render')
     );
-    expect((renderCall![1] as string[])).toContain('--codec=h264');
+    expect(renderCall![1] as string[]).toContain('--codec=h264');
   });
 
   it('selects h265 when requested', async () => {
@@ -123,9 +127,9 @@ describe('LocalRenderer', () => {
     await renderer.render(minimalProps, { outputPath: '/tmp/out.mp4', codec: 'h265' });
 
     const renderCall = mockExecFileSync.mock.calls.find(
-      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render'),
+      (c: unknown[]) => Array.isArray(c[1]) && (c[1] as string[]).includes('render')
     );
-    expect((renderCall![1] as string[])).toContain('--codec=h265');
+    expect(renderCall![1] as string[]).toContain('--codec=h265');
   });
 
   it('returns correct render result', async () => {
