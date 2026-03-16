@@ -35,29 +35,86 @@ export interface BuildSlideshowPropsInput {
     endTime: number;
     words?: Array<{ text: string; startTime: number; endTime: number }>;
   }>;
+  /** All word-level timestamps from transcription (for slide boundary detection). */
+  words: Array<{ text: string; startTime: number; endTime: number }>;
   voiceoverUrl: string;
   durationSeconds: number;
   musicUrl?: string;
   musicVolume?: number;
 }
 
-export function buildSlideshowProps(input: BuildSlideshowPropsInput): SlideshowProps {
-  const { script, imageUrls, cues, voiceoverUrl, durationSeconds, musicUrl, musicVolume } = input;
+/**
+ * Find slide transition times from actual word timestamps.
+ * Matches each slide's text to words in the timeline to find
+ * when narration moves from one slide to the next.
+ */
+function findSlideBoundaries(
+  slides: Array<{ title?: string; text?: string }>,
+  words: Array<{ text: string; startTime: number; endTime: number }>,
+  totalDuration: number
+): number[] {
+  if (words.length === 0 || slides.length === 0) return [];
 
-  // Distribute slide duration proportionally to narration text length.
-  // Longer text = more time on screen (matches TTS pacing).
-  const slideTexts = script.slides.map((s) => `${s.title ?? ''} ${s.text ?? ''}`.trim());
-  const totalChars = slideTexts.reduce((sum, t) => sum + Math.max(t.length, 10), 0);
+  // Build per-slide word lists from the narration
+  // The narration is: "slide1_text. slide2_text. slide3_text."
+  // We find where each slide's FIRST unique word appears in the word timeline.
+  const boundaries: number[] = [0]; // slide 0 always starts at 0
+
+  let wordCursor = 0;
+  for (let s = 1; s < slides.length; s++) {
+    const slideText = `${slides[s].title ?? ''} ${slides[s].text ?? ''}`.trim().toLowerCase();
+    const slideFirstWords = slideText.split(/\s+/).slice(0, 3); // first 3 words of this slide
+
+    if (slideFirstWords.length === 0) {
+      boundaries.push(boundaries[boundaries.length - 1]);
+      continue;
+    }
+
+    // Search forward in word timeline for the first word of this slide
+    let found = false;
+    for (let w = wordCursor; w < words.length; w++) {
+      const clean = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '');
+      if (clean(words[w].text) === clean(slideFirstWords[0])) {
+        // Check if next words also match (avoid false positives)
+        let match = true;
+        for (let k = 1; k < Math.min(slideFirstWords.length, 2); k++) {
+          if (w + k < words.length && clean(words[w + k].text) !== clean(slideFirstWords[k])) {
+            match = false;
+            break;
+          }
+        }
+        if (match) {
+          boundaries.push(words[w].startTime);
+          wordCursor = w;
+          found = true;
+          break;
+        }
+      }
+    }
+
+    if (!found) {
+      // Fallback: proportional
+      const proportion = s / slides.length;
+      boundaries.push(totalDuration * proportion);
+    }
+  }
+
+  boundaries.push(totalDuration); // end marker
+  return boundaries;
+}
+
+export function buildSlideshowProps(input: BuildSlideshowPropsInput): SlideshowProps {
+  const { script, imageUrls, cues, words, voiceoverUrl, durationSeconds, musicUrl, musicVolume } =
+    input;
 
   const TRANSITIONS = ['crossfade', 'slide-left', 'zoom-in', 'wipe', 'slide-right'] as const;
 
-  let cursor = 0;
+  // Find actual slide boundaries from word timestamps
+  const boundaries = findSlideBoundaries(script.slides, words, durationSeconds);
+
   const slides = imageUrls.map((url, i) => {
-    const weight = Math.max(slideTexts[i]?.length ?? 10, 10) / totalChars;
-    const duration = durationSeconds * weight;
-    const startTime = cursor;
-    const endTime = i === imageUrls.length - 1 ? durationSeconds : cursor + duration;
-    cursor = endTime;
+    const startTime = boundaries[i] ?? (durationSeconds * i) / imageUrls.length;
+    const endTime = boundaries[i + 1] ?? durationSeconds;
     return {
       imageUrl: url,
       startTime,
@@ -209,6 +266,7 @@ export async function produceSlideshow(request: SlideshowRequest): Promise<Slide
     script,
     imageUrls,
     cues: ttsResult.cues,
+    words: ttsResult.transcriptionWords,
     voiceoverUrl,
     durationSeconds: ttsResult.audioDuration,
     musicUrl: request.musicUrl,
