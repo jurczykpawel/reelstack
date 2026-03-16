@@ -15,14 +15,13 @@ import type { TranscriptionWord } from './types';
  */
 export function alignWordsWithScript(
   whisperWords: readonly TranscriptionWord[],
-  originalScript: string,
+  originalScript: string
 ): TranscriptionWord[] {
   if (!originalScript || whisperWords.length === 0) return [...whisperWords];
 
-  const scriptWords = originalScript
-    .replace(/[^\w\s'-]/g, ' ')
-    .split(/\s+/)
-    .filter(Boolean);
+  // Split on whitespace, keeping punctuation attached to words.
+  // "Hello, world." → ["Hello,", "world."]
+  const scriptWords = originalScript.split(/\s+/).filter(Boolean);
 
   if (scriptWords.length === 0) return [...whisperWords];
 
@@ -52,25 +51,28 @@ function wordsMatch(a: string, b: string): boolean {
  */
 function diffAlign(
   whisperWords: readonly TranscriptionWord[],
-  scriptWords: string[],
+  scriptWords: string[]
 ): TranscriptionWord[] {
   const wLen = whisperWords.length;
   const sLen = scriptWords.length;
 
   // Find common prefix (matching words from start)
   let prefixLen = 0;
-  while (prefixLen < wLen && prefixLen < sLen &&
-    wordsMatch(whisperWords[prefixLen].text, scriptWords[prefixLen])) {
+  while (
+    prefixLen < wLen &&
+    prefixLen < sLen &&
+    wordsMatch(whisperWords[prefixLen].text, scriptWords[prefixLen])
+  ) {
     prefixLen++;
   }
 
   // Find common suffix (matching words from end)
   let suffixLen = 0;
-  while (suffixLen < (wLen - prefixLen) && suffixLen < (sLen - prefixLen) &&
-    wordsMatch(
-      whisperWords[wLen - 1 - suffixLen].text,
-      scriptWords[sLen - 1 - suffixLen],
-    )) {
+  while (
+    suffixLen < wLen - prefixLen &&
+    suffixLen < sLen - prefixLen &&
+    wordsMatch(whisperWords[wLen - 1 - suffixLen].text, scriptWords[sLen - 1 - suffixLen])
+  ) {
     suffixLen++;
   }
 
