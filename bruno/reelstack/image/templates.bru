@@ -15,11 +15,11 @@ tests {
   });
 
   test("returns templates array", function() {
-    expect(res.body.templates).to.be.an("array");
-    expect(res.body.templates.length).to.be.greaterThan(0);
+    expect(res.body.data.templates).to.be.an("array");
+    expect(res.body.data.templates.length).to.be.greaterThan(0);
   });
 
   test("includes tip-card", function() {
-    expect(res.body.templates).to.include("tip-card");
+    expect(res.body.data.templates).to.include("tip-card");
   });
 }

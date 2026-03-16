@@ -19,7 +19,7 @@ tests {
   });
 
   test("returns brands array", function() {
-    expect(res.body.brands).to.be.an("array");
-    expect(res.body.brands.length).to.be.greaterThan(0);
+    expect(res.body.data.brands).to.be.an("array");
+    expect(res.body.data.brands.length).to.be.greaterThan(0);
   });
 }
