@@ -129,7 +129,21 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({ cues, style: sty
     );
   }
 
-  const activeCue = cues.find((c) => currentTime >= c.startTime && currentTime < c.endTime);
+  let activeCue = cues.find((c) => currentTime >= c.startTime && currentTime < c.endTime);
+
+  // Bridge gaps between cues: if we're between cue A (ended) and cue B (not started),
+  // keep showing cue A until cue B starts. Prevents flashing empty screen.
+  if (!activeCue) {
+    const pastCues = cues.filter((c) => c.endTime <= currentTime);
+    if (pastCues.length > 0) {
+      const lastCue = pastCues[pastCues.length - 1];
+      const nextCue = cues.find((c) => c.startTime > currentTime);
+      // Only bridge if gap is short (<1s) — long gaps are intentional pauses
+      if (nextCue && nextCue.startTime - lastCue.endTime < 1.0) {
+        activeCue = lastCue;
+      }
+    }
+  }
 
   if (!activeCue) return null;
 
