@@ -16,6 +16,34 @@
 
 ---
 
+## Demo Reels
+
+Generated entirely by ReelStack -- no editing software, no designer, just one API call.
+
+<table>
+<tr>
+<td align="center">
+<a href="https://www.youtube.com/watch?v=QSM9JQevxjw"><img src="docs/assets/demo-meta-preview.gif" width="200" alt="AI Video Automation"/></a><br/>
+<b>AI Video Automation</b><br/>
+<sub>tip-card + karaoke captions</sub>
+</td>
+<td align="center">
+<a href="https://www.youtube.com/watch?v=fE48rRCLx7Y"><img src="docs/assets/demo-science-preview.gif" width="200" alt="Science Facts"/></a><br/>
+<b>Science Facts</b><br/>
+<sub>quote-card + single-word mode</sub>
+</td>
+<td align="center">
+<a href="https://www.youtube.com/watch?v=pzi6JYb3Icc"><img src="docs/assets/demo-iphone-preview.gif" width="200" alt="iPhone Tips"/></a><br/>
+<b>iPhone Tips</b><br/>
+<sub>tip-card + karaoke captions</sub>
+</td>
+</tr>
+</table>
+
+> Click any preview to watch the full reel on YouTube.
+
+---
+
 ## Why ReelStack?
 
 Most video tools are either closed-source SaaS products with usage limits, or scattered scripts requiring manual assembly. ReelStack is a complete pipeline:
@@ -93,12 +121,12 @@ ReelStack replaces manual editing workflows in tools like **Kapwing**, **Descrip
 
 ### Prerequisites
 
-| Requirement | Version |
-|-------------|---------|
-| [Bun](https://bun.sh/) | 1.3+ |
-| [Node.js](https://nodejs.org/) | 20+ |
-| [PostgreSQL](https://www.postgresql.org/) | 15+ (or use Docker) |
-| OS | macOS, Linux, or Windows (WSL) |
+| Requirement                               | Version                        |
+| ----------------------------------------- | ------------------------------ |
+| [Bun](https://bun.sh/)                    | 1.3+                           |
+| [Node.js](https://nodejs.org/)            | 20+                            |
+| [PostgreSQL](https://www.postgresql.org/) | 15+ (or use Docker)            |
+| OS                                        | macOS, Linux, or Windows (WSL) |
 
 ### Run Locally (Development)
 
@@ -163,24 +191,24 @@ For full deployment instructions:
 
 ## Tech Stack
 
-| Layer | Technology | Role |
-|-------|-----------|------|
-| **Framework** | [Next.js 16](https://nextjs.org/) (App Router) | Server-side rendering, API routes, file-based routing |
-| **Language** | [TypeScript](https://www.typescriptlang.org/) | Type safety across all packages |
-| **UI** | [React 19](https://react.dev/) | Component framework |
-| **Styling** | [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/) | Utility-first CSS with accessible component library |
-| **State** | [Zustand](https://zustand-demo.pmnd.rs/) | 4 client-side stores (project, engine, timeline, UI) |
-| **Auth** | [Auth.js](https://authjs.dev/) (NextAuth v5) | Email/password + magic links, JWT sessions |
-| **Database** | [PostgreSQL](https://www.postgresql.org/) + [Prisma ORM](https://www.prisma.io/) | Relational storage with type-safe queries |
-| **Storage** | [MinIO](https://min.io/) / [Supabase Storage](https://supabase.com/storage) | Video and rendered file storage (adapter pattern) |
-| **Queue** | [BullMQ](https://docs.bullmq.io/) + [Redis](https://redis.io/) / [Inngest](https://www.inngest.com/) | Background render job processing (adapter pattern) |
-| **Client Rendering** | [FFmpeg.wasm](https://ffmpegwasm.netlify.app/) | In-browser video processing via WebAssembly |
-| **Server Rendering** | [FFmpeg](https://ffmpeg.org/) (native) | Server-side subtitle burning |
-| **Transcription** | [Transformers.js](https://huggingface.co/docs/transformers.js/) (Whisper) | In-browser speech-to-text with word timestamps |
-| **Monorepo** | [Turborepo](https://turbo.build/) + [Bun](https://bun.sh/) workspaces | Build orchestration and dependency management |
-| **Video Rendering** | [Remotion](https://www.remotion.dev/) | React-based video compositions (Reel + YouTube) |
-| **TTS** | [Edge TTS](https://github.com/niconiahi/edge-tts) / [ElevenLabs](https://elevenlabs.io/) | Text-to-speech voiceover generation |
-| **Testing** | [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/) | 537+ unit tests + E2E tests |
+| Layer                | Technology                                                                                           | Role                                                  |
+| -------------------- | ---------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
+| **Framework**        | [Next.js 16](https://nextjs.org/) (App Router)                                                       | Server-side rendering, API routes, file-based routing |
+| **Language**         | [TypeScript](https://www.typescriptlang.org/)                                                        | Type safety across all packages                       |
+| **UI**               | [React 19](https://react.dev/)                                                                       | Component framework                                   |
+| **Styling**          | [Tailwind CSS](https://tailwindcss.com/) + [shadcn/ui](https://ui.shadcn.com/)                       | Utility-first CSS with accessible component library   |
+| **State**            | [Zustand](https://zustand-demo.pmnd.rs/)                                                             | 4 client-side stores (project, engine, timeline, UI)  |
+| **Auth**             | [Auth.js](https://authjs.dev/) (NextAuth v5)                                                         | Email/password + magic links, JWT sessions            |
+| **Database**         | [PostgreSQL](https://www.postgresql.org/) + [Prisma ORM](https://www.prisma.io/)                     | Relational storage with type-safe queries             |
+| **Storage**          | [MinIO](https://min.io/) / [Supabase Storage](https://supabase.com/storage)                          | Video and rendered file storage (adapter pattern)     |
+| **Queue**            | [BullMQ](https://docs.bullmq.io/) + [Redis](https://redis.io/) / [Inngest](https://www.inngest.com/) | Background render job processing (adapter pattern)    |
+| **Client Rendering** | [FFmpeg.wasm](https://ffmpegwasm.netlify.app/)                                                       | In-browser video processing via WebAssembly           |
+| **Server Rendering** | [FFmpeg](https://ffmpeg.org/) (native)                                                               | Server-side subtitle burning                          |
+| **Transcription**    | [Transformers.js](https://huggingface.co/docs/transformers.js/) (Whisper)                            | In-browser speech-to-text with word timestamps        |
+| **Monorepo**         | [Turborepo](https://turbo.build/) + [Bun](https://bun.sh/) workspaces                                | Build orchestration and dependency management         |
+| **Video Rendering**  | [Remotion](https://www.remotion.dev/)                                                                | React-based video compositions (Reel + YouTube)       |
+| **TTS**              | [Edge TTS](https://github.com/niconiahi/edge-tts) / [ElevenLabs](https://elevenlabs.io/)             | Text-to-speech voiceover generation                   |
+| **Testing**          | [Vitest](https://vitest.dev/) + [Playwright](https://playwright.dev/)                                | 537+ unit tests + E2E tests                           |
 
 ---
 
@@ -215,17 +243,17 @@ reelstack/
 
 ### Key Packages
 
-| Package | Purpose |
-|---------|---------|
-| **`packages/remotion`** | Remotion compositions (Reel 9:16, YouTubeLongForm 16:9), 11 effect components (ZoomEffect, AnimatedCounter, HighlightBox, ChapterCard, etc.), schemas, and rendering helpers. See [COMPOSITION.md](packages/remotion/COMPOSITION.md). |
-| **`packages/tts`** | Text-to-speech providers: Edge TTS (free), ElevenLabs, OpenAI. Unified interface for synthesis. |
-| **`packages/transcription`** | whisper.cpp integration, audio normalization, BPE token merging, word-to-cue grouping. Produces karaoke-ready cues. |
-| **`packages/core`** | Pure-function engines (SubtitleEngine, TemplateEngine, RenderEngine, ActionSystem, ProjectSerializer). |
-| **`packages/ffmpeg`** | SRT parser, ASS generator (including karaoke timing tags), time-format utilities. |
-| **`packages/database`** | Prisma schema (User, Video, RenderJob, ReelJob, Template, ApiKey, TokenTransaction, etc.) + query helpers. |
-| **`packages/queue`** | Adapter: auto-detects Inngest (cloud) or BullMQ (VPS). |
-| **`packages/storage`** | Adapter: auto-detects Supabase Storage (cloud) or MinIO (VPS). |
-| **`packages/types`** | Shared TypeScript interfaces and API scope constants. |
+| Package                      | Purpose                                                                                                                                                                                                                               |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **`packages/remotion`**      | Remotion compositions (Reel 9:16, YouTubeLongForm 16:9), 11 effect components (ZoomEffect, AnimatedCounter, HighlightBox, ChapterCard, etc.), schemas, and rendering helpers. See [COMPOSITION.md](packages/remotion/COMPOSITION.md). |
+| **`packages/tts`**           | Text-to-speech providers: Edge TTS (free), ElevenLabs, OpenAI. Unified interface for synthesis.                                                                                                                                       |
+| **`packages/transcription`** | whisper.cpp integration, audio normalization, BPE token merging, word-to-cue grouping. Produces karaoke-ready cues.                                                                                                                   |
+| **`packages/core`**          | Pure-function engines (SubtitleEngine, TemplateEngine, RenderEngine, ActionSystem, ProjectSerializer).                                                                                                                                |
+| **`packages/ffmpeg`**        | SRT parser, ASS generator (including karaoke timing tags), time-format utilities.                                                                                                                                                     |
+| **`packages/database`**      | Prisma schema (User, Video, RenderJob, ReelJob, Template, ApiKey, TokenTransaction, etc.) + query helpers.                                                                                                                            |
+| **`packages/queue`**         | Adapter: auto-detects Inngest (cloud) or BullMQ (VPS).                                                                                                                                                                                |
+| **`packages/storage`**       | Adapter: auto-detects Supabase Storage (cloud) or MinIO (VPS).                                                                                                                                                                        |
+| **`packages/types`**         | Shared TypeScript interfaces and API scope constants.                                                                                                                                                                                 |
 
 For full architecture details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md). For the reel generation pipeline, see [docs/REEL_PIPELINE.md](docs/REEL_PIPELINE.md).
 
@@ -253,12 +281,12 @@ For full architecture details, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ### Keyboard Shortcuts
 
-| Key | Action |
-|-----|--------|
-| `Space` | Play / Pause |
-| `Left Arrow` | Seek back 0.1s (`Shift`: 1s) |
-| `Right Arrow` | Seek forward 0.1s (`Shift`: 1s) |
-| `Delete` / `Backspace` | Remove selected subtitle |
+| Key                    | Action                          |
+| ---------------------- | ------------------------------- |
+| `Space`                | Play / Pause                    |
+| `Left Arrow`           | Seek back 0.1s (`Shift`: 1s)    |
+| `Right Arrow`          | Seek forward 0.1s (`Shift`: 1s) |
+| `Delete` / `Backspace` | Remove selected subtitle        |
 
 ### SRT Workflow
 
@@ -342,23 +370,23 @@ bun run format:check       # Check formatting without writing
 
 ## Environment Variables
 
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `AUTH_SECRET` | Yes | Random secret for JWT signing (`openssl rand -base64 32`) |
-| `DATABASE_URL` | Yes | PostgreSQL connection string |
-| `SMTP_HOST` | No | SMTP server for magic link emails |
-| `SMTP_PORT` | No | SMTP port (default: 587) |
-| `SMTP_USER` | No | SMTP username |
-| `SMTP_PASS` | No | SMTP password |
-| `EMAIL_FROM` | No | From address for emails |
-| `REDIS_URL` | No | Redis for BullMQ (VPS mode) |
-| `MINIO_ENDPOINT` | No | MinIO endpoint (VPS mode) |
-| `MINIO_ACCESS_KEY` | No | MinIO access key |
-| `MINIO_SECRET_KEY` | No | MinIO secret key |
-| `MINIO_BUCKET` | No | MinIO bucket name |
-| `NEXT_PUBLIC_FFMPEG_CORE_URL` | No | Custom CDN base URL for FFmpeg WASM core (defaults to unpkg) |
-| `NEXT_PUBLIC_SUPABASE_URL` | No | Supabase URL (cloud mode, storage only) |
-| `SUPABASE_SERVICE_ROLE_KEY` | No | Supabase service key (cloud mode) |
+| Variable                      | Required | Description                                                  |
+| ----------------------------- | -------- | ------------------------------------------------------------ |
+| `AUTH_SECRET`                 | Yes      | Random secret for JWT signing (`openssl rand -base64 32`)    |
+| `DATABASE_URL`                | Yes      | PostgreSQL connection string                                 |
+| `SMTP_HOST`                   | No       | SMTP server for magic link emails                            |
+| `SMTP_PORT`                   | No       | SMTP port (default: 587)                                     |
+| `SMTP_USER`                   | No       | SMTP username                                                |
+| `SMTP_PASS`                   | No       | SMTP password                                                |
+| `EMAIL_FROM`                  | No       | From address for emails                                      |
+| `REDIS_URL`                   | No       | Redis for BullMQ (VPS mode)                                  |
+| `MINIO_ENDPOINT`              | No       | MinIO endpoint (VPS mode)                                    |
+| `MINIO_ACCESS_KEY`            | No       | MinIO access key                                             |
+| `MINIO_SECRET_KEY`            | No       | MinIO secret key                                             |
+| `MINIO_BUCKET`                | No       | MinIO bucket name                                            |
+| `NEXT_PUBLIC_FFMPEG_CORE_URL` | No       | Custom CDN base URL for FFmpeg WASM core (defaults to unpkg) |
+| `NEXT_PUBLIC_SUPABASE_URL`    | No       | Supabase URL (cloud mode, storage only)                      |
+| `SUPABASE_SERVICE_ROLE_KEY`   | No       | Supabase service key (cloud mode)                            |
 
 ---
 
@@ -434,19 +462,19 @@ ReelStack can process user-uploaded video files and stores user accounts identif
 
 ReelStack is built on top of these excellent open-source projects:
 
-| Project | Role |
-|---------|------|
-| [Next.js](https://nextjs.org/) | Full-stack React framework |
+| Project                                                                        | Role                                  |
+| ------------------------------------------------------------------------------ | ------------------------------------- |
+| [Next.js](https://nextjs.org/)                                                 | Full-stack React framework            |
 | [FFmpeg](https://ffmpeg.org/) / [FFmpeg.wasm](https://ffmpegwasm.netlify.app/) | Video processing (server and browser) |
-| [Transformers.js](https://huggingface.co/docs/transformers.js/) | In-browser Whisper transcription |
-| [Zustand](https://zustand-demo.pmnd.rs/) | Lightweight state management |
-| [Auth.js](https://authjs.dev/) | Authentication framework |
-| [Prisma](https://www.prisma.io/) | Database ORM |
-| [BullMQ](https://docs.bullmq.io/) | Redis-backed job queue |
-| [Tailwind CSS](https://tailwindcss.com/) | Utility-first CSS framework |
-| [shadcn/ui](https://ui.shadcn.com/) | Accessible UI components |
-| [Turborepo](https://turbo.build/) | Monorepo build system |
-| [Vitest](https://vitest.dev/) | Unit testing framework |
-| [Playwright](https://playwright.dev/) | End-to-end testing |
+| [Transformers.js](https://huggingface.co/docs/transformers.js/)                | In-browser Whisper transcription      |
+| [Zustand](https://zustand-demo.pmnd.rs/)                                       | Lightweight state management          |
+| [Auth.js](https://authjs.dev/)                                                 | Authentication framework              |
+| [Prisma](https://www.prisma.io/)                                               | Database ORM                          |
+| [BullMQ](https://docs.bullmq.io/)                                              | Redis-backed job queue                |
+| [Tailwind CSS](https://tailwindcss.com/)                                       | Utility-first CSS framework           |
+| [shadcn/ui](https://ui.shadcn.com/)                                            | Accessible UI components              |
+| [Turborepo](https://turbo.build/)                                              | Monorepo build system                 |
+| [Vitest](https://vitest.dev/)                                                  | Unit testing framework                |
+| [Playwright](https://playwright.dev/)                                          | End-to-end testing                    |
 
 ![](https://stats.techskills.academy/pixels/github?url=/readme/reelstack)
