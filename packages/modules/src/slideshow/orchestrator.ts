@@ -9,11 +9,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { renderToFile } from '@reelstack/image-gen';
-import {
-  runTTSPipeline,
-  uploadVoiceover,
-  renderVideo,
-} from '@reelstack/agent';
+import { runTTSPipeline, uploadVoiceover, renderVideo } from '@reelstack/agent';
 import type { ProductionStep } from '@reelstack/agent';
 import { createStorage } from '@reelstack/storage';
 import { createLogger } from '@reelstack/logger';
@@ -32,7 +28,13 @@ const DEFAULT_MUSIC_VOLUME = 0.13;
 export interface BuildSlideshowPropsInput {
   script: SlideshowScript;
   imageUrls: string[];
-  cues: Array<{ id: string; text: string; startTime: number; endTime: number; words?: Array<{ text: string; startTime: number; endTime: number }> }>;
+  cues: Array<{
+    id: string;
+    text: string;
+    startTime: number;
+    endTime: number;
+    words?: Array<{ text: string; startTime: number; endTime: number }>;
+  }>;
   voiceoverUrl: string;
   durationSeconds: number;
   musicUrl?: string;
@@ -40,19 +42,30 @@ export interface BuildSlideshowPropsInput {
 }
 
 export function buildSlideshowProps(input: BuildSlideshowPropsInput): SlideshowProps {
-  const { imageUrls, cues, voiceoverUrl, durationSeconds, musicUrl, musicVolume } = input;
-  const slideDuration = durationSeconds / imageUrls.length;
+  const { script, imageUrls, cues, voiceoverUrl, durationSeconds, musicUrl, musicVolume } = input;
 
-  // Rotate through transition types for variety
+  // Distribute slide duration proportionally to narration text length.
+  // Longer text = more time on screen (matches TTS pacing).
+  const slideTexts = script.slides.map((s) => `${s.title ?? ''} ${s.text ?? ''}`.trim());
+  const totalChars = slideTexts.reduce((sum, t) => sum + Math.max(t.length, 10), 0);
+
   const TRANSITIONS = ['crossfade', 'slide-left', 'zoom-in', 'wipe', 'slide-right'] as const;
 
-  const slides = imageUrls.map((url, i) => ({
-    imageUrl: url,
-    startTime: i * slideDuration,
-    endTime: (i + 1) * slideDuration,
-    transition: i === 0 ? ('none' as const) : TRANSITIONS[(i - 1) % TRANSITIONS.length]!,
-    transitionDurationMs: i === 0 ? 0 : 500,
-  }));
+  let cursor = 0;
+  const slides = imageUrls.map((url, i) => {
+    const weight = Math.max(slideTexts[i]?.length ?? 10, 10) / totalChars;
+    const duration = durationSeconds * weight;
+    const startTime = cursor;
+    const endTime = i === imageUrls.length - 1 ? durationSeconds : cursor + duration;
+    cursor = endTime;
+    return {
+      imageUrl: url,
+      startTime,
+      endTime,
+      transition: i === 0 ? ('none' as const) : TRANSITIONS[(i - 1) % TRANSITIONS.length]!,
+      transitionDurationMs: i === 0 ? 0 : 500,
+    };
+  });
 
   return {
     slides,
@@ -136,7 +149,7 @@ export async function produceSlideshow(request: SlideshowRequest): Promise<Slide
         badge: slide.badge ?? `${i + 1}`,
         num: slide.num ?? `${i + 1}`,
       },
-      outPath,
+      outPath
     );
 
     imagePaths.push(outPath);
@@ -164,18 +177,26 @@ export async function produceSlideshow(request: SlideshowRequest): Promise<Slide
   // ── 4. TTS + TRANSCRIPTION ─────────────────────────────────
   // Bridge top-level language to TTS language if not explicitly set.
   // E.g. language='en' → tts.language='en-US', language='pl' → tts.language='pl-PL'
-  const ttsLanguage = request.tts?.language
-    ?? (request.language === 'pl' ? 'pl-PL'
-      : request.language === 'en' ? 'en-US'
-      : request.language ? `${request.language}-${request.language.toUpperCase()}`
-      : undefined);
+  const ttsLanguage =
+    request.tts?.language ??
+    (request.language === 'pl'
+      ? 'pl-PL'
+      : request.language === 'en'
+        ? 'en-US'
+        : request.language
+          ? `${request.language}-${request.language.toUpperCase()}`
+          : undefined);
 
-  const ttsResult = await runTTSPipeline({
-    script: script.fullNarration,
-    tts: { ...request.tts, language: ttsLanguage },
-    whisper: request.whisper,
-    brandPreset: request.brandPreset,
-  }, tmpDir, onProgress);
+  const ttsResult = await runTTSPipeline(
+    {
+      script: script.fullNarration,
+      tts: { ...request.tts, language: ttsLanguage },
+      whisper: request.whisper,
+      brandPreset: request.brandPreset,
+    },
+    tmpDir,
+    onProgress
+  );
   steps.push(...ttsResult.steps);
 
   // ── 5. UPLOAD VOICEOVER ────────────────────────────────────
@@ -198,7 +219,7 @@ export async function produceSlideshow(request: SlideshowRequest): Promise<Slide
   const { outputPath, step: renderStep } = await renderVideo(
     { ...props, compositionId: 'Slideshow' } as unknown as Record<string, unknown>,
     request.outputPath,
-    onProgress,
+    onProgress
   );
   steps.push(renderStep);
 
