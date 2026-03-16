@@ -42,6 +42,35 @@ Generated entirely by ReelStack -- no editing software, no designer, just one AP
 
 > Click any preview to watch the full reel on YouTube.
 
+### Image Generator
+
+ReelStack also generates standalone branded images for social media -- no video required. Upload your brand CSS, pick a template and size, get a pixel-perfect PNG.
+
+<details>
+<summary><b>See examples</b> — 12 templates, 3 sizes, 2 built-in brands</summary>
+
+<br/>
+
+**Dark theme** (`example` brand)
+
+| Post (1080x1080)                                              | Story (1080x1920)                                              | YouTube (1280x720)                                               |
+| ------------------------------------------------------------- | -------------------------------------------------------------- | ---------------------------------------------------------------- |
+| <img src="docs/assets/covers/dark-tip-post.png" width="200"/> | <img src="docs/assets/covers/dark-tip-story.png" width="120"/> | <img src="docs/assets/covers/dark-tip-youtube.png" width="240"/> |
+| tip-card                                                      | tip-card                                                       | tip-card                                                         |
+
+**Light theme** (`example-light` brand)
+
+| Post (1080x1080)                                                 | Story (1080x1920)                                                 | YouTube (1280x720)                                                  |
+| ---------------------------------------------------------------- | ----------------------------------------------------------------- | ------------------------------------------------------------------- |
+| <img src="docs/assets/covers/light-quote-post.png" width="200"/> | <img src="docs/assets/covers/light-quote-story.png" width="120"/> | <img src="docs/assets/covers/light-quote-youtube.png" width="240"/> |
+| quote-card                                                       | quote-card                                                        | quote-card                                                          |
+
+**More templates:** ad-card, announcement, webinar-cover, webinar-point, webinar-cta-slide, webinar-countdown, webinar-lastcall, webinar-myth, webinar-program, webinar-question
+
+**Standalone image server:** `apps/image-gen-server` -- one `docker compose up` for a self-hosted image API.
+
+</details>
+
 ---
 
 ## Why ReelStack?
