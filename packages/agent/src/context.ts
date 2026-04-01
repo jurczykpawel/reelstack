@@ -2,13 +2,14 @@
  * Job context propagation using AsyncLocalStorage.
  *
  * Allows any code deep in the call stack (e.g., LLM calls, tool calls)
- * to access the current jobId without explicit parameter threading.
- * Used for correlating API call logs with pipeline jobs.
+ * to access the current jobId and collect costs without explicit parameter threading.
  */
 import { AsyncLocalStorage } from 'async_hooks';
+import type { CostEntry, CostSummary } from './types';
 
 interface JobStore {
   jobId: string;
+  costs: CostEntry[];
 }
 
 export const jobContext = new AsyncLocalStorage<JobStore>();
@@ -18,7 +19,34 @@ export function getJobId(): string | undefined {
   return jobContext.getStore()?.jobId;
 }
 
-/** Run a function within a job context so all nested calls can access jobId. */
+/** Run a function within a job context so all nested calls can access jobId and collect costs. */
 export function runWithJobId<T>(jobId: string, fn: () => T): T {
-  return jobContext.run({ jobId }, fn);
+  return jobContext.run({ jobId, costs: [] }, fn);
+}
+
+/** Add a cost entry to the current job context. Safe to call outside a job (no-op). */
+export function addCost(entry: CostEntry): void {
+  const store = jobContext.getStore();
+  if (store) store.costs.push(entry);
+}
+
+/** Get all cost entries collected in the current job context. */
+export function getCosts(): readonly CostEntry[] {
+  return jobContext.getStore()?.costs ?? [];
+}
+
+/** Get aggregated cost summary for the current job. */
+export function getCostSummary(): CostSummary {
+  const entries = getCosts();
+  const byType: Record<string, number> = {};
+  const byProvider: Record<string, number> = {};
+  let totalUSD = 0;
+
+  for (const e of entries) {
+    totalUSD += e.costUSD;
+    byType[e.type] = (byType[e.type] ?? 0) + e.costUSD;
+    byProvider[e.provider] = (byProvider[e.provider] ?? 0) + e.costUSD;
+  }
+
+  return { totalUSD, byType, byProvider, entries };
 }

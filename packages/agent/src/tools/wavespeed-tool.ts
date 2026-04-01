@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
-import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
+import type {
+  ToolCapability,
+  AssetGenerationRequest,
+  AssetGenerationJob,
+  AssetGenerationStatus,
+} from '../types';
 import { createLogger } from '@reelstack/logger';
+import { addCost } from '../context';
+import { calculateToolCost } from '../config/pricing';
 import { NANOBANANA_GUIDELINES, WAN_GUIDELINES, QWEN_IMAGE_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('wavespeed-tool');
@@ -52,7 +59,12 @@ class WavespeedTool implements ProductionTool {
 
   async generate(request: AssetGenerationRequest): Promise<AssetGenerationJob> {
     if (!this.apiKey) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'WAVESPEED_API_KEY not set' };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: 'WAVESPEED_API_KEY not set',
+      };
     }
 
     try {
@@ -68,14 +80,27 @@ class WavespeedTool implements ProductionTool {
 
       if (!res.ok) {
         const errBody = await res.text();
-        log.warn({ toolId: this.id, status: res.status, errorPreview: errBody.substring(0, 200) }, 'wavespeed generate failed');
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `WaveSpeed API error (${res.status})` };
+        log.warn(
+          { toolId: this.id, status: res.status, errorPreview: errBody.substring(0, 200) },
+          'wavespeed generate failed'
+        );
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: `WaveSpeed API error (${res.status})`,
+        };
       }
 
       const data = (await res.json()) as { data?: { id?: string } };
 
       if (!data.data?.id) {
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'No task id returned' };
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: 'No task id returned',
+        };
       }
 
       log.info({ toolId: this.id, taskId: data.data.id }, 'wavespeed generation started');
@@ -83,7 +108,12 @@ class WavespeedTool implements ProductionTool {
       return { jobId: data.data.id, toolId: this.id, status: 'processing' };
     } catch (err) {
       log.warn({ toolId: this.id, err }, 'wavespeed generate error');
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `WaveSpeed request failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: `WaveSpeed request failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -119,14 +149,31 @@ class WavespeedTool implements ProductionTool {
       if (!taskData) return { jobId, toolId: this.id, status: 'processing' };
 
       if (taskData.status === 'failed') {
-        return { jobId, toolId: this.id, status: 'failed', error: taskData.error ?? 'WaveSpeed generation failed' };
+        return {
+          jobId,
+          toolId: this.id,
+          status: 'failed',
+          error: taskData.error ?? 'WaveSpeed generation failed',
+        };
       }
 
       if (taskData.status === 'completed') {
         const url = taskData.outputs?.[0];
         if (!url) {
-          return { jobId, toolId: this.id, status: 'failed', error: 'No output URL in WaveSpeed result' };
+          return {
+            jobId,
+            toolId: this.id,
+            status: 'failed',
+            error: 'No output URL in WaveSpeed result',
+          };
         }
+        addCost({
+          step: `asset:${this.id}`,
+          provider: 'wavespeed',
+          type: 'video',
+          costUSD: calculateToolCost(this.id, 5),
+          inputUnits: 1,
+        });
         return { jobId, toolId: this.id, status: 'completed', url };
       }
 
@@ -199,7 +246,12 @@ export const wavespeedFluxTool: ProductionTool = new WavespeedTool({
   ],
   buildInput: (req) => ({
     prompt: req.prompt ?? 'abstract background',
-    image_size: req.aspectRatio === '16:9' ? 'landscape_16_9' : req.aspectRatio === '1:1' ? 'square' : 'portrait_16_9',
+    image_size:
+      req.aspectRatio === '16:9'
+        ? 'landscape_16_9'
+        : req.aspectRatio === '1:1'
+          ? 'square'
+          : 'portrait_16_9',
     num_inference_steps: 4,
     num_images: 1,
   }),

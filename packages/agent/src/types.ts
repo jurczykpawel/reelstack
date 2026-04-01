@@ -14,6 +14,15 @@ export type AssetType =
 
 export type CostTier = 'free' | 'cheap' | 'moderate' | 'expensive';
 
+/** Whisper transcription provider options */
+export type WhisperProviderType = 'openai' | 'cloudflare' | 'whisper-cpp' | 'synthetic';
+
+/** Whisper config — shared across all modules */
+export interface WhisperConfig {
+  readonly provider?: WhisperProviderType;
+  readonly apiKey?: string;
+}
+
 export interface ToolCapability {
   readonly assetType: AssetType;
   /** Can generate from a text prompt? */
@@ -64,6 +73,8 @@ export interface AssetGenerationRequest {
   readonly searchQuery?: string;
   /** Source image URL for image-to-video generation */
   readonly imageUrl?: string;
+  /** Reference image for character consistency (last frame of previous clip) */
+  readonly referenceImageUrl?: string;
 }
 
 export interface AssetGenerationJob {
@@ -256,6 +267,8 @@ export interface BrandPreset {
     | 'zoom-in'
     | 'wipe'
     | 'none';
+  /** Presenter persona ID (registered via registerPersona) */
+  readonly personaId?: string;
   /** Logo / watermark overlay (persistent on all frames) */
   readonly logoOverlay?: {
     readonly url: string;
@@ -291,10 +304,7 @@ export interface ProductionRequest {
     readonly language?: string;
   };
   /** Whisper config */
-  readonly whisper?: {
-    readonly provider?: 'openrouter' | 'cloudflare' | 'ollama';
-    readonly apiKey?: string;
-  };
+  readonly whisper?: WhisperConfig;
   /** Brand preset */
   readonly brandPreset?: BrandPreset;
   /** Avatar settings (for HeyGen) */
@@ -404,4 +414,27 @@ export interface GeneratedAsset {
   readonly url: string;
   readonly type: AssetType;
   readonly durationSeconds?: number;
+}
+
+// ── Cost tracking ────────────────────────────────────────────
+
+export type CostType = 'llm' | 'image' | 'video' | 'tts' | 'transcription' | 'render';
+
+export interface CostEntry {
+  readonly step: string;
+  readonly provider: string;
+  readonly model?: string;
+  readonly type: CostType;
+  readonly costUSD: number;
+  readonly inputUnits?: number;
+  readonly outputUnits?: number;
+  readonly durationMs?: number;
+  readonly metadata?: Record<string, unknown>;
+}
+
+export interface CostSummary {
+  readonly totalUSD: number;
+  readonly byType: Record<string, number>;
+  readonly byProvider: Record<string, number>;
+  readonly entries: readonly CostEntry[];
 }

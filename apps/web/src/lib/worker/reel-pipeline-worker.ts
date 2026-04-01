@@ -17,6 +17,7 @@ import {
   isCoreMode,
   PipelineEngine,
   createGeneratePipeline,
+  getCostSummary,
 } from '@reelstack/agent';
 import type {
   UserAsset,
@@ -644,6 +645,7 @@ function buildPipelineProductionMeta(result: PipelineResult): Record<string, unk
       error: s.error,
     })),
     durationSeconds: ttsResult?.audioDuration,
+    costs: getCostSummary(),
   };
 }
 

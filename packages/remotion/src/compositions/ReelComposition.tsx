@@ -276,9 +276,10 @@ export const ReelComposition: React.FC<ReelProps> = ({
   if (dynamicCaptionPosition && captionStyle) {
     const basePosition = captionStyle.position ?? 80;
     const positionForOverlayType = (type: string | undefined): number => {
-      if (!type) return basePosition; // fullscreen
+      if (!type) return basePosition; // no overlay — presenter only
       if (type === 'split-screen') return Math.max(basePosition - 15, 50);
-      return Math.max(basePosition - 5, 50); // B-roll
+      // Fullscreen content (B-roll/image) — move captions higher to avoid overlap
+      return Math.max(basePosition - 12, 55);
     };
 
     let captionPosition = positionForOverlayType(undefined);

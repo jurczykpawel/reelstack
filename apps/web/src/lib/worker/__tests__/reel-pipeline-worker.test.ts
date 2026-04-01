@@ -56,6 +56,7 @@ vi.mock('@reelstack/agent', () => ({
     discover: vi.fn().mockResolvedValue(undefined),
     getToolManifest: vi.fn().mockReturnValue({ tools: [], summary: '' }),
   })),
+  getCostSummary: vi.fn().mockReturnValue({ totalUSD: 0, byType: {}, byProvider: {}, entries: [] }),
 }));
 
 const mockUpload = vi.fn();

@@ -31,7 +31,12 @@ export class UserUploadTool implements ProductionTool {
     }
 
     if (!isPublicUrl(request.prompt)) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'URL must be a public HTTP(S) URL' };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: 'URL must be a public HTTP(S) URL',
+      };
     }
 
     return {

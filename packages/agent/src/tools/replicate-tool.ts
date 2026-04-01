@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
-import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
+import type {
+  ToolCapability,
+  AssetGenerationRequest,
+  AssetGenerationJob,
+  AssetGenerationStatus,
+} from '../types';
 import { createLogger } from '@reelstack/logger';
+import { addCost } from '../context';
+import { calculateToolCost } from '../config/pricing';
 import { IDEOGRAM_GUIDELINES, RECRAFT_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('replicate-tool');
@@ -58,7 +65,12 @@ class ReplicateTool implements ProductionTool {
 
   async generate(request: AssetGenerationRequest): Promise<AssetGenerationJob> {
     if (!this.apiKey) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'REPLICATE_API_TOKEN not set' };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: 'REPLICATE_API_TOKEN not set',
+      };
     }
 
     try {
@@ -75,14 +87,27 @@ class ReplicateTool implements ProductionTool {
 
       if (!res.ok) {
         const errBody = await res.text();
-        log.warn({ toolId: this.id, status: res.status, errorPreview: errBody.substring(0, 200) }, 'replicate generate failed');
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `Replicate API error (${res.status})` };
+        log.warn(
+          { toolId: this.id, status: res.status, errorPreview: errBody.substring(0, 200) },
+          'replicate generate failed'
+        );
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: `Replicate API error (${res.status})`,
+        };
       }
 
       const data = (await res.json()) as { id?: string; status?: string };
 
       if (!data.id) {
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'No prediction id returned' };
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: 'No prediction id returned',
+        };
       }
 
       log.info({ toolId: this.id, predictionId: data.id }, 'replicate generation started');
@@ -90,7 +115,12 @@ class ReplicateTool implements ProductionTool {
       return { jobId: data.id, toolId: this.id, status: 'processing' };
     } catch (err) {
       log.warn({ toolId: this.id, err }, 'replicate generate error');
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `Replicate request failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: `Replicate request failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -122,7 +152,12 @@ class ReplicateTool implements ProductionTool {
       };
 
       if (data.status === 'failed' || data.status === 'canceled') {
-        return { jobId, toolId: this.id, status: 'failed', error: data.error ?? 'Replicate generation failed' };
+        return {
+          jobId,
+          toolId: this.id,
+          status: 'failed',
+          error: data.error ?? 'Replicate generation failed',
+        };
       }
 
       if (data.status === 'succeeded') {
@@ -130,6 +165,14 @@ class ReplicateTool implements ProductionTool {
         if (!url) {
           return { jobId, toolId: this.id, status: 'failed', error: 'No URL in Replicate result' };
         }
+        addCost({
+          step: `asset:${this.id}`,
+          provider: 'replicate',
+          model: this.id,
+          type: 'video',
+          costUSD: calculateToolCost(this.id, 5),
+          inputUnits: 1,
+        });
         return { jobId, toolId: this.id, status: 'completed', url };
       }
 
@@ -266,7 +309,12 @@ export const replicateRecraftTool: ProductionTool = new ReplicateTool({
   ],
   buildInput: (req) => ({
     prompt: req.prompt ?? 'abstract background',
-    size: req.aspectRatio === '16:9' ? '1820x1024' : req.aspectRatio === '1:1' ? '1024x1024' : '1024x1820',
+    size:
+      req.aspectRatio === '16:9'
+        ? '1820x1024'
+        : req.aspectRatio === '1:1'
+          ? '1024x1024'
+          : '1024x1820',
     style: 'realistic_image',
   }),
   parseOutput: parseReplicateOutput,

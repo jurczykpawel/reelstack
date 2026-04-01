@@ -7,6 +7,8 @@ import type {
   AssetGenerationStatus,
 } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { addCost } from '../context';
+import { calculateToolCost } from '../config/pricing';
 import { SEEDANCE_GUIDELINES, HUNYUAN_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('piapi-tool');

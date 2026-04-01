@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
-import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
+import type {
+  ToolCapability,
+  AssetGenerationRequest,
+  AssetGenerationJob,
+  AssetGenerationStatus,
+} from '../types';
 import { createLogger } from '@reelstack/logger';
+import { addCost } from '../context';
+import { calculateToolCost } from '../config/pricing';
 import { VEO3_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('veo3-tool');
@@ -59,7 +66,12 @@ export class Veo3Tool implements ProductionTool {
 
   async generate(request: AssetGenerationRequest): Promise<AssetGenerationJob> {
     if (!this.apiKey || !this.projectId) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'Veo3 not configured' };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: 'Veo3 not configured',
+      };
     }
 
     const prompt = request.prompt ?? 'abstract cinematic background';
@@ -89,14 +101,27 @@ export class Veo3Tool implements ProductionTool {
 
       if (!res.ok) {
         const errBody = await res.text();
-        log.warn({ status: res.status, errorPreview: errBody.substring(0, 200) }, 'Veo3 generate failed');
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `Veo3 API error (${res.status})` };
+        log.warn(
+          { status: res.status, errorPreview: errBody.substring(0, 200) },
+          'Veo3 generate failed'
+        );
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: `Veo3 API error (${res.status})`,
+        };
       }
 
       const data = (await res.json()) as { name?: string };
 
       if (!data.name) {
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'No operation name returned' };
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: 'No operation name returned',
+        };
       }
 
       log.info({ operationName: data.name }, 'Veo3 video generation started');
@@ -107,7 +132,12 @@ export class Veo3Tool implements ProductionTool {
         status: 'processing',
       };
     } catch (err) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `Veo3 request failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: `Veo3 request failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -139,6 +169,14 @@ export class Veo3Tool implements ProductionTool {
         // Extract video URL from the response
         const video = data.response?.generateVideoResponse?.generatedSamples?.[0];
         if (video?.video?.uri) {
+          addCost({
+            step: `asset:${this.id}`,
+            provider: 'veo3',
+            model: 'veo-3',
+            type: 'video',
+            costUSD: calculateToolCost(this.id, 8),
+            inputUnits: 1,
+          });
           return {
             jobId,
             toolId: this.id,

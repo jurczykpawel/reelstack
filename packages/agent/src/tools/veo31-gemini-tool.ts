@@ -11,6 +11,8 @@ import type {
   AssetGenerationStatus,
 } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { addCost } from '../context';
+import { calculateToolCost } from '../config/pricing';
 
 const log = createLogger('veo31-vertex');
 
@@ -94,14 +96,16 @@ export class Veo31GeminiTool implements ProductionTool {
 
     try {
       const instance: Record<string, unknown> = { prompt };
-      if (request.imageUrl) {
+      // Character consistency: referenceImageUrl falls back to imageUrl
+      const sourceImageUrl = request.imageUrl ?? request.referenceImageUrl;
+      if (sourceImageUrl) {
         // Vertex AI image-to-video: instance.image with base64 + mimeType
         let imgBuffer: Buffer | undefined;
 
-        if (request.imageUrl.startsWith('/') || request.imageUrl.startsWith('file:')) {
-          imgBuffer = fs.readFileSync(request.imageUrl.replace('file://', ''));
-        } else if (request.imageUrl.startsWith('http')) {
-          const imgRes = await fetch(request.imageUrl, {
+        if (sourceImageUrl.startsWith('/') || sourceImageUrl.startsWith('file:')) {
+          imgBuffer = fs.readFileSync(sourceImageUrl.replace('file://', ''));
+        } else if (sourceImageUrl.startsWith('http')) {
+          const imgRes = await fetch(sourceImageUrl, {
             signal: AbortSignal.timeout(30_000),
             redirect: 'follow',
           });
@@ -110,7 +114,7 @@ export class Veo31GeminiTool implements ProductionTool {
 
         if (imgBuffer) {
           const mimeType =
-            request.imageUrl.endsWith('.jpg') || request.imageUrl.endsWith('.jpeg')
+            sourceImageUrl.endsWith('.jpg') || sourceImageUrl.endsWith('.jpeg')
               ? 'image/jpeg'
               : 'image/png';
           instance.image = { bytesBase64Encoded: imgBuffer.toString('base64'), mimeType };
@@ -295,12 +299,30 @@ export class Veo31GeminiTool implements ProductionTool {
           { path: tmpFile, sizeKB: Math.round(buffer.length / 1024) },
           'Veo 3.1 video decoded'
         );
+        addCost({
+          step: `asset:${this.id}`,
+          provider: 'vertex-ai',
+          model: this.model,
+          type: 'video',
+          costUSD: calculateToolCost(this.id, 8),
+          inputUnits: 1,
+          durationMs,
+        });
         return { jobId, toolId: this.id, status: 'completed', url: tmpFile, durationSeconds: 8 };
       }
 
       // Fallback: check for URI-based response
       const sample = data.response?.generateVideoResponse?.generatedSamples?.[0];
       if (sample?.video?.uri) {
+        addCost({
+          step: `asset:${this.id}`,
+          provider: 'vertex-ai',
+          model: this.model,
+          type: 'video',
+          costUSD: calculateToolCost(this.id, 8),
+          inputUnits: 1,
+          durationMs,
+        });
         return { jobId, toolId: this.id, status: 'completed', url: sample.video.uri };
       }
 

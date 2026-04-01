@@ -7,7 +7,8 @@
 import { createLogger } from '@reelstack/logger';
 import { detectProvider, getModel, getApiKey } from './config/models';
 import type { ModelRole, LLMProvider } from './config/models';
-import { getJobId } from './context';
+import { getJobId, addCost } from './context';
+import { calculateLLMCost } from './config/pricing';
 
 const log = createLogger('llm');
 
@@ -153,14 +154,19 @@ async function callAnthropic(
   const durationMs = Math.round(performance.now() - startTime);
   const responseText = textBlock.text;
 
+  const inputTokens = data.usage?.input_tokens ?? 0;
+  const outputTokens = data.usage?.output_tokens ?? 0;
+  const costUSD = calculateLLMCost(model, inputTokens, outputTokens);
+
   log.info(
     {
       provider: 'anthropic',
       model,
       role: opts.modelRole,
       jobId,
-      inputTokens: data.usage?.input_tokens,
-      outputTokens: data.usage?.output_tokens,
+      inputTokens,
+      outputTokens,
+      costUSD: costUSD.toFixed(5),
       durationMs,
       systemPromptPreview: systemPrompt.slice(0, 200),
       userMessagePreview: userMessage.slice(0, 200),
@@ -168,6 +174,22 @@ async function callAnthropic(
     },
     'LLM call completed'
   );
+
+  addCost({
+    step: `llm:${opts.modelRole ?? 'unknown'}`,
+    provider: 'anthropic',
+    model,
+    type: 'llm',
+    costUSD,
+    inputUnits: inputTokens,
+    outputUnits: outputTokens,
+    durationMs,
+    metadata: {
+      systemPromptPreview: systemPrompt.slice(0, 500),
+      userMessagePreview: userMessage.slice(0, 500),
+      responsePreview: responseText.slice(0, 500),
+    },
+  });
 
   return responseText;
 }
@@ -239,14 +261,19 @@ async function callOpenAICompatible(
 
   const durationMs = Math.round(performance.now() - startTime);
 
+  const inputTokens = data.usage?.prompt_tokens ?? 0;
+  const outputTokens = data.usage?.completion_tokens ?? 0;
+  const costUSD = calculateLLMCost(model, inputTokens, outputTokens);
+
   log.info(
     {
       provider,
       model,
       role: opts.modelRole,
       jobId,
-      inputTokens: data.usage?.prompt_tokens,
-      outputTokens: data.usage?.completion_tokens,
+      inputTokens,
+      outputTokens,
+      costUSD: costUSD.toFixed(5),
       durationMs,
       systemPromptPreview: systemPrompt.slice(0, 200),
       userMessagePreview: userMessage.slice(0, 200),
@@ -254,6 +281,22 @@ async function callOpenAICompatible(
     },
     'LLM call completed'
   );
+
+  addCost({
+    step: `llm:${opts.modelRole ?? 'unknown'}`,
+    provider,
+    model,
+    type: 'llm',
+    costUSD,
+    inputUnits: inputTokens,
+    outputUnits: outputTokens,
+    durationMs,
+    metadata: {
+      systemPromptPreview: systemPrompt.slice(0, 500),
+      userMessagePreview: userMessage.slice(0, 500),
+      responsePreview: content.slice(0, 500),
+    },
+  });
 
   return content;
 }

@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
-import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
+import type {
+  ToolCapability,
+  AssetGenerationRequest,
+  AssetGenerationJob,
+  AssetGenerationStatus,
+} from '../types';
 import { createLogger } from '@reelstack/logger';
+import { addCost } from '../context';
+import { calculateToolCost } from '../config/pricing';
 import { KLING_GUIDELINES, VEO3_GUIDELINES, SORA_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('aimlapi-tool');
@@ -47,7 +54,12 @@ export class AimlapiKlingTool implements ProductionTool {
 
   async generate(request: AssetGenerationRequest): Promise<AssetGenerationJob> {
     if (!this.apiKey) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'AIMLAPI_KEY not set' };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: 'AIMLAPI_KEY not set',
+      };
     }
 
     const duration = String(Math.min(Math.max(5, request.durationSeconds ?? 5), 10));
@@ -72,14 +84,27 @@ export class AimlapiKlingTool implements ProductionTool {
 
       if (!res.ok) {
         const errBody = await res.text();
-        log.warn({ status: res.status, errorPreview: errBody.substring(0, 200) }, 'aimlapi kling generate failed');
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `AIMLAPI error (${res.status})` };
+        log.warn(
+          { status: res.status, errorPreview: errBody.substring(0, 200) },
+          'aimlapi kling generate failed'
+        );
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: `AIMLAPI error (${res.status})`,
+        };
       }
 
       const data = (await res.json()) as { id?: string };
 
       if (!data.id) {
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'No generation id returned' };
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: 'No generation id returned',
+        };
       }
 
       log.info({ generationId: data.id }, 'aimlapi kling generation started');
@@ -87,7 +112,12 @@ export class AimlapiKlingTool implements ProductionTool {
       return { jobId: data.id, toolId: this.id, status: 'processing' };
     } catch (err) {
       log.warn({ err }, 'aimlapi kling generate error');
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `AIMLAPI request failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: `AIMLAPI request failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -120,13 +150,23 @@ export class AimlapiKlingTool implements ProductionTool {
       };
 
       if (data.status === 'failed') {
-        return { jobId, toolId: this.id, status: 'failed', error: 'AIMLAPI Kling generation failed' };
+        return {
+          jobId,
+          toolId: this.id,
+          status: 'failed',
+          error: 'AIMLAPI Kling generation failed',
+        };
       }
 
       if (data.status === 'completed') {
         const videoUrl = data.video?.url;
         if (!videoUrl) {
-          return { jobId, toolId: this.id, status: 'failed', error: 'No video URL in AIMLAPI result' };
+          return {
+            jobId,
+            toolId: this.id,
+            status: 'failed',
+            error: 'No video URL in AIMLAPI result',
+          };
         }
         return { jobId, toolId: this.id, status: 'completed', url: videoUrl };
       }
@@ -171,14 +211,20 @@ export class AimlapiFluxTool implements ProductionTool {
 
   async generate(request: AssetGenerationRequest): Promise<AssetGenerationJob> {
     if (!this.apiKey) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'AIMLAPI_KEY not set' };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: 'AIMLAPI_KEY not set',
+      };
     }
 
-    const imageSize = request.aspectRatio === '16:9'
-      ? 'landscape_16_9'
-      : request.aspectRatio === '1:1'
-        ? 'square'
-        : 'portrait_16_9';
+    const imageSize =
+      request.aspectRatio === '16:9'
+        ? 'landscape_16_9'
+        : request.aspectRatio === '1:1'
+          ? 'square'
+          : 'portrait_16_9';
 
     try {
       const res = await fetch(`${AIMLAPI_BASE}/v1/images/generations`, {
@@ -198,15 +244,28 @@ export class AimlapiFluxTool implements ProductionTool {
 
       if (!res.ok) {
         const errBody = await res.text();
-        log.warn({ status: res.status, errorPreview: errBody.substring(0, 200) }, 'aimlapi flux generate failed');
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `AIMLAPI error (${res.status})` };
+        log.warn(
+          { status: res.status, errorPreview: errBody.substring(0, 200) },
+          'aimlapi flux generate failed'
+        );
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: `AIMLAPI error (${res.status})`,
+        };
       }
 
       const data = (await res.json()) as { data?: Array<{ url?: string }> };
       const url = data.data?.[0]?.url;
 
       if (!url) {
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'No image URL in AIMLAPI response' };
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: 'No image URL in AIMLAPI response',
+        };
       }
 
       log.info('aimlapi flux image generated');
@@ -214,7 +273,12 @@ export class AimlapiFluxTool implements ProductionTool {
       return { jobId: randomUUID(), toolId: this.id, status: 'completed', url };
     } catch (err) {
       log.warn({ err }, 'aimlapi flux generate error');
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `AIMLAPI request failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: `AIMLAPI request failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 }
@@ -251,7 +315,9 @@ class AimlapiVideoTool implements ProductionTool {
     this.buildBody = config.buildBody;
   }
 
-  private get apiKey(): string | undefined { return process.env.AIMLAPI_KEY; }
+  private get apiKey(): string | undefined {
+    return process.env.AIMLAPI_KEY;
+  }
 
   async healthCheck(): Promise<{ available: boolean; reason?: string }> {
     if (!this.apiKey) return { available: false, reason: 'AIMLAPI_KEY not set' };
@@ -260,7 +326,12 @@ class AimlapiVideoTool implements ProductionTool {
 
   async generate(request: AssetGenerationRequest): Promise<AssetGenerationJob> {
     if (!this.apiKey) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'AIMLAPI_KEY not set' };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: 'AIMLAPI_KEY not set',
+      };
     }
     try {
       const res = await fetch(`${AIMLAPI_BASE}/v2/generate/video/${this.provider}/generation`, {
@@ -271,24 +342,44 @@ class AimlapiVideoTool implements ProductionTool {
       });
       if (!res.ok) {
         const errBody = await res.text();
-        log.warn({ toolId: this.id, status: res.status, errorPreview: errBody.substring(0, 200) }, 'aimlapi video generate failed');
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `AIMLAPI error (${res.status})` };
+        log.warn(
+          { toolId: this.id, status: res.status, errorPreview: errBody.substring(0, 200) },
+          'aimlapi video generate failed'
+        );
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: `AIMLAPI error (${res.status})`,
+        };
       }
       const data = (await res.json()) as { id?: string };
       if (!data.id) {
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'No generation id returned' };
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: 'No generation id returned',
+        };
       }
       log.info({ toolId: this.id, generationId: data.id }, 'aimlapi video generation started');
       return { jobId: data.id, toolId: this.id, status: 'processing' };
     } catch (err) {
       log.warn({ toolId: this.id, err }, 'aimlapi video generate error');
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `AIMLAPI request failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: `AIMLAPI request failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
   async poll(jobId: string): Promise<AssetGenerationStatus> {
-    if (!this.apiKey) return { jobId, toolId: this.id, status: 'failed', error: 'AIMLAPI_KEY not set' };
-    if (!validateJobId(jobId)) return { jobId, toolId: this.id, status: 'failed', error: 'Invalid jobId format' };
+    if (!this.apiKey)
+      return { jobId, toolId: this.id, status: 'failed', error: 'AIMLAPI_KEY not set' };
+    if (!validateJobId(jobId))
+      return { jobId, toolId: this.id, status: 'failed', error: 'Invalid jobId format' };
     try {
       const url = new URL(`${AIMLAPI_BASE}/v2/generate/video/${this.provider}/generation`);
       url.searchParams.set('generation_id', jobId);
@@ -301,10 +392,12 @@ class AimlapiVideoTool implements ProductionTool {
         return { jobId, toolId: this.id, status: 'processing' };
       }
       const data = (await res.json()) as { status?: string; video?: { url?: string } };
-      if (data.status === 'failed') return { jobId, toolId: this.id, status: 'failed', error: 'AIMLAPI generation failed' };
+      if (data.status === 'failed')
+        return { jobId, toolId: this.id, status: 'failed', error: 'AIMLAPI generation failed' };
       if (data.status === 'completed') {
         const videoUrl = data.video?.url;
-        if (!videoUrl) return { jobId, toolId: this.id, status: 'failed', error: 'No video URL in result' };
+        if (!videoUrl)
+          return { jobId, toolId: this.id, status: 'failed', error: 'No video URL in result' };
         return { jobId, toolId: this.id, status: 'completed', url: videoUrl };
       }
       return { jobId, toolId: this.id, status: 'processing' };
@@ -322,7 +415,15 @@ export const aimlapiKlingV3Tool: ProductionTool = new AimlapiVideoTool({
   provider: 'kling',
   promptGuidelines: KLING_GUIDELINES,
   capabilities: [
-    { assetType: 'ai-video', supportsPrompt: true, supportsScript: false, maxDurationSeconds: 10, estimatedLatencyMs: 180_000, isAsync: true, costTier: 'moderate' },
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 10,
+      estimatedLatencyMs: 180_000,
+      isAsync: true,
+      costTier: 'moderate',
+    },
   ],
   buildBody: (req) => ({
     model: 'klingai/video-v3-pro-text-to-video',
@@ -340,7 +441,15 @@ export const aimlapiVeo3Tool: ProductionTool = new AimlapiVideoTool({
   provider: 'google',
   promptGuidelines: VEO3_GUIDELINES,
   capabilities: [
-    { assetType: 'ai-video', supportsPrompt: true, supportsScript: false, maxDurationSeconds: 8, estimatedLatencyMs: 300_000, isAsync: true, costTier: 'expensive' },
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 8,
+      estimatedLatencyMs: 300_000,
+      isAsync: true,
+      costTier: 'expensive',
+    },
   ],
   buildBody: (req) => ({
     model: 'google/veo3',
@@ -356,7 +465,15 @@ export const aimlapiSora2Tool: ProductionTool = new AimlapiVideoTool({
   provider: 'openai',
   promptGuidelines: SORA_GUIDELINES,
   capabilities: [
-    { assetType: 'ai-video', supportsPrompt: true, supportsScript: false, maxDurationSeconds: 10, estimatedLatencyMs: 300_000, isAsync: true, costTier: 'expensive' },
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 10,
+      estimatedLatencyMs: 300_000,
+      isAsync: true,
+      costTier: 'expensive',
+    },
   ],
   buildBody: (req) => ({
     model: 'sora-2-t2v',
@@ -372,7 +489,15 @@ export const aimlapiPixverseTool: ProductionTool = new AimlapiVideoTool({
   modelId: 'pixverse/v5-5-text-to-video',
   provider: 'pixverse',
   capabilities: [
-    { assetType: 'ai-video', supportsPrompt: true, supportsScript: false, maxDurationSeconds: 8, estimatedLatencyMs: 120_000, isAsync: true, costTier: 'moderate' },
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 8,
+      estimatedLatencyMs: 120_000,
+      isAsync: true,
+      costTier: 'moderate',
+    },
   ],
   buildBody: (req) => ({
     model: 'pixverse/v5-5-text-to-video',

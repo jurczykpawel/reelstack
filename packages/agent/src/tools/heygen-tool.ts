@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
-import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
+import type {
+  ToolCapability,
+  AssetGenerationRequest,
+  AssetGenerationJob,
+  AssetGenerationStatus,
+} from '../types';
 import { createLogger } from '@reelstack/logger';
+import { addCost } from '../context';
+import { calculateToolCost } from '../config/pricing';
 import { HEYGEN_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('heygen-tool');
@@ -61,22 +68,34 @@ export class HeyGenTool implements ProductionTool {
 
   async generate(request: AssetGenerationRequest): Promise<AssetGenerationJob> {
     if (!this.apiKey) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'HEYGEN_API_KEY not set' };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: 'HEYGEN_API_KEY not set',
+      };
     }
 
     if (!request.script) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'Script is required for avatar generation' };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: 'Script is required for avatar generation',
+      };
     }
 
-    const avatarId = request.avatarId ?? process.env.HEYGEN_AVATAR_ID ?? 'Angela-inTshworking-20220820';
+    const avatarId =
+      request.avatarId ?? process.env.HEYGEN_AVATAR_ID ?? 'Angela-inTshworking-20220820';
     const voiceId = request.voice ?? process.env.HEYGEN_VOICE_ID;
 
     // Determine dimensions based on aspect ratio
-    const dimension = request.aspectRatio === '16:9'
-      ? { width: 1920, height: 1080 }
-      : request.aspectRatio === '1:1'
-        ? { width: 1080, height: 1080 }
-        : { width: 1080, height: 1920 }; // default 9:16
+    const dimension =
+      request.aspectRatio === '16:9'
+        ? { width: 1920, height: 1080 }
+        : request.aspectRatio === '1:1'
+          ? { width: 1080, height: 1080 }
+          : { width: 1080, height: 1920 }; // default 9:16
 
     const body: Record<string, unknown> = {
       video_inputs: [
@@ -112,14 +131,27 @@ export class HeyGenTool implements ProductionTool {
 
       if (!res.ok) {
         const errBody = await res.text();
-        log.warn({ status: res.status, errorPreview: errBody.substring(0, 200) }, 'HeyGen generate failed');
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `HeyGen API error (${res.status})` };
+        log.warn(
+          { status: res.status, errorPreview: errBody.substring(0, 200) },
+          'HeyGen generate failed'
+        );
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: `HeyGen API error (${res.status})`,
+        };
       }
 
       const data = (await res.json()) as { data?: { video_id?: string }; error?: string };
 
       if (!data.data?.video_id) {
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: data.error ?? 'No video_id returned' };
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: data.error ?? 'No video_id returned',
+        };
       }
 
       log.info({ videoId: data.data.video_id }, 'HeyGen video generation started');
@@ -130,7 +162,12 @@ export class HeyGenTool implements ProductionTool {
         status: 'processing',
       };
     } catch (err) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `HeyGen request failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: `HeyGen request failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -144,10 +181,13 @@ export class HeyGenTool implements ProductionTool {
     }
 
     try {
-      const res = await fetch(`${HEYGEN_API}/v1/video_status.get?video_id=${encodeURIComponent(jobId)}`, {
-        headers: { 'x-api-key': this.apiKey },
-        signal: AbortSignal.timeout(10_000),
-      });
+      const res = await fetch(
+        `${HEYGEN_API}/v1/video_status.get?video_id=${encodeURIComponent(jobId)}`,
+        {
+          headers: { 'x-api-key': this.apiKey },
+          signal: AbortSignal.timeout(10_000),
+        }
+      );
 
       if (!res.ok) {
         return { jobId, toolId: this.id, status: 'processing' };
@@ -165,6 +205,13 @@ export class HeyGenTool implements ProductionTool {
       const status = data.data?.status;
 
       if (status === 'completed') {
+        addCost({
+          step: `asset:${this.id}`,
+          provider: 'heygen',
+          type: 'video',
+          costUSD: calculateToolCost(this.id, data.data?.duration ?? 5),
+          inputUnits: 1,
+        });
         return {
           jobId,
           toolId: this.id,

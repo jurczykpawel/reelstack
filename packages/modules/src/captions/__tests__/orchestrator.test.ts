@@ -222,7 +222,7 @@ describe('produceCaptions', () => {
       videoUrl: 'https://example.com/video.mp4',
       // No cues, no script → transcribe mode
       highlightMode: 'glow',
-      whisper: { provider: 'openrouter' },
+      whisper: { provider: 'cloudflare' },
     });
 
     // 1. Should download the video

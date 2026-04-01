@@ -4,6 +4,8 @@ import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob } from 
 import { isPublicUrl } from '../planner/production-planner';
 import { PEXELS_GUIDELINES } from './prompt-guidelines';
 import { createLogger } from '@reelstack/logger';
+import { addCost } from '../context';
+import { calculateToolCost } from '../config/pricing';
 
 const log = createLogger('pexels-tool');
 const PEXELS_API = 'https://api.pexels.com';
@@ -125,6 +127,14 @@ export class PexelsTool implements ProductionTool {
         };
       }
 
+      addCost({
+        step: `asset:${this.id}`,
+        provider: 'pexels',
+        type: 'video',
+        costUSD: 0,
+        inputUnits: 1,
+        durationMs,
+      });
       return {
         jobId: randomUUID(),
         toolId: this.id,
@@ -160,6 +170,14 @@ export class PexelsTool implements ProductionTool {
       };
     }
 
+    addCost({
+      step: `asset:${this.id}`,
+      provider: 'pexels',
+      type: 'image',
+      costUSD: 0,
+      inputUnits: 1,
+      durationMs,
+    });
     return {
       jobId: randomUUID(),
       toolId: this.id,

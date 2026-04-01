@@ -1,0 +1,135 @@
+import { describe, test, expect } from 'vitest';
+import { buildTemplatePlan, getTemplate, listTemplates } from '../content/template-montage';
+import type { ContentPackage } from '../content/content-package';
+
+function makeContentPackage(sectionCount: number, durationSeconds = 30): ContentPackage {
+  const sectionDur = durationSeconds / sectionCount;
+  const sections = Array.from({ length: sectionCount }, (_, i) => ({
+    index: i,
+    text: `Section ${i + 1} about topic ${i + 1}`,
+    startTime: i * sectionDur,
+    endTime: (i + 1) * sectionDur,
+    assetId: `asset-${i + 1}`,
+  }));
+  const assets = sections.map((s) => ({
+    id: s.assetId!,
+    url: `https://example.com/img-${s.index + 1}.jpg`,
+    type: 'image' as const,
+    role: 'board' as const,
+    description: `Board for section ${s.index + 1}`,
+    sectionIndex: s.index,
+  }));
+
+  return {
+    script: sections.map((s) => s.text).join('. '),
+    voiceover: {
+      url: 'https://example.com/voiceover.mp3',
+      durationSeconds,
+      source: 'tts',
+    },
+    cues: [],
+    sections,
+    assets,
+    primaryVideo: {
+      url: 'https://example.com/head.mp4',
+      durationSeconds,
+      source: 'user-recording',
+      framing: 'bottom-aligned',
+      loop: false,
+    },
+    metadata: { language: 'en' },
+  };
+}
+
+describe('template-montage', () => {
+  describe('registry', () => {
+    test('built-in templates are registered', () => {
+      expect(getTemplate('anchor-bottom-simple')).toBeDefined();
+      expect(getTemplate('fullscreen-broll')).toBeDefined();
+    });
+
+    test('listTemplates returns all registered', () => {
+      const templates = listTemplates();
+      expect(templates.length).toBeGreaterThanOrEqual(2);
+      const ids = templates.map((t) => t.id);
+      expect(ids).toContain('anchor-bottom-simple');
+      expect(ids).toContain('fullscreen-broll');
+    });
+
+    test('unknown template throws', () => {
+      const content = makeContentPackage(3);
+      expect(() => buildTemplatePlan(content, 'nonexistent')).toThrow('Unknown template');
+    });
+  });
+
+  describe('anchor-bottom-simple', () => {
+    test('generates plan with correct layout', () => {
+      const plan = buildTemplatePlan(makeContentPackage(5), 'anchor-bottom-simple');
+      expect(plan.layout).toBe('anchor-bottom');
+      expect(plan.shots.length).toBeGreaterThan(3);
+    });
+
+    test('head time is under 40% of total duration', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 30), 'anchor-bottom-simple');
+      const totalDuration = 30;
+      const headTime = plan.shots
+        .filter((s) => s.shotLayout === 'head')
+        .reduce((sum, s) => sum + (s.endTime - s.startTime), 0);
+      expect(headTime / totalDuration).toBeLessThan(0.4);
+    });
+
+    test('has content shots consuming assets', () => {
+      const plan = buildTemplatePlan(makeContentPackage(5), 'anchor-bottom-simple');
+      const contentShots = plan.shots.filter((s) => s.shotLayout === 'content');
+      expect(contentShots.length).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe('fullscreen-broll', () => {
+    test('generates plan with fullscreen layout', () => {
+      const plan = buildTemplatePlan(makeContentPackage(5), 'fullscreen-broll');
+      expect(plan.layout).toBe('fullscreen');
+    });
+
+    test('alternates head and content shots', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 40), 'fullscreen-broll');
+      const headShots = plan.shots.filter((s) => s.shotLayout === 'head');
+      const contentShots = plan.shots.filter((s) => s.shotLayout === 'content');
+      expect(headShots.length).toBeGreaterThan(0);
+      expect(contentShots.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('plan structure', () => {
+    test('shots cover entire duration without gaps', () => {
+      const duration = 30;
+      const plan = buildTemplatePlan(makeContentPackage(5, duration), 'anchor-bottom-simple');
+      expect(plan.shots[0].startTime).toBeLessThanOrEqual(2.5);
+      const lastShot = plan.shots[plan.shots.length - 1];
+      expect(lastShot.endTime).toBe(duration);
+    });
+
+    test('no overlapping shots', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 30), 'anchor-bottom-simple');
+      for (let i = 1; i < plan.shots.length; i++) {
+        expect(plan.shots[i].startTime).toBeGreaterThanOrEqual(plan.shots[i - 1].endTime - 0.01);
+      }
+    });
+
+    test('zoom segments are generated for head shots', () => {
+      const plan = buildTemplatePlan(makeContentPackage(5), 'anchor-bottom-simple');
+      expect(plan.zoomSegments.length).toBeGreaterThan(0);
+    });
+
+    test('subscribe banner effect is generated for long reels', () => {
+      const plan = buildTemplatePlan(makeContentPackage(5, 25), 'anchor-bottom-simple');
+      const banners = plan.effects.filter((e) => e.type === 'subscribe-banner');
+      expect(banners.length).toBe(1);
+    });
+
+    test('auto SFX are generated by default', () => {
+      const plan = buildTemplatePlan(makeContentPackage(5, 25), 'anchor-bottom-simple');
+      expect(plan.sfxSegments!.length).toBeGreaterThan(0);
+    });
+  });
+});

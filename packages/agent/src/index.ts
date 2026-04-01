@@ -85,7 +85,15 @@ export {
 export type { ReelModule, BaseModuleRequest, ModuleResult, ProgressCallback } from './modules';
 
 export { detectLanguage } from './utils/detect-language';
-export { getJobId, runWithJobId, jobContext } from './context';
+export { getJobId, runWithJobId, jobContext, addCost, getCosts, getCostSummary } from './context';
+export {
+  calculateLLMCost,
+  calculateToolCost,
+  calculateTTSCost,
+  calculateWhisperCost,
+} from './config/pricing';
+export { registerPersona, getPersona, listPersonas } from './config/personas';
+export type { PresenterPersona } from './config/personas';
 
 // ── Types ─────────────────────────────────────────────────────
 export type { ProductionTool } from './registry/tool-interface';
@@ -103,11 +111,16 @@ export type {
   AssetGenerationRequest,
   AssetGenerationJob,
   AssetGenerationStatus,
+  CostEntry,
+  CostSummary,
+  CostType,
   ToolCapability,
   ToolManifest,
   ToolManifestEntry,
   CostTier,
   BrandPreset,
+  WhisperConfig,
+  WhisperProviderType,
 } from './types';
 
 /**

@@ -1,7 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
-import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob, AssetGenerationStatus } from '../types';
+import type {
+  ToolCapability,
+  AssetGenerationRequest,
+  AssetGenerationJob,
+  AssetGenerationStatus,
+} from '../types';
 import { createLogger } from '@reelstack/logger';
+import { addCost } from '../context';
+import { calculateToolCost } from '../config/pricing';
 import { isPublicUrl } from '../planner/production-planner';
 import { SEEDANCE_GUIDELINES } from './prompt-guidelines';
 
@@ -59,14 +66,18 @@ export class SeedanceTool implements ProductionTool {
 
   async generate(request: AssetGenerationRequest): Promise<AssetGenerationJob> {
     if (!this.apiKey) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: 'SEEDANCE_API_KEY not set' };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: 'SEEDANCE_API_KEY not set',
+      };
     }
 
     const prompt = request.prompt ?? 'abstract cinematic background';
     const duration = Math.min(request.durationSeconds ?? 5, 10);
-    const aspectRatio = request.aspectRatio === '16:9' ? '16:9'
-      : request.aspectRatio === '1:1' ? '1:1'
-        : '9:16';
+    const aspectRatio =
+      request.aspectRatio === '16:9' ? '16:9' : request.aspectRatio === '1:1' ? '1:1' : '9:16';
 
     try {
       const res = await fetch(`${this.apiBase}/v1/videos/text2video`, {
@@ -86,14 +97,27 @@ export class SeedanceTool implements ProductionTool {
 
       if (!res.ok) {
         const errBody = await res.text();
-        log.warn({ status: res.status, errorPreview: errBody.substring(0, 200) }, 'Seedance generate failed');
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `Seedance API error (${res.status})` };
+        log.warn(
+          { status: res.status, errorPreview: errBody.substring(0, 200) },
+          'Seedance generate failed'
+        );
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: `Seedance API error (${res.status})`,
+        };
       }
 
       const data = (await res.json()) as { data?: { task_id?: string }; message?: string };
 
       if (!data.data?.task_id) {
-        return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: data.message ?? 'No task_id returned' };
+        return {
+          jobId: randomUUID(),
+          toolId: this.id,
+          status: 'failed',
+          error: data.message ?? 'No task_id returned',
+        };
       }
 
       log.info({ taskId: data.data.task_id }, 'Seedance video generation started');
@@ -104,7 +128,12 @@ export class SeedanceTool implements ProductionTool {
         status: 'processing',
       };
     } catch (err) {
-      return { jobId: randomUUID(), toolId: this.id, status: 'failed', error: `Seedance request failed: ${err instanceof Error ? err.message : 'unknown'}` };
+      return {
+        jobId: randomUUID(),
+        toolId: this.id,
+        status: 'failed',
+        error: `Seedance request failed: ${err instanceof Error ? err.message : 'unknown'}`,
+      };
     }
   }
 
@@ -141,6 +170,14 @@ export class SeedanceTool implements ProductionTool {
       if (task.task_status === 'succeed' || task.task_status === 'completed') {
         const videoUrl = task.task_result?.videos?.[0]?.url;
         if (videoUrl) {
+          addCost({
+            step: `asset:${this.id}`,
+            provider: 'seedance',
+            model: 'seedance',
+            type: 'video',
+            costUSD: calculateToolCost(this.id, 5),
+            inputUnits: 1,
+          });
           return {
             jobId,
             toolId: this.id,
@@ -153,7 +190,12 @@ export class SeedanceTool implements ProductionTool {
       }
 
       if (task.task_status === 'failed') {
-        return { jobId, toolId: this.id, status: 'failed', error: task.error_msg ?? 'Seedance generation failed' };
+        return {
+          jobId,
+          toolId: this.id,
+          status: 'failed',
+          error: task.error_msg ?? 'Seedance generation failed',
+        };
       }
 
       return { jobId, toolId: this.id, status: 'processing' };

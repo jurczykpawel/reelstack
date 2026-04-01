@@ -5,6 +5,8 @@ import path from 'path';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { addCost } from '../context';
+import { calculateToolCost } from '../config/pricing';
 import { NANOBANANA_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('nanobanana-tool');
@@ -168,6 +170,14 @@ export class NanoBananaTool implements ProductionTool {
         'NanoBanana image generated'
       );
 
+      addCost({
+        step: `asset:${this.id}`,
+        provider: 'nanobanana',
+        model: 'gemini-2.0-flash-exp',
+        type: 'image',
+        costUSD: calculateToolCost(this.id),
+        inputUnits: 1,
+      });
       return {
         jobId: randomUUID(),
         toolId: this.id,
