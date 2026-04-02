@@ -21,20 +21,21 @@ function makeCue(overrides?: Partial<SubtitleCue>): SubtitleCue {
   };
 }
 
+const snapPopStyle = { animationStyle: 'snap-pop' };
+
 describe('caption-animation-renderer', () => {
   describe('snap-pop', () => {
-    const cue = makeCue({ animationStyle: 'snap-pop' });
+    const cue = makeCue();
 
     test('words before their startTime are hidden', () => {
-      const frame = renderAnimatedCaption(cue, 1.0);
-      // "Hello" just started, "world" and "test" not yet
+      const frame = renderAnimatedCaption(cue, 1.0, snapPopStyle);
       const worldSeg = frame.segments.find((s) => s.text === 'world');
       expect(worldSeg?.opacity).toBe(0);
       expect(worldSeg?.style).toBe('hidden');
     });
 
     test('word at startTime has pop scale > 1.0', () => {
-      const frame = renderAnimatedCaption(cue, 1.001);
+      const frame = renderAnimatedCaption(cue, 1.001, snapPopStyle);
       const helloSeg = frame.segments.find((s) => s.text === 'Hello');
       expect(helloSeg?.opacity).toBe(1);
       expect(helloSeg?.scale).toBeGreaterThan(1.0);
@@ -42,15 +43,14 @@ describe('caption-animation-renderer', () => {
     });
 
     test('word settles to scale 1.0 after pop duration', () => {
-      // 0.12s after word start = settled
-      const frame = renderAnimatedCaption(cue, 1.15);
+      const frame = renderAnimatedCaption(cue, 1.15, snapPopStyle);
       const helloSeg = frame.segments.find((s) => s.text === 'Hello');
       expect(helloSeg?.scale).toBe(1);
       expect(helloSeg?.opacity).toBe(1);
     });
 
     test('all words visible after all have started', () => {
-      const frame = renderAnimatedCaption(cue, 2.0);
+      const frame = renderAnimatedCaption(cue, 2.0, snapPopStyle);
       expect(frame.segments.length).toBe(3);
       for (const seg of frame.segments) {
         expect(seg.opacity).toBe(1);
@@ -59,10 +59,29 @@ describe('caption-animation-renderer', () => {
     });
 
     test('returns empty outside cue time range', () => {
-      const before = renderAnimatedCaption(cue, 0.5);
+      const before = renderAnimatedCaption(cue, 0.5, snapPopStyle);
       expect(before.visible).toBe(false);
-      const after = renderAnimatedCaption(cue, 3.5);
+      const after = renderAnimatedCaption(cue, 3.5, snapPopStyle);
       expect(after.visible).toBe(false);
+    });
+  });
+
+  describe('defaults', () => {
+    test('no animationStyle renders static text', () => {
+      const cue = makeCue();
+      const frame = renderAnimatedCaption(cue, 1.5);
+      expect(frame.visible).toBe(true);
+      // 'none' renders full text as single segment
+      expect(frame.segments.length).toBe(1);
+      expect(frame.segments[0].text).toBe('Hello world test');
+    });
+
+    test('word-highlight scales active word', () => {
+      const cue = makeCue();
+      const frame = renderAnimatedCaption(cue, 1.2, { animationStyle: 'word-highlight' });
+      const hello = frame.segments.find((s) => s.text === 'Hello');
+      expect(hello?.scale).toBe(1.15);
+      expect(hello?.style).toBe('highlighted');
     });
   });
 

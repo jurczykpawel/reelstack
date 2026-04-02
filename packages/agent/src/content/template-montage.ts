@@ -33,7 +33,7 @@ export interface TemplateMontageConfig {
   /** Transition between shots */
   transition: 'crossfade' | 'slide-left' | 'zoom-in' | 'varied';
   /** Caption highlight mode (overrides default) */
-  captionMode?: 'hormozi' | 'single-word' | 'pill' | 'text';
+  highlightMode?: 'hormozi' | 'single-word' | 'pill' | 'text';
   /** Max seconds for final head/CTA shot */
   maxCtaSeconds?: number;
   /** Show presenter as PiP circle during content shots */
@@ -84,7 +84,7 @@ export interface TemplateMontageConfig {
   /** Transition duration in ms */
   transitionDurationMs?: number;
 
-  /** Caption style overrides (beyond captionMode) */
+  /** Caption style overrides (beyond highlightMode) */
   captionStyleOverrides?: {
     highlightColor?: string;
     fontSize?: number;
@@ -428,8 +428,7 @@ export function buildTemplatePlan(content: ContentPackage, templateId: string): 
     animationPool: defaults.animations,
     layout: config.layout,
     captionStyle: {
-      highlightMode: config.captionMode ?? 'hormozi',
-      highlightColor: '#FFD700',
+      highlightMode: config.highlightMode ?? 'hormozi',
       ...(config.showPip ? { position: defaults.pipStyle.captionOffset } : {}),
       ...defaults.captionStyleOverrides,
     },

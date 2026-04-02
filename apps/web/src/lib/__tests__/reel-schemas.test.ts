@@ -23,7 +23,6 @@ describe('generateReelSchema', () => {
       style: 'cinematic',
       tts: { provider: 'elevenlabs', voice: 'rachel', language: 'en-US' },
       brandPreset: {
-        captionTemplate: 'bold-pop',
         highlightColor: '#FFD700',
         backgroundColor: '#000000',
         defaultTransition: 'crossfade',

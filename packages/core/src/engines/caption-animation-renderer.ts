@@ -245,13 +245,13 @@ function renderTypewriter(
 export function renderAnimatedCaption(
   cue: SubtitleCue,
   currentTime: number,
-  styleOverrides?: { highlightColor?: string; upcomingColor?: string }
+  styleOverrides?: { highlightColor?: string; upcomingColor?: string; animationStyle?: string }
 ): AnimatedCaptionFrame {
   if (currentTime < cue.startTime || currentTime > cue.endTime) {
     return EMPTY_FRAME;
   }
 
-  const animationStyle = cue.animationStyle ?? 'none';
+  const animationStyle = styleOverrides?.animationStyle ?? 'none';
 
   // If no per-word timing data, fall back to static rendering
   if (!cue.words || cue.words.length === 0 || animationStyle === 'none') {

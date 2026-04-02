@@ -23,7 +23,6 @@ export interface SubtitleCue {
   readonly endTime: number; // seconds
   readonly text: string;
   readonly words?: readonly SubtitleWord[];
-  readonly animationStyle?: CaptionAnimationStyle;
 }
 
 // ==========================================
@@ -57,6 +56,8 @@ export interface SubtitleStyle {
   readonly pillColor?: string;
   readonly pillBorderRadius?: number;
   readonly pillPadding?: number;
+  /** Caption animation style — global, not per-cue */
+  readonly animationStyle?: CaptionAnimationStyle;
 }
 
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {

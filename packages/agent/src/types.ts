@@ -229,7 +229,6 @@ export interface EffectPlan {
 
 export interface BrandPreset {
   readonly captionPreset?: string;
-  readonly captionTemplate?: string;
   readonly animationStyle?:
     | 'none'
     | 'word-highlight'

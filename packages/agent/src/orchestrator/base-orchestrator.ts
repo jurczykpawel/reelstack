@@ -220,15 +220,11 @@ export async function runTTSPipeline(
 
   // Group into cues using preset config
   const presetConfig = resolvePresetConfig(request.brandPreset);
-  const cues = groupWordsIntoCues(
-    offsetWords,
-    {
-      maxWordsPerCue: presetConfig.maxWordsPerCue,
-      maxDurationPerCue: presetConfig.maxDurationPerCue,
-      breakOnPunctuation: true,
-    },
-    presetConfig.animationStyle
-  );
+  const cues = groupWordsIntoCues(offsetWords, {
+    maxWordsPerCue: presetConfig.maxWordsPerCue,
+    maxDurationPerCue: presetConfig.maxDurationPerCue,
+    breakOnPunctuation: true,
+  });
 
   return {
     voiceoverPath,
@@ -244,7 +240,6 @@ export async function runTTSPipeline(
       startTime: c.startTime,
       endTime: c.endTime,
       words: c.words?.map((w) => ({ text: w.text, startTime: w.startTime, endTime: w.endTime })),
-      animationStyle: c.animationStyle,
     })),
     steps,
   };

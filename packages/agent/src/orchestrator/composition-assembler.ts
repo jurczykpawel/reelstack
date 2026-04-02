@@ -69,7 +69,6 @@ interface CueEntry {
   startTime: number;
   endTime: number;
   words?: Array<{ text: string; startTime: number; endTime: number }>;
-  animationStyle?: string;
 }
 
 export interface AssemblyInput {
@@ -349,6 +348,7 @@ export function assembleComposition(input: AssemblyInput): AssembledProps {
       (str(llm.textTransform) as 'none' | 'uppercase') ??
       preset.style.textTransform ??
       'none',
+    animationStyle: brandPreset?.animationStyle ?? str(llm.animationStyle) ?? preset.animationStyle,
   };
 
   // Map plan segments to props
@@ -407,7 +407,9 @@ export function assembleComposition(input: AssemblyInput): AssembledProps {
   }));
 
   return {
-    layout: brandPreset?.layout ?? plan.layout,
+    // Layout is decided by the orchestrator (request > plan), not by brandPreset.
+    // BrandPreset.layout is intentionally ignored here — use request.layout at orchestrator level.
+    layout: plan.layout,
     primaryVideoUrl,
     primaryVideoDurationSeconds,
     primaryVideoObjectPosition: input.primaryVideoObjectPosition,

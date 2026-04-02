@@ -75,7 +75,7 @@ beforeEach(() => {
 
   // resolvePresetConfig default
   vi.mocked(resolvePresetConfig).mockReturnValue({
-    animationStyle: 'word-highlight',
+    animationStyle: 'word-highlight' as const,
     maxWordsPerCue: 6,
     maxDurationPerCue: 3,
   });

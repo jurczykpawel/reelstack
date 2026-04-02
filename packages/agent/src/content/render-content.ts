@@ -110,12 +110,6 @@ export async function renderContentPackage(
     centered: 'center',
   };
 
-  // If template specifies animationStyle via captionStyleOverrides, patch all cues.
-  // Animation style normally lives on cues (set during TTS pipeline), but template
-  // montage runs AFTER TTS, so we patch here to allow template-level override.
-  const templateAnimationStyle = (plan.captionStyle as Record<string, unknown> | undefined)
-    ?.animationStyle as string | undefined;
-
   const props = assembleComposition({
     plan,
     assets,
@@ -125,7 +119,6 @@ export async function renderContentPackage(
       startTime: c.startTime,
       endTime: c.endTime,
       words: c.words ? [...c.words.map((w) => ({ ...w }))] : undefined,
-      ...(templateAnimationStyle ? { animationStyle: templateAnimationStyle } : {}),
     })),
     voiceoverFilename: content.voiceover.url,
     brandPreset: request.brandPreset,

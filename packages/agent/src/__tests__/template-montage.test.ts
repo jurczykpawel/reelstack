@@ -123,7 +123,7 @@ describe('template-montage', () => {
       ],
       transition: 'varied',
       transitionDurationMs: 200,
-      captionMode: 'hormozi',
+      highlightMode: 'hormozi',
       maxCtaSeconds: 2.5,
       hook: { type: 'head', minDuration: 1.5, maxDuration: 2.5 },
       zoom: { enabled: true, pattern: 'all', scale: 1.12, focusPoint: { x: 50, y: 40 } },
