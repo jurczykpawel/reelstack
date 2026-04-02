@@ -1,5 +1,10 @@
 import { describe, test, expect } from 'vitest';
-import { buildTemplatePlan, getTemplate, listTemplates } from '../content/template-montage';
+import {
+  buildTemplatePlan,
+  getTemplate,
+  listTemplates,
+  registerTemplate,
+} from '../content/template-montage';
 import type { ContentPackage } from '../content/content-package';
 
 function makeContentPackage(sectionCount: number, durationSeconds = 30): ContentPackage {
@@ -97,6 +102,100 @@ describe('template-montage', () => {
       const contentShots = plan.shots.filter((s) => s.shotLayout === 'content');
       expect(headShots.length).toBeGreaterThan(0);
       expect(contentShots.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('jump-cut-dynamic', () => {
+    // Register inline (mirrors premium-templates.ts) so tests don't depend on private modules
+    registerTemplate({
+      id: 'jump-cut-dynamic',
+      name: 'Jump Cut Dynamic (Jabłoński)',
+      layout: 'fullscreen',
+      shotPattern: [
+        { type: 'head', durationStrategy: 'fixed', fixedDurationSeconds: 1.5 },
+        { type: 'content', durationStrategy: 'fill-section', maxDurationSeconds: 3 },
+        { type: 'head', durationStrategy: 'fixed', fixedDurationSeconds: 1.2 },
+        { type: 'content', durationStrategy: 'fill-section', maxDurationSeconds: 3 },
+        { type: 'head', durationStrategy: 'fixed', fixedDurationSeconds: 1.5 },
+        { type: 'content', durationStrategy: 'fill-section', maxDurationSeconds: 3.5 },
+        { type: 'head', durationStrategy: 'fixed', fixedDurationSeconds: 1.2 },
+        { type: 'content', durationStrategy: 'fill-section', maxDurationSeconds: 3 },
+      ],
+      transition: 'varied',
+      transitionDurationMs: 200,
+      captionMode: 'hormozi',
+      maxCtaSeconds: 2.5,
+      hook: { type: 'head', minDuration: 1.5, maxDuration: 2.5 },
+      zoom: { enabled: true, pattern: 'all', scale: 1.12, focusPoint: { x: 50, y: 40 } },
+      captionStyleOverrides: { highlightColor: '#FFD700', fontSize: 54 },
+      effectsConfig: { hookTextEmphasis: true, subscribeBanner: true },
+      sfxMode: 'auto',
+      scrollStopper: { preset: 'zoom-bounce', durationSeconds: 0.5 },
+    });
+
+    test('generates fullscreen layout plan', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 28), 'jump-cut-dynamic');
+      expect(plan.layout).toBe('fullscreen');
+    });
+
+    test('rapid alternation: many short head shots', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 28), 'jump-cut-dynamic');
+      const headShots = plan.shots.filter((s) => s.shotLayout === 'head');
+      // At least 3 head shots for a 28s reel (hook + transitions + CTA)
+      expect(headShots.length).toBeGreaterThanOrEqual(3);
+      // All head shots should be short (< 2.5s)
+      for (const h of headShots) {
+        expect(h.endTime - h.startTime).toBeLessThanOrEqual(2.5);
+      }
+    });
+
+    test('no content shot exceeds 3.5s', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 28), 'jump-cut-dynamic');
+      const contentShots = plan.shots.filter((s) => s.shotLayout === 'content');
+      for (const c of contentShots) {
+        expect(c.endTime - c.startTime).toBeLessThanOrEqual(4); // 3.5 + tolerance
+      }
+    });
+
+    test('zoom segments on all head shots except first', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 28), 'jump-cut-dynamic');
+      const headShots = plan.shots.filter((s) => s.shotLayout === 'head');
+      // pattern: 'all' skips 1st head, zooms rest
+      expect(plan.zoomSegments.length).toBe(headShots.length - 1);
+      for (const z of plan.zoomSegments) {
+        expect(z.scale).toBeGreaterThanOrEqual(1.07); // 1.12 or 1.12*0.96
+        expect(z.scale).toBeLessThanOrEqual(1.15);
+      }
+    });
+
+    test('has hook text emphasis effect', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 28), 'jump-cut-dynamic');
+      const emphasis = plan.effects.filter((e) => e.type === 'text-emphasis');
+      expect(emphasis.length).toBe(1);
+      expect(emphasis[0].startTime).toBe(0);
+    });
+
+    test('caption style has gold highlighting', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 28), 'jump-cut-dynamic');
+      expect(plan.captionStyle).toMatchObject({
+        highlightMode: 'hormozi',
+        highlightColor: '#FFD700',
+      });
+    });
+
+    test('scroll stopper is zoom-bounce', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 28), 'jump-cut-dynamic');
+      expect(plan.scrollStopper).toMatchObject({ preset: 'zoom-bounce' });
+    });
+
+    test('auto SFX generated', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 28), 'jump-cut-dynamic');
+      expect(plan.sfxSegments!.length).toBeGreaterThan(0);
+    });
+
+    test('no PiP segments (presenter is fullscreen)', () => {
+      const plan = buildTemplatePlan(makeContentPackage(6, 28), 'jump-cut-dynamic');
+      expect(plan.pipSegments?.length ?? 0).toBe(0);
     });
   });
 
