@@ -14,7 +14,8 @@ export type CaptionAnimationStyle =
   | 'word-by-word'
   | 'karaoke'
   | 'bounce'
-  | 'typewriter';
+  | 'typewriter'
+  | 'snap-pop';
 
 export interface SubtitleCue {
   readonly id: string;

@@ -90,6 +90,7 @@ export interface TemplateMontageConfig {
     fontSize?: number;
     fontFamily?: string;
     position?: number;
+    animationStyle?: string;
   };
 
   /** Auto SFX on montage events (zoom changes, shot transitions) */

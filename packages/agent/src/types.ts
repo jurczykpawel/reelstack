@@ -236,7 +236,8 @@ export interface BrandPreset {
     | 'word-by-word'
     | 'karaoke'
     | 'bounce'
-    | 'typewriter';
+    | 'typewriter'
+    | 'snap-pop';
   readonly maxWordsPerCue?: number;
   readonly maxDurationPerCue?: number;
   readonly textTransform?: 'none' | 'uppercase';
