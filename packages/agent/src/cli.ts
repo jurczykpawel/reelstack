@@ -3,15 +3,15 @@
  * ReelStack CLI — step-by-step pipeline testing.
  *
  * Usage:
- *   reelstack tts "Tekst do mówienia"
- *   reelstack plan <tts.json> [--template jump-cut-dynamic]
- *   reelstack assemble <plan.json> <tts.json>
- *   reelstack render <composition.json>
- *   reelstack heygen "Tekst dla avatara" [--iv] [--emotion Friendly]
- *   reelstack heygen-poll <job-id>
- *   reelstack heygen-status
+ *   bun run rs tts "Tekst do mówienia"
+ *   bun run rs plan <tts.json> [--template jump-cut-dynamic]
+ *   bun run rs assemble <plan.json> <tts.json>
+ *   bun run rs render <composition.json>
+ *   bun run rs heygen "Tekst dla avatara" [--iv] [--emotion Friendly]
+ *   bun run rs heygen-poll <job-id>
+ *   bun run rs heygen-status
  *
- * All outputs go to /tmp/reelstack/ (or --out <dir>).
+ * All outputs go to /tmp/bun run rs/ (or --out <dir>).
  * Each command reads the previous step's output file.
  */
 import fs from 'fs';
@@ -59,7 +59,7 @@ async function tts() {
   const script = positional(1);
   if (!script) {
     console.log(
-      `Usage: reelstack tts "Tekst do mówienia" [--voice pl-PL-MarekNeural] [--lang pl-PL]`
+      `Usage: bun run rs tts "Tekst do mówienia" [--voice pl-PL-MarekNeural] [--lang pl-PL]`
     );
     process.exit(1);
   }
@@ -92,19 +92,19 @@ async function tts() {
     `${G}Done${X} (${elapsed(t0)}): ${result.audioDuration.toFixed(1)}s audio, ${result.cues.length} cues`
   );
   console.log(`${D}Listen: open ${outDir}/voiceover.mp3${X}`);
-  console.log(`${D}Next:   reelstack plan ${outDir}/tts.json${X}`);
+  console.log(`${D}Next:   bun run rs plan ${outDir}/tts.json${X}`);
 }
 
 async function plan() {
   const ttsFile = positional(1);
   if (!ttsFile || !fs.existsSync(ttsFile)) {
-    console.log(`Usage: reelstack plan <tts.json> [--template jump-cut-dynamic]`);
+    console.log(`Usage: bun run rs plan <tts.json> [--template jump-cut-dynamic]`);
     process.exit(1);
   }
 
   // Load private modules for premium templates
   try {
-    await import('@reelstack/modules');
+    await import('@bun run rs/modules');
   } catch {
     try {
       await import('../../modules/src/index');
@@ -197,14 +197,14 @@ async function plan() {
     `Zooms: ${planResult.zoomSegments.length}, SFX: ${planResult.sfxSegments?.length ?? 0}`
   );
   console.log(`${G}Done${X}`);
-  console.log(`${D}Next: reelstack assemble ${outDir}/plan.json ${outDir}/tts.json${X}`);
+  console.log(`${D}Next: bun run rs assemble ${outDir}/plan.json ${outDir}/tts.json${X}`);
 }
 
 async function assemble() {
   const planFile = positional(1);
   const ttsFile = positional(2);
   if (!planFile || !ttsFile || !fs.existsSync(planFile) || !fs.existsSync(ttsFile)) {
-    console.log(`Usage: reelstack assemble <plan.json> <tts.json>`);
+    console.log(`Usage: bun run rs assemble <plan.json> <tts.json>`);
     process.exit(1);
   }
 
@@ -248,13 +248,13 @@ async function assemble() {
     `Caption: ${props.captionStyle?.fontSize}px ${props.captionStyle?.highlightMode} ${props.captionStyle?.animationStyle ?? ''}`
   );
   console.log(`${G}Done${X}`);
-  console.log(`${D}Next: reelstack render ${outDir}/composition.json${X}`);
+  console.log(`${D}Next: bun run rs render ${outDir}/composition.json${X}`);
 }
 
 async function render() {
   const compFile = positional(1);
   if (!compFile || !fs.existsSync(compFile)) {
-    console.log(`Usage: reelstack render <composition.json>`);
+    console.log(`Usage: bun run rs render <composition.json>`);
     process.exit(1);
   }
 
@@ -275,7 +275,7 @@ async function render() {
 async function heygen() {
   const script = positional(1);
   if (!script) {
-    console.log(`Usage: reelstack heygen "Tekst" [--iv] [--emotion Friendly] [--speed 1.1]`);
+    console.log(`Usage: bun run rs heygen "Tekst" [--iv] [--emotion Friendly] [--speed 1.1]`);
     process.exit(1);
   }
 
@@ -321,7 +321,7 @@ async function heygen() {
 
   console.log(`Job: ${result.jobId}`);
   console.log(
-    `Polling (ctrl+c to cancel, use 'reelstack heygen-poll ${result.jobId}' to resume)...`
+    `Polling (ctrl+c to cancel, use 'bun run rs heygen-poll ${result.jobId}' to resume)...`
   );
 
   for (let i = 0; i < 60; i++) {
@@ -337,7 +337,7 @@ async function heygen() {
       });
       console.log(`${G}Done${X} (${sec}s): ${poll.durationSeconds?.toFixed(1)}s video`);
       console.log(`${D}URL: ${poll.url?.substring(0, 80)}...${X}`);
-      console.log(`${D}Next: reelstack plan ${outDir}/tts.json${X}`);
+      console.log(`${D}Next: bun run rs plan ${outDir}/tts.json${X}`);
       return;
     }
     if (poll.status === 'failed') {
@@ -346,13 +346,13 @@ async function heygen() {
     }
     if (sec % 30 === 0) console.log(`  ${D}${sec}s...${X}`);
   }
-  console.log(`${Y}Timeout. Use: reelstack heygen-poll ${result.jobId}${X}`);
+  console.log(`${Y}Timeout. Use: bun run rs heygen-poll ${result.jobId}${X}`);
 }
 
 async function heygenPoll() {
   const jobId = positional(1);
   if (!jobId) {
-    console.log(`Usage: reelstack heygen-poll <job-id>`);
+    console.log(`Usage: bun run rs heygen-poll <job-id>`);
     process.exit(1);
   }
 
@@ -403,15 +403,15 @@ if (!command || !commands[command]) {
   console.log(`${B}ReelStack CLI${X}
 
 ${Y}Step-by-step pipeline:${X}
-  reelstack tts "Tekst"                    Generate voiceover + transcription
-  reelstack plan tts.json                  Build template montage plan
-  reelstack assemble plan.json tts.json    Compose Remotion props
-  reelstack render composition.json        Render to MP4
+  bun run rs tts "Tekst"                    Generate voiceover + transcription
+  bun run rs plan tts.json                  Build template montage plan
+  bun run rs assemble plan.json tts.json    Compose Remotion props
+  bun run rs render composition.json        Render to MP4
 
 ${Y}HeyGen:${X}
-  reelstack heygen "Tekst" [--iv]          Generate avatar video
-  reelstack heygen-poll <job-id>           Check generation status
-  reelstack heygen-status                  Check quota
+  bun run rs heygen "Tekst" [--iv]          Generate avatar video
+  bun run rs heygen-poll <job-id>           Check generation status
+  bun run rs heygen-status                  Check quota
 
 ${Y}Options:${X}
   --template <id>    Template (default: jump-cut-dynamic)
@@ -419,7 +419,7 @@ ${Y}Options:${X}
   --iv               Avatar IV mode
   --emotion <name>   Voice emotion (Excited, Friendly, Serious)
   --speed <n>        Voice speed (0.5-1.5)
-  --out <dir>        Output directory (default: /tmp/reelstack)
+  --out <dir>        Output directory (default: /tmp/bun run rs)
 `);
   process.exit(0);
 }
