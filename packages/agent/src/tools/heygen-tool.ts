@@ -86,8 +86,9 @@ export class HeyGenTool implements ProductionTool {
     }
 
     const avatarId =
-      request.avatarId ?? process.env.HEYGEN_AVATAR_ID ?? 'Angela-inTshworking-20220820';
-    const voiceId = request.voice ?? process.env.HEYGEN_VOICE_ID;
+      request.avatarId ?? process.env.HEYGEN_AVATAR_ID ?? 'cbf9cdacb813465d805991360a2206da';
+    const voiceId =
+      request.voice ?? process.env.HEYGEN_VOICE_ID ?? '0cbf3f0556f74c84abdf598a297ae810';
 
     // Determine dimensions based on aspect ratio
     const dimension =
@@ -105,9 +106,11 @@ export class HeyGenTool implements ProductionTool {
             avatar_id: avatarId,
             avatar_style: 'normal',
           },
-          voice: voiceId
-            ? { type: 'audio', voice_id: voiceId, input_text: request.script }
-            : { type: 'text', input_text: request.script },
+          voice: {
+            type: 'text',
+            voice_id: voiceId,
+            input_text: request.script,
+          },
           background: {
             type: 'color',
             value: '#000000',
