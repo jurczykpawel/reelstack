@@ -37,6 +37,9 @@ export function getJobId(): string | undefined {
 
 /** Run a function within a job context so all nested calls can access jobId and collect costs. */
 export function runWithJobId<T>(jobId: string, fn: () => T): T {
+  // If already in a context with the same jobId, reuse it (avoids nested stores losing costs)
+  const existing = jobContext.getStore();
+  if (existing && existing.jobId === jobId) return fn();
   return jobContext.run({ jobId, costs: [] }, fn);
 }
 

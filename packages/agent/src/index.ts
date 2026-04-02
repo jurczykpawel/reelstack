@@ -85,7 +85,16 @@ export {
 export type { ReelModule, BaseModuleRequest, ModuleResult, ProgressCallback } from './modules';
 
 export { detectLanguage } from './utils/detect-language';
-export { getJobId, runWithJobId, jobContext, addCost, getCosts, getCostSummary } from './context';
+export {
+  getJobId,
+  runWithJobId,
+  jobContext,
+  addCost,
+  getCosts,
+  getCostSummary,
+  setApiCallLogger,
+  logApiCall,
+} from './context';
 export {
   calculateLLMCost,
   calculateToolCost,
