@@ -113,12 +113,17 @@ export class HeyGenTool implements ProductionTool {
     if (hg?.speed != null) voice.speed = hg.speed;
     if (hg?.pitch != null) voice.pitch = hg.pitch;
 
-    // Character config — Avatar IV via use_avatar_iv_model flag
-    const character: Record<string, unknown> = {
-      type: 'avatar',
-      avatar_id: avatarId,
-      avatar_style: hg?.avatarStyle ?? 'normal',
-    };
+    // Character config — type determines structure, Avatar IV via flag
+    const charType = hg?.characterType ?? 'avatar';
+    const character: Record<string, unknown> = { type: charType };
+
+    if (charType === 'talking_photo') {
+      character.talking_photo_id = hg?.talkingPhotoId ?? avatarId;
+    } else {
+      character.avatar_id = avatarId;
+      character.avatar_style = hg?.avatarStyle ?? 'normal';
+    }
+
     if (hg?.useAvatarIV) {
       character.use_avatar_iv_model = true;
       if (hg.motionPrompt) {

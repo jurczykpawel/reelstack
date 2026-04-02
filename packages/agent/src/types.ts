@@ -77,6 +77,10 @@ export interface AssetGenerationRequest {
   readonly referenceImageUrl?: string;
   /** HeyGen-specific character/voice params — passed through to API as-is */
   readonly heygenConfig?: {
+    /** Character type: 'avatar' (digital twin) or 'talking_photo' (animated photo). Default: 'avatar'. */
+    readonly characterType?: 'avatar' | 'talking_photo';
+    /** Talking photo ID (required when characterType is 'talking_photo') */
+    readonly talkingPhotoId?: string;
     /** Enable Avatar IV (realistic face/body movements). Default: false (Engine III). */
     readonly useAvatarIV?: boolean;
     /** Motion prompt for Avatar IV — describes gestures (e.g. "gestures enthusiastically") */
