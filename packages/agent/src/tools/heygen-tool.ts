@@ -86,7 +86,7 @@ export class HeyGenTool implements ProductionTool {
     }
 
     const avatarId =
-      request.avatarId ?? process.env.HEYGEN_AVATAR_ID ?? 'cbf9cdacb813465d805991360a2206da';
+      request.avatarId ?? process.env.HEYGEN_AVATAR_ID ?? 'Abigail_expressive_2024112501';
     const voiceId =
       request.voice ?? process.env.HEYGEN_VOICE_ID ?? '0cbf3f0556f74c84abdf598a297ae810';
 
