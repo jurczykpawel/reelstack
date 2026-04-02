@@ -444,6 +444,79 @@ await renderContentPackage({ content2, templateId: 'jump-cut-dynamic', brandPres
 
 ---
 
+## HeyGen Avatar Integration
+
+HeyGen generates talking-head videos from script. Two character types, two quality tiers.
+
+### Character types
+
+| Type               | Field              | Use case                         |
+| ------------------ | ------------------ | -------------------------------- |
+| `avatar` (default) | `avatar_id`        | Digital twin / pre-built avatars |
+| `talking_photo`    | `talking_photo_id` | Animate a single photo           |
+
+### Quality tiers
+
+| Tier                  | Flag                        | Cost          | What you get                               |
+| --------------------- | --------------------------- | ------------- | ------------------------------------------ |
+| Standard (Engine III) | default                     | 1 credit/min  | Basic lip sync                             |
+| Avatar IV             | `use_avatar_iv_model: true` | 6 credits/min | Realistic face, body, background movements |
+
+### Configuration
+
+`heygen_character` and `heygen_voice` use **exact HeyGen API field names** - pure passthrough, zero mapping.
+
+```typescript
+// Standard avatar (Engine III)
+generate({
+  script: 'Cześć, dzisiaj pokażę...',
+  avatarId: 'my-avatar-id', // or HEYGEN_AVATAR_ID env var
+});
+
+// Avatar IV with motion prompt + voice emotion
+generate({
+  script: 'Cześć, dzisiaj pokażę...',
+  heygen_character: {
+    use_avatar_iv_model: true,
+    prompt: 'gestures enthusiastically while explaining',
+    keep_original_prompt: false,
+  },
+  heygen_voice: {
+    emotion: 'Friendly', // Excited, Friendly, Serious, Soothing, Broadcaster
+    speed: 1.1, // 0.5-1.5
+  },
+});
+
+// Talking photo
+generate({
+  script: 'Hello from a photo...',
+  heygen_character: {
+    type: 'talking_photo',
+    talking_photo_id: 'photo-abc',
+    use_avatar_iv_model: true,
+  },
+});
+```
+
+### Env vars
+
+| Var                | Purpose                                 | Default          |
+| ------------------ | --------------------------------------- | ---------------- |
+| `HEYGEN_API_KEY`   | API key (required)                      | -                |
+| `HEYGEN_AVATAR_ID` | Default avatar ID                       | Abigail (public) |
+| `HEYGEN_VOICE_ID`  | Default voice ID                        | Polish voice     |
+| `HEYGEN_TEST_MODE` | `true` = free test videos (5/day limit) | `false`          |
+
+### In produce() mode
+
+LLM planner decides whether to use HeyGen based on script content and available tools. Set `HEYGEN_API_KEY` and the tool auto-discovers.
+
+### In template montage mode
+
+Set `primaryVideo.source: 'heygen'` in ContentPackage. Pre-generate avatar video, pass URL.
+
+---
+
 ## Architecture Notes
 
 1. **Layout priority:** request > plan > preset. `BrandPreset.layout` is ignored by the assembler - set layout at request/orchestrator level.
