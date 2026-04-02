@@ -75,6 +75,14 @@ export interface AssetGenerationRequest {
   readonly imageUrl?: string;
   /** Reference image for character consistency (last frame of previous clip) */
   readonly referenceImageUrl?: string;
+  /** Avatar quality tier: standard (Engine III) or premium (Avatar IV with realistic movements) */
+  readonly avatarQuality?: 'standard' | 'premium';
+  /** Motion prompt for Avatar IV: describes gestures/expressions (e.g. "gestures enthusiastically") */
+  readonly motionPrompt?: string;
+  /** Voice emotion: Excited, Friendly, Serious, Soothing, Broadcaster */
+  readonly voiceEmotion?: string;
+  /** Voice speed (0.5-1.5, default 1.0) */
+  readonly voiceSpeed?: number;
 }
 
 export interface AssetGenerationJob {
