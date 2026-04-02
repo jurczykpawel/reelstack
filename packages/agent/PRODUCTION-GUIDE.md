@@ -129,7 +129,7 @@ Captions have THREE orthogonal concerns. Don't confuse them:
    → Set via: BrandPreset.animationStyle OR template captionStyleOverrides.animationStyle
 
 2. HIGHLIGHT (how active words look visually)
-   → Set via: template captionMode (maps to highlightMode)
+   → Set via: template highlightMode (maps to highlightMode)
 
 3. STYLE (typography: font, size, color, position)
    → Set via: BrandPreset fields (fontSize, fontColor, ...) OR captionStyleOverrides
@@ -165,7 +165,7 @@ Captions have THREE orthogonal concerns. Don't confuse them:
 ```typescript
 // Jabłoński style: snap entrance + hormozi scale + gold color
 templateConfig: {
-  captionMode: 'hormozi',           // highlight: active word scales 1.15x
+  highlightMode: 'hormozi',           // highlight: active word scales 1.15x
   captionStyleOverrides: {
     animationStyle: 'snap-pop',     // animation: words snap in at 1.3x
     highlightColor: '#FFD700',      // style: gold color
@@ -190,7 +190,7 @@ brandPreset: {
 }
 // + template:
 templateConfig: {
-  captionMode: 'pill',
+  highlightMode: 'pill',
   captionStyleOverrides: {
     highlightColor: '#FF6B6B',
     fontSize: 48,
@@ -262,7 +262,7 @@ registerTemplate({
   transition: 'varied', // 'crossfade' | 'slide-left' | 'zoom-in' | 'varied'
 
   // ── Captions ──
-  captionMode: 'hormozi', // highlight mode (axis 2)
+  highlightMode: 'hormozi', // highlight mode (axis 2)
   captionStyleOverrides: {
     // style overrides (axis 3)
     highlightColor: '#FFD700',
@@ -444,14 +444,12 @@ await renderContentPackage({ content2, templateId: 'jump-cut-dynamic', brandPres
 
 ---
 
-## Known Issues & Gotchas
+## Architecture Notes
 
-1. **BrandPreset.layout overrides everything** - even explicit user layout choice. Don't set it unless you want forced layout.
+1. **Layout priority:** request > plan > preset. `BrandPreset.layout` is ignored by the assembler - set layout at request/orchestrator level.
 
-2. **captionMode vs highlightMode** - naming inconsistency. `captionMode` in template config maps to `highlightMode` in final style. They mean the same thing.
+2. **animationStyle is global** (in captionStyle), not per-cue. Flows through 3-layer cascade: preset < template/plan < brandPreset.
 
-3. **Animation style lives on cues, not style** - `animationStyle` is per-cue (set in TTS pipeline), while `highlightMode` is global (in captionStyle). Template `captionStyleOverrides.animationStyle` patches cues post-TTS.
+3. **Template captionStyle goes through assembler cascade** - template sets layer 2 (like LLM suggestions), brandPreset overrides at layer 3.
 
-4. **Template mode bypasses LLM caption suggestions** - templates directly set captionStyle, LLM layer 2 is skipped.
-
-5. **Premium highlight modes require module import** - `hormozi`, `pill`, `single-word` etc. only work if private modules are loaded. Without them, falls back to `text`.
+4. **Premium highlight modes require module import** - `hormozi`, `pill`, `single-word` etc. only work if private modules are loaded. Without them, falls back to `text`.
