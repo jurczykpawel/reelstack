@@ -7,7 +7,7 @@
 import { createLogger } from '@reelstack/logger';
 import { detectProvider, getModel, getApiKey } from './config/models';
 import type { ModelRole, LLMProvider } from './config/models';
-import { getJobId, addCost } from './context';
+import { getJobId, addCost, logApiCall } from './context';
 import { calculateLLMCost } from './config/pricing';
 
 const log = createLogger('llm');
@@ -191,6 +191,14 @@ async function callAnthropic(
     },
   });
 
+  logApiCall(`llm:${opts.modelRole ?? 'unknown'}`, `anthropic-${Date.now()}`, {
+    provider: 'anthropic',
+    model,
+    request: { systemPrompt, userMessage },
+    response: { text: responseText, usage: { inputTokens, outputTokens } },
+    durationMs,
+  });
+
   return responseText;
 }
 
@@ -296,6 +304,14 @@ async function callOpenAICompatible(
       userMessagePreview: userMessage.slice(0, 500),
       responsePreview: content.slice(0, 500),
     },
+  });
+
+  logApiCall(`llm:${opts.modelRole ?? 'unknown'}`, `${provider}-${Date.now()}`, {
+    provider,
+    model,
+    request: { systemPrompt, userMessage },
+    response: { text: content, usage: { inputTokens, outputTokens } },
+    durationMs,
   });
 
   return content;
