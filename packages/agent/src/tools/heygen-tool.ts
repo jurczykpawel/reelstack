@@ -90,7 +90,6 @@ export class HeyGenTool implements ProductionTool {
       };
     }
 
-    const hg = request.heygenConfig;
     const avatarId =
       request.avatarId ?? process.env.HEYGEN_AVATAR_ID ?? 'Abigail_expressive_2024112501';
     const voiceId =
@@ -103,34 +102,21 @@ export class HeyGenTool implements ProductionTool {
           ? { width: 1080, height: 1080 }
           : { width: 1080, height: 1920 };
 
-    // Voice config — pass through HeyGen params as-is
+    // Character — spread heygen_character directly, fill defaults
+    const character: Record<string, unknown> = {
+      type: 'avatar',
+      avatar_id: avatarId,
+      avatar_style: 'normal',
+      ...request.heygen_character,
+    };
+
+    // Voice — spread heygen_voice directly, fill defaults
     const voice: Record<string, unknown> = {
       type: 'text',
       voice_id: voiceId,
       input_text: request.script,
+      ...request.heygen_voice,
     };
-    if (hg?.emotion) voice.emotion = hg.emotion;
-    if (hg?.speed != null) voice.speed = hg.speed;
-    if (hg?.pitch != null) voice.pitch = hg.pitch;
-
-    // Character config — type determines structure, Avatar IV via flag
-    const charType = hg?.characterType ?? 'avatar';
-    const character: Record<string, unknown> = { type: charType };
-
-    if (charType === 'talking_photo') {
-      character.talking_photo_id = hg?.talkingPhotoId ?? avatarId;
-    } else {
-      character.avatar_id = avatarId;
-      character.avatar_style = hg?.avatarStyle ?? 'normal';
-    }
-
-    if (hg?.useAvatarIV) {
-      character.use_avatar_iv_model = true;
-      if (hg.motionPrompt) {
-        character.prompt = hg.motionPrompt;
-        character.keep_original_prompt = hg.keepOriginalPrompt ?? false;
-      }
-    }
 
     const body: Record<string, unknown> = {
       video_inputs: [{ character, voice, background: { type: 'color', value: '#000000' } }],
@@ -172,7 +158,7 @@ export class HeyGenTool implements ProductionTool {
       }
 
       log.info(
-        { videoId: data.data.video_id, avatarIV: !!hg?.useAvatarIV, avatarId },
+        { videoId: data.data.video_id, avatarId: character.avatar_id, type: character.type },
         'HeyGen video generation started'
       );
 

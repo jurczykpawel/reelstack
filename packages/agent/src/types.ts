@@ -75,26 +75,26 @@ export interface AssetGenerationRequest {
   readonly imageUrl?: string;
   /** Reference image for character consistency (last frame of previous clip) */
   readonly referenceImageUrl?: string;
-  /** HeyGen-specific character/voice params — passed through to API as-is */
-  readonly heygenConfig?: {
-    /** Character type: 'avatar' (digital twin) or 'talking_photo' (animated photo). Default: 'avatar'. */
-    readonly characterType?: 'avatar' | 'talking_photo';
-    /** Talking photo ID (required when characterType is 'talking_photo') */
-    readonly talkingPhotoId?: string;
-    /** Enable Avatar IV (realistic face/body movements). Default: false (Engine III). */
-    readonly useAvatarIV?: boolean;
-    /** Motion prompt for Avatar IV — describes gestures (e.g. "gestures enthusiastically") */
-    readonly motionPrompt?: string;
-    /** Let HeyGen AI enhance the motion prompt. Default: true when motionPrompt set. */
-    readonly keepOriginalPrompt?: boolean;
-    /** Voice emotion: Excited, Friendly, Serious, Soothing, Broadcaster */
+  /**
+   * HeyGen character params — exact API field names, zero mapping.
+   * Docs: https://docs.heygen.com/reference/create-an-avatar-video-v2
+   */
+  readonly heygen_character?: {
+    readonly type?: 'avatar' | 'talking_photo';
+    readonly avatar_id?: string;
+    readonly avatar_style?: string;
+    readonly talking_photo_id?: string;
+    readonly use_avatar_iv_model?: boolean;
+    readonly prompt?: string;
+    readonly keep_original_prompt?: boolean;
+  };
+  /**
+   * HeyGen voice params — exact API field names, zero mapping.
+   */
+  readonly heygen_voice?: {
     readonly emotion?: string;
-    /** Voice speed (0.5-1.5) */
     readonly speed?: number;
-    /** Voice pitch (-50 to 50) */
     readonly pitch?: number;
-    /** Avatar style override */
-    readonly avatarStyle?: string;
   };
 }
 
