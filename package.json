@@ -16,7 +16,8 @@
     "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
     "api:seed": "bun scripts/dev-seed.ts",
     "api:test": "npx @usebruno/cli run bruno/reelstack --env local",
-    "api:test:validation": "npx @usebruno/cli run bruno/reelstack/validation --env local"
+    "api:test:validation": "npx @usebruno/cli run bruno/reelstack/validation --env local",
+    "rs": "bun packages/agent/src/cli.ts"
   },
   "overrides": {
     "fast-xml-parser": ">=5.3.6",
