@@ -27,7 +27,9 @@ const B = '\x1b[36m',
 
 const args = process.argv.slice(2);
 const command = args[0];
-const outDir = args.includes('--out') ? args[args.indexOf('--out') + 1] : '/tmp/reelstack';
+const outDir = args.includes('--out')
+  ? args[args.indexOf('--out') + 1]
+  : path.resolve(import.meta.dirname ?? __dirname, '../../..', 'out');
 
 fs.mkdirSync(outDir, { recursive: true });
 
