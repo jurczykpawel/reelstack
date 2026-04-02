@@ -75,14 +75,23 @@ export interface AssetGenerationRequest {
   readonly imageUrl?: string;
   /** Reference image for character consistency (last frame of previous clip) */
   readonly referenceImageUrl?: string;
-  /** Avatar quality tier: standard (Engine III) or premium (Avatar IV with realistic movements) */
-  readonly avatarQuality?: 'standard' | 'premium';
-  /** Motion prompt for Avatar IV: describes gestures/expressions (e.g. "gestures enthusiastically") */
-  readonly motionPrompt?: string;
-  /** Voice emotion: Excited, Friendly, Serious, Soothing, Broadcaster */
-  readonly voiceEmotion?: string;
-  /** Voice speed (0.5-1.5, default 1.0) */
-  readonly voiceSpeed?: number;
+  /** HeyGen-specific character/voice params — passed through to API as-is */
+  readonly heygenConfig?: {
+    /** Enable Avatar IV (realistic face/body movements). Default: false (Engine III). */
+    readonly useAvatarIV?: boolean;
+    /** Motion prompt for Avatar IV — describes gestures (e.g. "gestures enthusiastically") */
+    readonly motionPrompt?: string;
+    /** Let HeyGen AI enhance the motion prompt. Default: true when motionPrompt set. */
+    readonly keepOriginalPrompt?: boolean;
+    /** Voice emotion: Excited, Friendly, Serious, Soothing, Broadcaster */
+    readonly emotion?: string;
+    /** Voice speed (0.5-1.5) */
+    readonly speed?: number;
+    /** Voice pitch (-50 to 50) */
+    readonly pitch?: number;
+    /** Avatar style override */
+    readonly avatarStyle?: string;
+  };
 }
 
 export interface AssetGenerationJob {

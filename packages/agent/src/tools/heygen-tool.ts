@@ -90,11 +90,11 @@ export class HeyGenTool implements ProductionTool {
       };
     }
 
+    const hg = request.heygenConfig;
     const avatarId =
       request.avatarId ?? process.env.HEYGEN_AVATAR_ID ?? 'Abigail_expressive_2024112501';
     const voiceId =
       request.voice ?? process.env.HEYGEN_VOICE_ID ?? '0cbf3f0556f74c84abdf598a297ae810';
-    const isPremium = request.avatarQuality === 'premium';
 
     const dimension =
       request.aspectRatio === '16:9'
@@ -103,26 +103,27 @@ export class HeyGenTool implements ProductionTool {
           ? { width: 1080, height: 1080 }
           : { width: 1080, height: 1920 };
 
-    // Build voice config with optional emotion/speed
+    // Voice config — pass through HeyGen params as-is
     const voice: Record<string, unknown> = {
       type: 'text',
       voice_id: voiceId,
       input_text: request.script,
     };
-    if (request.voiceEmotion) voice.emotion = request.voiceEmotion;
-    if (request.voiceSpeed != null) voice.speed = request.voiceSpeed;
+    if (hg?.emotion) voice.emotion = hg.emotion;
+    if (hg?.speed != null) voice.speed = hg.speed;
+    if (hg?.pitch != null) voice.pitch = hg.pitch;
 
-    // Build character config — Avatar IV uses flag on same endpoint
+    // Character config — Avatar IV via use_avatar_iv_model flag
     const character: Record<string, unknown> = {
       type: 'avatar',
       avatar_id: avatarId,
-      avatar_style: 'normal',
+      avatar_style: hg?.avatarStyle ?? 'normal',
     };
-    if (isPremium) {
+    if (hg?.useAvatarIV) {
       character.use_avatar_iv_model = true;
-      if (request.motionPrompt) {
-        character.prompt = request.motionPrompt;
-        character.keep_original_prompt = false;
+      if (hg.motionPrompt) {
+        character.prompt = hg.motionPrompt;
+        character.keep_original_prompt = hg.keepOriginalPrompt ?? false;
       }
     }
 
@@ -166,7 +167,7 @@ export class HeyGenTool implements ProductionTool {
       }
 
       log.info(
-        { videoId: data.data.video_id, isPremium, avatarId },
+        { videoId: data.data.video_id, avatarIV: !!hg?.useAvatarIV, avatarId },
         'HeyGen video generation started'
       );
 
