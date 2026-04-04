@@ -897,11 +897,13 @@ function parseCtaSegments(raw: unknown): CtaPlan[] {
  * Post-process plan to enforce mandatory tool selection order.
  * LLM often ignores tool preference instructions, so we fix it programmatically.
  *
- * AI video priority: seedance2-piapi > veo31-gemini > kling-piapi > seedance-piapi > others
+ * AI video priority: seedance2-kie > seedance2-piapi > veo31-gemini > others
  * AI image priority: nanobanana2-kie > nanobanana > flux-* > others
  */
 function enforceToolPreferences(plan: ProductionPlan, availableToolIds: string[]): ProductionPlan {
   const VIDEO_PRIORITY = [
+    'seedance2-kie',
+    'seedance2-fast-kie',
     'seedance2-piapi',
     'veo31-gemini',
     'kling-piapi',

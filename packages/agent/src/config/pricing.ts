@@ -52,6 +52,8 @@ const TOOL_PRICING: Record<string, ToolPricing> = {
   minimax: { perSecond: 0.08 },
   wavespeed: { perSecond: 0.06 },
   kie: { perSecond: 0.1 },
+  'seedance2-kie': { perSecond: 0.205 }, // Seedance 2.0 720p via kie.ai
+  'seedance2-fast-kie': { perSecond: 0.165 }, // Seedance 2.0 Fast 720p via kie.ai
   runway: { perSecond: 0.25 },
   'user-upload': { perRequest: 0 },
 };

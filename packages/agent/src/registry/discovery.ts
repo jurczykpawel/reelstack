@@ -44,6 +44,8 @@ import {
 import {
   kieKlingTool,
   kieSeedanceTool,
+  kieSeedance2Tool,
+  kieSeedance2FastTool,
   kieSeedanceImg2VideoTool,
   kieWanTool,
   kieFluxTool,
@@ -155,6 +157,8 @@ export function discoverTools(): ProductionTool[] {
   if (process.env.KIE_API_KEY) {
     tools.push(
       kieKlingTool,
+      kieSeedance2Tool,
+      kieSeedance2FastTool,
       kieSeedanceTool,
       kieSeedanceImg2VideoTool,
       kieWanTool,

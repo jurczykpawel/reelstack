@@ -248,6 +248,8 @@ async function tryGenerate(
 }
 
 const VIDEO_FALLBACK_ORDER = [
+  'seedance2-kie',
+  'seedance2-fast-kie',
   'seedance2-piapi',
   'veo31-gemini',
   'kling-fal',

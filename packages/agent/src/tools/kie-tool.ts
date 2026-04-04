@@ -405,6 +405,59 @@ export const kieSeedanceImg2VideoTool: ProductionTool = new KieTool({
   },
 });
 
+export const kieSeedance2Tool: ProductionTool = new KieTool({
+  id: 'seedance2-kie',
+  name: 'Seedance 2.0 via kie.ai',
+  model: 'bytedance/seedance-2',
+  task_type: 'txt2video',
+  promptGuidelines: SEEDANCE_GUIDELINES,
+  capabilities: [
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 15,
+      estimatedLatencyMs: 600_000, // ~10 min
+      isAsync: true,
+      costTier: 'expensive', // $0.205/s at 720p
+    },
+  ],
+  buildInput: (req) => ({
+    prompt: req.prompt ?? 'abstract cinematic background',
+    duration: Math.min(Math.max(req.durationSeconds ?? 5, 3), 15),
+    aspect_ratio: req.aspectRatio ?? '9:16',
+    resolution: '720p',
+    ...(req.imageUrl ? { first_frame_url: req.imageUrl } : {}),
+    ...(req.referenceImageUrl ? { reference_image_urls: [req.referenceImageUrl] } : {}),
+  }),
+});
+
+export const kieSeedance2FastTool: ProductionTool = new KieTool({
+  id: 'seedance2-fast-kie',
+  name: 'Seedance 2.0 Fast via kie.ai',
+  model: 'bytedance/seedance-2-fast',
+  task_type: 'txt2video',
+  promptGuidelines: SEEDANCE_GUIDELINES,
+  capabilities: [
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 15,
+      estimatedLatencyMs: 300_000, // ~5 min
+      isAsync: true,
+      costTier: 'moderate', // $0.165/s at 720p
+    },
+  ],
+  buildInput: (req) => ({
+    prompt: req.prompt ?? 'abstract cinematic background',
+    duration: Math.min(Math.max(req.durationSeconds ?? 5, 3), 15),
+    aspect_ratio: req.aspectRatio ?? '9:16',
+    resolution: '720p',
+    ...(req.imageUrl ? { first_frame_url: req.imageUrl } : {}),
+  }),
+});
+
 export const kieNanaBanana2Tool: ProductionTool = new KieTool({
   id: 'nanobanana2-kie',
   name: 'NanoBanana 2 via kie.ai',
