@@ -517,6 +517,63 @@ Set `primaryVideo.source: 'heygen'` in ContentPackage. Pre-generate avatar video
 
 ---
 
+## Frame Chaining (Visual Continuity Between Clips)
+
+When generating multiple AI video clips for a reel, each clip normally starts from scratch visually. Frame chaining fixes this: the last frame of clip N becomes the first frame of clip N+1, creating smooth visual transitions.
+
+### How it works
+
+Set `chainFromPrevious: true` on consecutive `ai-video` shots in the plan:
+
+```typescript
+shots: [
+  { id: 's1', visual: { type: 'ai-video', prompt: 'developer at desk', toolId: 'seedance2-kie' } },
+  {
+    id: 's2',
+    visual: { type: 'ai-video', prompt: 'developer stands up excited', toolId: 'seedance2-kie' },
+    chainFromPrevious: true,
+  },
+  {
+    id: 's3',
+    visual: {
+      type: 'ai-video',
+      prompt: 'developer shows screen to colleague',
+      toolId: 'seedance2-kie',
+    },
+    chainFromPrevious: true,
+  },
+];
+```
+
+Asset generator processes chained shots **sequentially**:
+
+1. Generate clip 1 → complete
+2. Download clip 1 → extract last frame → upload frame to storage
+3. Generate clip 2 with `imageUrl` = last frame of clip 1 (maps to `first_frame_url` in Seedance 2.0)
+4. Repeat for clip 3...
+
+Independent shots (no `chainFromPrevious`) still generate in parallel.
+
+### Tool support
+
+| Tool                    | Field                       | Status         |
+| ----------------------- | --------------------------- | -------------- |
+| Seedance 2.0 (KIE)      | `first_frame_url`           | Native support |
+| Veo 3.1 (Gemini)        | `imageUrl` → image-to-video | Supported      |
+| fal.ai (Kling/Seedance) | `image_url`                 | Supported      |
+
+### When to use
+
+- Multi-scene AI video sequences (story reels)
+- Smooth transitions between generated B-roll clips
+- NOT needed for: HeyGen avatars (already consistent), user recordings, AI images
+
+### Performance
+
+Chained clips are sequential — each waits for the previous one. Budget ~5-10 min per clip (Seedance 2.0). A 3-clip chain = 15-30 min total vs ~10 min parallel.
+
+---
+
 ## Architecture Notes
 
 1. **Layout priority:** request > plan > preset. `BrandPreset.layout` is ignored by the assembler - set layout at request/orchestrator level.

@@ -236,6 +236,8 @@ export interface ShotPlan {
   /** For montage shots: asset IDs to show as multi-panel grid */
   readonly montagePanelIds?: readonly string[];
   readonly reason: string;
+  /** Chain visual continuity: use last frame of previous ai-video shot as first frame for this one */
+  readonly chainFromPrevious?: boolean;
 }
 
 export interface EffectPlan {
