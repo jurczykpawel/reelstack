@@ -574,6 +574,58 @@ Chained clips are sequential — each waits for the previous one. Budget ~5-10 m
 
 ---
 
+## Lip Sync (AI Talking Head in Multiple Scenes)
+
+Generate AI characters speaking to camera with lip sync to your TTS audio.
+
+### CLI workflow
+
+```bash
+# 1. Generate voiceover
+bun run rs tts "AI zmieni sposób w jaki pracujesz. To się dzieje teraz."
+
+# 2. Split into per-scene audio fragments
+bun run rs split-audio out/tts.json
+
+# 3. Generate lip-synced clips (needs character portrait image)
+bun run rs lipsync character.jpg
+bun run rs lipsync character.jpg --tool seedance  # use Seedance instead of Kling
+
+# 4. Continue normal pipeline
+bun run rs plan out/tts.json
+bun run rs render out/composition.json
+```
+
+### Tools
+
+| Tool                             | How                                                     | Cost      | Best for                        |
+| -------------------------------- | ------------------------------------------------------- | --------- | ------------------------------- |
+| **Kling Avatar v2 Pro** (fal.ai) | `image_url` + `audio_url` → video                       | ~$0.115/s | Fast, stable API, good lip sync |
+| **Seedance 2.0** (KIE)           | `reference_audio_urls` + `reference_image_urls` → video | ~$0.205/s | Higher quality, multi-reference |
+
+### AI Storytelling module (private)
+
+Full automated pipeline: script + character image → TTS → scene planning (LLM) → audio splitting → N lip-synced clips → template montage → render.
+
+```typescript
+// Mode: 'ai-storytelling' in reel config
+{
+  mode: 'ai-storytelling',
+  script: 'Your narration text...',
+  characterImageUrl: 'https://storage/character.jpg',
+  lipSyncTool: 'kling',        // or 'seedance'
+  templateId: 'jump-cut-dynamic',
+  tts: { voice: 'pl-PL-MarekNeural' },
+}
+```
+
+### Overlay components
+
+- **MultiVideoOverlay**: Multiple floating video/image windows (for "reveal" moments)
+- **LabelOverlay**: Text badges + arrows ("NOT A REAL PERSON" style callouts)
+
+---
+
 ## Architecture Notes
 
 1. **Layout priority:** request > plan > preset. `BrandPreset.layout` is ignored by the assembler - set layout at request/orchestrator level.
