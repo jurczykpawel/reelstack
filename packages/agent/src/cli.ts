@@ -104,6 +104,7 @@ async function plan() {
 
   // Load private modules for premium templates
   try {
+    // @ts-expect-error — private module, no type declarations
     await import('@reelstack/modules');
   } catch {
     try {
@@ -469,6 +470,7 @@ async function lipsync() {
 
   // Load private modules for Kling Avatar tool
   try {
+    // @ts-expect-error — private module, no type declarations
     await import('@reelstack/modules');
   } catch {
     try {
@@ -559,7 +561,7 @@ async function lipsync() {
     let poll = job;
     for (let p = 0; p < 60; p++) {
       await new Promise((r) => setTimeout(r, 5000));
-      poll = await tool.poll(job.jobId);
+      poll = await tool!.poll(job.jobId);
       if (poll.status === 'completed') {
         console.log(`    ${G}Done${X}: ${poll.durationSeconds?.toFixed(1)}s`);
         results.push({ segmentIndex: i, url: poll.url });
