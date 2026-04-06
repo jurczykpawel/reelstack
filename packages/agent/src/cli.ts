@@ -562,7 +562,7 @@ async function lipsync() {
     let poll = job;
     for (let p = 0; p < 60; p++) {
       await new Promise((r) => setTimeout(r, 5000));
-      poll = await tool.poll(job.jobId);
+      poll = await tool.poll!(job.jobId);
       if (poll.status === 'completed') {
         console.log(`    ${G}Done${X}: ${poll.durationSeconds?.toFixed(1)}s`);
         results.push({ segmentIndex: i, url: poll.url });
