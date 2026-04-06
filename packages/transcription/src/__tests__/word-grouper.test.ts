@@ -76,7 +76,7 @@ describe('groupWordsIntoCues', () => {
   it('cues have no animationStyle (moved to captionStyle)', () => {
     const words = makeWords(['Hello', 'world']);
     const cues = groupWordsIntoCues(words);
-    expect((cues[0] as Record<string, unknown>).animationStyle).toBeUndefined();
+    expect((cues[0] as unknown as Record<string, unknown>).animationStyle).toBeUndefined();
   });
 
   it('sets cue startTime and endTime from word boundaries', () => {
