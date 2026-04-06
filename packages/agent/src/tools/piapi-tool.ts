@@ -119,6 +119,7 @@ class PiapiTool implements ProductionTool {
         },
         body: JSON.stringify(requestBody),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       const durationMs = Math.round(performance.now() - startTime);
@@ -195,6 +196,7 @@ class PiapiTool implements ProductionTool {
       const res = await fetch(`${PIAPI_BASE}/task/${encodeURIComponent(jobId)}`, {
         headers: { 'X-API-Key': this.apiKey },
         signal: AbortSignal.timeout(10_000),
+        redirect: 'error',
       });
 
       const durationMs = Math.round(performance.now() - startTime);
@@ -245,6 +247,14 @@ class PiapiTool implements ProductionTool {
         if (!url) {
           return { jobId, toolId: this.id, status: 'failed', error: 'No URL in piapi result' };
         }
+        addCost({
+          step: `asset:${this.id}`,
+          provider: 'piapi',
+          model: this.model,
+          type: 'video',
+          costUSD: calculateToolCost(this.id, 5),
+          inputUnits: 1,
+        });
         log.info(
           { toolId: this.id, jobId, url: url.substring(0, 100) },
           'piapi generation completed'

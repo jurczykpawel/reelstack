@@ -110,7 +110,7 @@ function makeProgressCallback(jobId: string, progressMap: Record<string, number>
   };
 }
 
-export async function processReelPipelineJob(jobId: string): Promise<void> {
+export async function processReelPipelineJob(jobId: string, fromStepId?: string): Promise<void> {
   const job = await getReelJobInternal(jobId);
   if (!job) throw new Error(`Reel job ${jobId} not found`);
 
@@ -141,15 +141,14 @@ export async function processReelPipelineJob(jobId: string): Promise<void> {
       );
 
       const engine = new PipelineEngine();
-      const pipelineResult = await engine.runAll(
-        pipeline,
-        initialInput,
-        jobId,
-        (stepId: string, _status: StepStatus) => {
-          const progress = stepProgressMap[stepId] ?? 50;
-          updateReelJobStatus(jobId, { progress }).catch(() => {});
-        }
-      );
+      const onStepProgress = (stepId: string, _status: StepStatus) => {
+        const progress = stepProgressMap[stepId] ?? 50;
+        updateReelJobStatus(jobId, { progress }).catch(() => {});
+      };
+
+      const pipelineResult = fromStepId
+        ? await engine.resumeFrom(pipeline, jobId, fromStepId, onStepProgress)
+        : await engine.runAll(pipeline, initialInput, jobId, onStepProgress);
 
       if (pipelineResult.status === 'failed') {
         throw new Error(

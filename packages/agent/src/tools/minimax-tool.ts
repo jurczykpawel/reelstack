@@ -88,6 +88,7 @@ export class MinimaxVideoTool implements ProductionTool {
           resolution,
         }),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {
@@ -155,6 +156,7 @@ export class MinimaxVideoTool implements ProductionTool {
         {
           headers: { Authorization: `Bearer ${this.apiKey}` },
           signal: AbortSignal.timeout(10_000),
+          redirect: 'error',
         }
       );
 
@@ -193,6 +195,7 @@ export class MinimaxVideoTool implements ProductionTool {
         {
           headers: { Authorization: `Bearer ${this.apiKey}` },
           signal: AbortSignal.timeout(10_000),
+          redirect: 'error',
         }
       );
 

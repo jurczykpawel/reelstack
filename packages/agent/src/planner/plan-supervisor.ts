@@ -220,6 +220,7 @@ async function callSupervisor(systemPrompt: string, userMessage: string): Promis
       messages: [{ role: 'user', content: userMessage }],
     }),
     signal: AbortSignal.timeout(60_000),
+    redirect: 'error',
   });
 
   if (!res.ok) {

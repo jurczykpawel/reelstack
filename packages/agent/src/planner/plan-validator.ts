@@ -11,7 +11,7 @@
  *
  * Run AFTER planning, BEFORE asset generation.
  */
-import type { ProductionPlan, EffectPlan } from '../types';
+import type { ProductionPlan } from '../types';
 
 export interface ValidationIssue {
   readonly severity: 'error' | 'warning';

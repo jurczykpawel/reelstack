@@ -93,6 +93,7 @@
       "name": "@reelstack/agent",
       "version": "0.1.0",
       "dependencies": {
+        "@reelstack/ffmpeg": "workspace:*",
         "@reelstack/logger": "workspace:*",
         "@reelstack/remotion": "workspace:*",
         "@reelstack/storage": "workspace:*",
@@ -169,6 +170,7 @@
       "version": "0.1.0",
       "dependencies": {
         "@reelstack/agent": "workspace:*",
+        "@reelstack/ffmpeg": "workspace:*",
         "@reelstack/image-gen": "workspace:*",
         "@reelstack/logger": "workspace:*",
         "@reelstack/remotion": "workspace:*",

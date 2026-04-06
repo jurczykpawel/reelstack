@@ -44,6 +44,8 @@ import {
 import {
   kieKlingTool,
   kieSeedanceTool,
+  kieSeedance2Tool,
+  kieSeedance2FastTool,
   kieSeedanceImg2VideoTool,
   kieWanTool,
   kieFluxTool,
@@ -155,6 +157,8 @@ export function discoverTools(): ProductionTool[] {
   if (process.env.KIE_API_KEY) {
     tools.push(
       kieKlingTool,
+      kieSeedance2Tool,
+      kieSeedance2FastTool,
       kieSeedanceTool,
       kieSeedanceImg2VideoTool,
       kieWanTool,
@@ -173,5 +177,18 @@ export function discoverTools(): ProductionTool[] {
     tools.push(humoTool);
   }
 
+  // External tools registered by private modules via registerExternalTool()
+  tools.push(...externalTools);
+
   return tools;
+}
+
+// ── External tool registration (for private modules) ──────────
+
+const externalTools: ProductionTool[] = [];
+
+/** Register a tool from an external module (e.g. private repo). Called on import. Deduplicates by ID. */
+export function registerExternalTool(tool: ProductionTool): void {
+  if (externalTools.some((t) => t.id === tool.id)) return;
+  externalTools.push(tool);
 }

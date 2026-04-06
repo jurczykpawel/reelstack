@@ -82,6 +82,7 @@ export class NanoBananaTool implements ProductionTool {
           },
         }),
         signal: AbortSignal.timeout(60_000),
+        redirect: 'error',
       });
 
       const durationMs = Math.round(performance.now() - startTime);

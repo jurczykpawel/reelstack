@@ -7,9 +7,25 @@
 import { AsyncLocalStorage } from 'async_hooks';
 import type { CostEntry, CostSummary } from './types';
 
+/** Minimal interface to avoid circular dependency with pipeline-logger module */
+interface ApiCallLogger {
+  saveApiCall(
+    stepId: string,
+    callId: string,
+    data: {
+      provider: string;
+      model: string;
+      request: { systemPrompt: string; userMessage: string };
+      response: { text: string; usage?: { inputTokens: number; outputTokens: number } };
+      durationMs: number;
+    }
+  ): void;
+}
+
 interface JobStore {
   jobId: string;
   costs: CostEntry[];
+  apiCallLogger?: ApiCallLogger;
 }
 
 export const jobContext = new AsyncLocalStorage<JobStore>();
@@ -21,7 +37,31 @@ export function getJobId(): string | undefined {
 
 /** Run a function within a job context so all nested calls can access jobId and collect costs. */
 export function runWithJobId<T>(jobId: string, fn: () => T): T {
+  // If already in a context with the same jobId, reuse it (avoids nested stores losing costs)
+  const existing = jobContext.getStore();
+  if (existing && existing.jobId === jobId) return fn();
   return jobContext.run({ jobId, costs: [] }, fn);
+}
+
+/** Set API call logger for the current job (called by orchestrator after creating PipelineLogger). */
+export function setApiCallLogger(logger: ApiCallLogger): void {
+  const store = jobContext.getStore();
+  if (store) store.apiCallLogger = logger;
+}
+
+/** Log an API call to the pipeline logger (if available in job context). */
+export function logApiCall(
+  stepId: string,
+  callId: string,
+  data: {
+    provider: string;
+    model: string;
+    request: { systemPrompt: string; userMessage: string };
+    response: { text: string; usage?: { inputTokens: number; outputTokens: number } };
+    durationMs: number;
+  }
+): void {
+  jobContext.getStore()?.apiCallLogger?.saveApiCall(stepId, callId, data);
 }
 
 /** Add a cost entry to the current job context. Safe to call outside a job (no-op). */

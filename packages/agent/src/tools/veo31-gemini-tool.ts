@@ -107,7 +107,7 @@ export class Veo31GeminiTool implements ProductionTool {
         } else if (sourceImageUrl.startsWith('http')) {
           const imgRes = await fetch(sourceImageUrl, {
             signal: AbortSignal.timeout(30_000),
-            redirect: 'follow',
+            redirect: 'error',
           });
           if (imgRes.ok) imgBuffer = Buffer.from(await imgRes.arrayBuffer());
         }
@@ -130,7 +130,7 @@ export class Veo31GeminiTool implements ProductionTool {
         } else if (endUrl.startsWith('http')) {
           const res = await fetch(endUrl, {
             signal: AbortSignal.timeout(30_000),
-            redirect: 'follow',
+            redirect: 'error',
           });
           if (res.ok) endBuffer = Buffer.from(await res.arrayBuffer());
         }
@@ -173,6 +173,7 @@ export class Veo31GeminiTool implements ProductionTool {
         },
         body: JSON.stringify(requestBody),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       const durationMs = Math.round(performance.now() - startTime);
@@ -257,6 +258,7 @@ export class Veo31GeminiTool implements ProductionTool {
         },
         body: JSON.stringify({ operationName: jobId }),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       const durationMs = Math.round(performance.now() - startTime);

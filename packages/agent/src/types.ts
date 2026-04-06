@@ -75,6 +75,29 @@ export interface AssetGenerationRequest {
   readonly imageUrl?: string;
   /** Reference image for character consistency (last frame of previous clip) */
   readonly referenceImageUrl?: string;
+  /** Audio URL for lip-sync tools (Kling Avatar, Seedance audio-driven) */
+  readonly audioUrl?: string;
+  /**
+   * HeyGen character params — exact API field names, zero mapping.
+   * Docs: https://docs.heygen.com/reference/create-an-avatar-video-v2
+   */
+  readonly heygen_character?: {
+    readonly type?: 'avatar' | 'talking_photo';
+    readonly avatar_id?: string;
+    readonly avatar_style?: string;
+    readonly talking_photo_id?: string;
+    readonly use_avatar_iv_model?: boolean;
+    readonly prompt?: string;
+    readonly keep_original_prompt?: boolean;
+  };
+  /**
+   * HeyGen voice params — exact API field names, zero mapping.
+   */
+  readonly heygen_voice?: {
+    readonly emotion?: string;
+    readonly speed?: number;
+    readonly pitch?: number;
+  };
 }
 
 export interface AssetGenerationJob {
@@ -215,6 +238,8 @@ export interface ShotPlan {
   /** For montage shots: asset IDs to show as multi-panel grid */
   readonly montagePanelIds?: readonly string[];
   readonly reason: string;
+  /** Chain visual continuity: use last frame of previous ai-video shot as first frame for this one */
+  readonly chainFromPrevious?: boolean;
 }
 
 export interface EffectPlan {
@@ -229,14 +254,14 @@ export interface EffectPlan {
 
 export interface BrandPreset {
   readonly captionPreset?: string;
-  readonly captionTemplate?: string;
   readonly animationStyle?:
     | 'none'
     | 'word-highlight'
     | 'word-by-word'
     | 'karaoke'
     | 'bounce'
-    | 'typewriter';
+    | 'typewriter'
+    | 'snap-pop';
   readonly maxWordsPerCue?: number;
   readonly maxDurationPerCue?: number;
   readonly textTransform?: 'none' | 'uppercase';

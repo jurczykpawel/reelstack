@@ -85,6 +85,7 @@ class FalTool implements ProductionTool {
         },
         body: JSON.stringify(this.buildInput(request)),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {
@@ -141,6 +142,7 @@ class FalTool implements ProductionTool {
         {
           headers: { Authorization: `Key ${this.apiKey}` },
           signal: AbortSignal.timeout(10_000),
+          redirect: 'error',
         }
       );
 
@@ -170,6 +172,7 @@ class FalTool implements ProductionTool {
         {
           headers: { Authorization: `Key ${this.apiKey}` },
           signal: AbortSignal.timeout(10_000),
+          redirect: 'error',
         }
       );
 

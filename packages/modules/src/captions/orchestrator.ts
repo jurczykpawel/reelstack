@@ -190,16 +190,12 @@ export async function produceCaptions(request: CaptionsRequest): Promise<Caption
     }));
 
     const presetConfig = resolvePresetConfig(request.brandPreset);
-    cues = groupWordsIntoCues(
-      offsetWords,
-      {
-        maxWordsPerCue:
-          request.highlightMode === 'single-word' ? 1 : (presetConfig.maxWordsPerCue ?? 6),
-        maxDurationPerCue: presetConfig.maxDurationPerCue ?? 3,
-        breakOnPunctuation: true,
-      },
-      presetConfig.animationStyle ?? 'word-highlight'
-    ) as CaptionCue[];
+    cues = groupWordsIntoCues(offsetWords, {
+      maxWordsPerCue:
+        request.highlightMode === 'single-word' ? 1 : (presetConfig.maxWordsPerCue ?? 6),
+      maxDurationPerCue: presetConfig.maxDurationPerCue ?? 3,
+      breakOnPunctuation: true,
+    }) as CaptionCue[];
 
     // No voiceoverUrl — keep video's original audio
     voiceoverUrl = undefined;

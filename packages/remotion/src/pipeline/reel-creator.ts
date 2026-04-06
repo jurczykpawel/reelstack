@@ -92,15 +92,11 @@ export async function createReel(
     onStep?.('Grouping into subtitle cues...');
     const groupStart = performance.now();
 
-    const cues = groupWordsIntoCues(
-      transcription.words,
-      {
-        maxWordsPerCue: 6,
-        maxDurationPerCue: 3,
-        breakOnPunctuation: true,
-      },
-      'karaoke'
-    );
+    const cues = groupWordsIntoCues(transcription.words, {
+      maxWordsPerCue: 6,
+      maxDurationPerCue: 3,
+      breakOnPunctuation: true,
+    });
 
     steps.push({
       name: 'Word grouping',
@@ -198,7 +194,6 @@ export async function createReel(
           startTime: w.startTime,
           endTime: w.endTime,
         })),
-        animationStyle: c.animationStyle,
       })),
       captionStyle: {
         fontFamily: request.brandPreset?.captionTemplate?.fontFamily ?? 'Outfit, sans-serif',

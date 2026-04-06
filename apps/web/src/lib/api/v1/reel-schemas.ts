@@ -120,11 +120,17 @@ const brandPresetSchema = z
     captionPreset: z
       .enum(['tiktok', 'mrbeast', 'cinematic', 'minimal', 'neon', 'classic'])
       .optional(),
-    // Template ID (e.g. "builtin-neon") - overrides preset style
-    captionTemplate: z.string().optional(),
     // Animation style override
     animationStyle: z
-      .enum(['none', 'word-highlight', 'word-by-word', 'karaoke', 'bounce', 'typewriter'])
+      .enum([
+        'none',
+        'word-highlight',
+        'word-by-word',
+        'karaoke',
+        'bounce',
+        'typewriter',
+        'snap-pop',
+      ])
       .optional(),
     // Word grouping overrides
     maxWordsPerCue: z.number().min(1).max(10).optional(),

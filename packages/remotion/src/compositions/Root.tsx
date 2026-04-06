@@ -1,8 +1,6 @@
 import { Composition } from 'remotion';
 import { ReelComposition } from './ReelComposition';
 import { YouTubeLongFormComposition } from './YouTubeLongFormComposition';
-import type { ReelProps } from '../schemas/reel-props';
-import type { YouTubeProps } from '../schemas/youtube-props';
 import { calculateReelMetadata } from './calculate-metadata';
 import { calculateYouTubeMetadata } from './calculate-youtube-metadata';
 import { listCompositions } from './registry';

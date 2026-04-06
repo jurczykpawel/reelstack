@@ -80,6 +80,7 @@ export class AimlapiKlingTool implements ProductionTool {
           mode: 'std',
         }),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {
@@ -137,6 +138,7 @@ export class AimlapiKlingTool implements ProductionTool {
       const res = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${this.apiKey}` },
         signal: AbortSignal.timeout(10_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {
@@ -168,6 +170,14 @@ export class AimlapiKlingTool implements ProductionTool {
             error: 'No video URL in AIMLAPI result',
           };
         }
+        addCost({
+          step: `asset:${this.id}`,
+          provider: 'aimlapi',
+          model: this.id,
+          type: 'video',
+          costUSD: calculateToolCost(this.id, 5),
+          inputUnits: 1,
+        });
         return { jobId, toolId: this.id, status: 'completed', url: videoUrl };
       }
 
@@ -240,6 +250,7 @@ export class AimlapiFluxTool implements ProductionTool {
           num_inference_steps: 4,
         }),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {
@@ -268,6 +279,14 @@ export class AimlapiFluxTool implements ProductionTool {
         };
       }
 
+      addCost({
+        step: `asset:${this.id}`,
+        provider: 'aimlapi',
+        model: 'flux',
+        type: 'image',
+        costUSD: calculateToolCost(this.id, 0),
+        inputUnits: 1,
+      });
       log.info('aimlapi flux image generated');
 
       return { jobId: randomUUID(), toolId: this.id, status: 'completed', url };
@@ -339,6 +358,7 @@ class AimlapiVideoTool implements ProductionTool {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${this.apiKey}` },
         body: JSON.stringify(this.buildBody(request)),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
       if (!res.ok) {
         const errBody = await res.text();
@@ -386,6 +406,7 @@ class AimlapiVideoTool implements ProductionTool {
       const res = await fetch(url.toString(), {
         headers: { Authorization: `Bearer ${this.apiKey}` },
         signal: AbortSignal.timeout(10_000),
+        redirect: 'error',
       });
       if (!res.ok) {
         log.warn({ toolId: this.id, jobId, status: res.status }, 'aimlapi video poll failed');
@@ -398,6 +419,14 @@ class AimlapiVideoTool implements ProductionTool {
         const videoUrl = data.video?.url;
         if (!videoUrl)
           return { jobId, toolId: this.id, status: 'failed', error: 'No video URL in result' };
+        addCost({
+          step: `asset:${this.id}`,
+          provider: 'aimlapi',
+          model: this.id,
+          type: 'video',
+          costUSD: calculateToolCost(this.id, 5),
+          inputUnits: 1,
+        });
         return { jobId, toolId: this.id, status: 'completed', url: videoUrl };
       }
       return { jobId, toolId: this.id, status: 'processing' };

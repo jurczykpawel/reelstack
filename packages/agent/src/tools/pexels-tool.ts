@@ -5,7 +5,6 @@ import { isPublicUrl } from '../planner/production-planner';
 import { PEXELS_GUIDELINES } from './prompt-guidelines';
 import { createLogger } from '@reelstack/logger';
 import { addCost } from '../context';
-import { calculateToolCost } from '../config/pricing';
 
 const log = createLogger('pexels-tool');
 const PEXELS_API = 'https://api.pexels.com';
@@ -45,6 +44,7 @@ export class PexelsTool implements ProductionTool {
       const res = await fetch(`${PEXELS_API}/videos/search?query=test&per_page=1`, {
         headers: { Authorization: apiKey },
         signal: AbortSignal.timeout(5000),
+        redirect: 'error',
       });
       return res.ok
         ? { available: true }
@@ -83,6 +83,7 @@ export class PexelsTool implements ProductionTool {
     const res = await fetch(url, {
       headers: { Authorization: apiKey },
       signal: AbortSignal.timeout(10_000),
+      redirect: 'error',
     });
 
     const durationMs = Math.round(performance.now() - startTime);

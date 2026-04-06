@@ -120,6 +120,7 @@ class KieTool implements ProductionTool {
         },
         body: JSON.stringify(requestBody),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       const durationMs = Math.round(performance.now() - startTime);
@@ -209,6 +210,7 @@ class KieTool implements ProductionTool {
           'Content-Type': 'application/json',
         },
         signal: AbortSignal.timeout(10_000),
+        redirect: 'error',
       });
 
       const durationMs = Math.round(performance.now() - startTime);
@@ -251,8 +253,20 @@ class KieTool implements ProductionTool {
         if (!url) {
           return { jobId, toolId: this.id, status: 'failed', error: 'No URL in kie.ai result' };
         }
+        // costTime is API processing time (ms), NOT video duration.
+        // Use requested duration from buildInput or default 5s for pricing.
+        const estimatedDuration = 5;
+        addCost({
+          step: `asset:${this.id}`,
+          provider: 'kie',
+          model: this.model,
+          type: this.task_type === 'txt2img' ? 'image' : 'video',
+          costUSD: calculateToolCost(this.id, estimatedDuration),
+          inputUnits: 1,
+          durationMs: taskData.costTime,
+        });
         log.info(
-          { toolId: this.id, jobId, url: url.substring(0, 100) },
+          { toolId: this.id, jobId, url: url.substring(0, 100), processingMs: taskData.costTime },
           'kie generation completed'
         );
         return { jobId, toolId: this.id, status: 'completed', url };
@@ -403,6 +417,61 @@ export const kieSeedanceImg2VideoTool: ProductionTool = new KieTool({
       resolution: '720p',
     };
   },
+});
+
+export const kieSeedance2Tool: ProductionTool = new KieTool({
+  id: 'seedance2-kie',
+  name: 'Seedance 2.0 via kie.ai',
+  model: 'bytedance/seedance-2',
+  task_type: 'txt2video',
+  promptGuidelines: SEEDANCE_GUIDELINES,
+  capabilities: [
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 15,
+      estimatedLatencyMs: 600_000, // ~10 min
+      isAsync: true,
+      costTier: 'expensive', // $0.205/s at 720p
+    },
+  ],
+  buildInput: (req) => ({
+    prompt: req.prompt ?? 'abstract cinematic background',
+    duration: Math.min(Math.max(req.durationSeconds ?? 5, 3), 15),
+    aspect_ratio: req.aspectRatio ?? '9:16',
+    resolution: '720p',
+    ...(req.imageUrl ? { first_frame_url: req.imageUrl } : {}),
+    ...(req.referenceImageUrl ? { reference_image_urls: [req.referenceImageUrl] } : {}),
+    ...(req.audioUrl ? { reference_audio_urls: [req.audioUrl] } : {}),
+  }),
+});
+
+export const kieSeedance2FastTool: ProductionTool = new KieTool({
+  id: 'seedance2-fast-kie',
+  name: 'Seedance 2.0 Fast via kie.ai',
+  model: 'bytedance/seedance-2-fast',
+  task_type: 'txt2video',
+  promptGuidelines: SEEDANCE_GUIDELINES,
+  capabilities: [
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 15,
+      estimatedLatencyMs: 300_000, // ~5 min
+      isAsync: true,
+      costTier: 'moderate', // $0.165/s at 720p
+    },
+  ],
+  buildInput: (req) => ({
+    prompt: req.prompt ?? 'abstract cinematic background',
+    duration: Math.min(Math.max(req.durationSeconds ?? 5, 3), 15),
+    aspect_ratio: req.aspectRatio ?? '9:16',
+    resolution: '720p',
+    ...(req.imageUrl ? { first_frame_url: req.imageUrl } : {}),
+    ...(req.audioUrl ? { reference_audio_urls: [req.audioUrl] } : {}),
+  }),
 });
 
 export const kieNanaBanana2Tool: ProductionTool = new KieTool({

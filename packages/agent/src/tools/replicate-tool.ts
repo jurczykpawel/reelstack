@@ -83,6 +83,7 @@ class ReplicateTool implements ProductionTool {
         },
         body: JSON.stringify({ input: this.buildInput(request) }),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {
@@ -137,6 +138,7 @@ class ReplicateTool implements ProductionTool {
       const res = await fetch(`${REPLICATE_BASE}/predictions/${encodeURIComponent(jobId)}`, {
         headers: { Authorization: `Bearer ${this.apiKey}` },
         signal: AbortSignal.timeout(10_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {

@@ -52,7 +52,11 @@ const TOOL_PRICING: Record<string, ToolPricing> = {
   minimax: { perSecond: 0.08 },
   wavespeed: { perSecond: 0.06 },
   kie: { perSecond: 0.1 },
+  'seedance2-kie': { perSecond: 0.205 }, // Seedance 2.0 720p via kie.ai
+  'seedance2-fast-kie': { perSecond: 0.165 }, // Seedance 2.0 Fast 720p via kie.ai
   runway: { perSecond: 0.25 },
+  piapi: { perSecond: 0.1 },
+  aimlapi: { perSecond: 0.08 },
   'user-upload': { perRequest: 0 },
 };
 
@@ -87,7 +91,8 @@ export function calculateLLMCost(model: string, inputTokens: number, outputToken
 }
 
 export function calculateToolCost(toolId: string, durationSeconds?: number): number {
-  const pricing = TOOL_PRICING[toolId];
+  // Exact match first, then try provider suffix (e.g., 'kling-piapi' → 'piapi')
+  const pricing = TOOL_PRICING[toolId] ?? TOOL_PRICING[toolId.split('-').pop() ?? ''];
   if (!pricing) return 0;
   if (pricing.perSecond && durationSeconds) return pricing.perSecond * durationSeconds;
   return pricing.perRequest ?? 0;

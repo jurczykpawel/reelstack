@@ -85,6 +85,7 @@ export class RunwayTool implements ProductionTool {
           model: 'gen4_turbo',
         }),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {
@@ -142,6 +143,7 @@ export class RunwayTool implements ProductionTool {
           'X-Runway-Version': RUNWAY_VERSION,
         },
         signal: AbortSignal.timeout(10_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {

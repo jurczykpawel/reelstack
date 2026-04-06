@@ -17,8 +17,13 @@ const HEYGEN_API = 'https://api.heygen.com';
 
 /**
  * HeyGen avatar video generation tool.
- * Creates talking head videos from script text.
- * Uses HeyGen API v2 for generation and v1 for status polling.
+ *
+ * Supports two quality tiers via the same /v2/video/generate endpoint:
+ * - standard: Engine III (1 credit/min)
+ * - premium:  Avatar IV with realistic movements (6 credits/min)
+ *
+ * Avatar IV adds motion prompts (gesture descriptions) and higher quality
+ * face/body animation. Premium tier is toggled by request.avatarQuality.
  */
 export class HeyGenTool implements ProductionTool {
   readonly id = 'heygen';
@@ -44,9 +49,10 @@ export class HeyGenTool implements ProductionTool {
     if (!this.apiKey) return { available: false, reason: 'HEYGEN_API_KEY not set' };
 
     try {
-      const res = await fetch(`${HEYGEN_API}/v1/user/remaining_quota`, {
+      const res = await fetch(`${HEYGEN_API}/v2/user/remaining_quota`, {
         headers: { 'x-api-key': this.apiKey },
         signal: AbortSignal.timeout(10_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {
@@ -86,34 +92,35 @@ export class HeyGenTool implements ProductionTool {
     }
 
     const avatarId =
-      request.avatarId ?? process.env.HEYGEN_AVATAR_ID ?? 'Angela-inTshworking-20220820';
-    const voiceId = request.voice ?? process.env.HEYGEN_VOICE_ID;
+      request.avatarId ?? process.env.HEYGEN_AVATAR_ID ?? 'Abigail_expressive_2024112501';
+    const voiceId =
+      request.voice ?? process.env.HEYGEN_VOICE_ID ?? '0cbf3f0556f74c84abdf598a297ae810';
 
-    // Determine dimensions based on aspect ratio
     const dimension =
       request.aspectRatio === '16:9'
         ? { width: 1920, height: 1080 }
         : request.aspectRatio === '1:1'
           ? { width: 1080, height: 1080 }
-          : { width: 1080, height: 1920 }; // default 9:16
+          : { width: 1080, height: 1920 };
+
+    // Character — spread heygen_character directly, fill defaults
+    const character: Record<string, unknown> = {
+      type: 'avatar',
+      avatar_id: avatarId,
+      avatar_style: 'normal',
+      ...request.heygen_character,
+    };
+
+    // Voice — spread heygen_voice directly, fill defaults
+    const voice: Record<string, unknown> = {
+      type: 'text',
+      voice_id: voiceId,
+      input_text: request.script,
+      ...request.heygen_voice,
+    };
 
     const body: Record<string, unknown> = {
-      video_inputs: [
-        {
-          character: {
-            type: 'avatar',
-            avatar_id: avatarId,
-            avatar_style: 'normal',
-          },
-          voice: voiceId
-            ? { type: 'audio', voice_id: voiceId, input_text: request.script }
-            : { type: 'text', input_text: request.script },
-          background: {
-            type: 'color',
-            value: '#000000',
-          },
-        },
-      ],
+      video_inputs: [{ character, voice, background: { type: 'color', value: '#000000' } }],
       dimension,
       test: process.env.HEYGEN_TEST_MODE === 'true',
     };
@@ -121,25 +128,23 @@ export class HeyGenTool implements ProductionTool {
     try {
       const res = await fetch(`${HEYGEN_API}/v2/video/generate`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': this.apiKey,
-        },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': this.apiKey },
         body: JSON.stringify(body),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {
         const errBody = await res.text();
         log.warn(
-          { status: res.status, errorPreview: errBody.substring(0, 200) },
+          { status: res.status, errorPreview: errBody.substring(0, 300) },
           'HeyGen generate failed'
         );
         return {
           jobId: randomUUID(),
           toolId: this.id,
           status: 'failed',
-          error: `HeyGen API error (${res.status})`,
+          error: `HeyGen API error (${res.status}): ${errBody.substring(0, 200)}`,
         };
       }
 
@@ -154,13 +159,12 @@ export class HeyGenTool implements ProductionTool {
         };
       }
 
-      log.info({ videoId: data.data.video_id }, 'HeyGen video generation started');
+      log.info(
+        { videoId: data.data.video_id, avatarId: character.avatar_id, type: character.type },
+        'HeyGen video generation started'
+      );
 
-      return {
-        jobId: data.data.video_id,
-        toolId: this.id,
-        status: 'processing',
-      };
+      return { jobId: data.data.video_id, toolId: this.id, status: 'processing' };
     } catch (err) {
       return {
         jobId: randomUUID(),
@@ -181,13 +185,11 @@ export class HeyGenTool implements ProductionTool {
     }
 
     try {
-      const res = await fetch(
-        `${HEYGEN_API}/v1/video_status.get?video_id=${encodeURIComponent(jobId)}`,
-        {
-          headers: { 'x-api-key': this.apiKey },
-          signal: AbortSignal.timeout(10_000),
-        }
-      );
+      const res = await fetch(`${HEYGEN_API}/v2/videos/${encodeURIComponent(jobId)}`, {
+        headers: { 'x-api-key': this.apiKey },
+        signal: AbortSignal.timeout(10_000),
+        redirect: 'error',
+      });
 
       if (!res.ok) {
         return { jobId, toolId: this.id, status: 'processing' };
@@ -230,7 +232,6 @@ export class HeyGenTool implements ProductionTool {
         };
       }
 
-      // pending / processing
       return { jobId, toolId: this.id, status: 'processing' };
     } catch (err) {
       log.warn({ jobId, err }, 'HeyGen poll error');

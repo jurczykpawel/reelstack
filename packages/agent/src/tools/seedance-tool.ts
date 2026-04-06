@@ -93,6 +93,7 @@ export class SeedanceTool implements ProductionTool {
           aspect_ratio: aspectRatio,
         }),
         signal: AbortSignal.timeout(30_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {
@@ -150,6 +151,7 @@ export class SeedanceTool implements ProductionTool {
       const res = await fetch(`${this.apiBase}/v1/videos/text2video/${encodeURIComponent(jobId)}`, {
         headers: { Authorization: `Bearer ${this.apiKey}` },
         signal: AbortSignal.timeout(10_000),
+        redirect: 'error',
       });
 
       if (!res.ok) {

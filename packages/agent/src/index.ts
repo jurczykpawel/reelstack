@@ -33,7 +33,7 @@ export type { LLMProvider, LLMCallOptions } from './llm';
 export { getModel } from './config/models';
 export type { ModelRole } from './config/models';
 export { ToolRegistry } from './registry/tool-registry';
-export { discoverTools } from './registry/discovery';
+export { discoverTools, registerExternalTool } from './registry/discovery';
 export { discoverAvailableTools, findFirstAvailableTool } from './registry/tool-helpers';
 export { planProduction, planComposition, revisePlan } from './planner/production-planner';
 export {
@@ -54,11 +54,7 @@ export { persistAssetsToStorage } from './orchestrator/asset-persistence';
 export { pollUntilDone } from './polling';
 export { AgentError, PlanningError, GenerationError } from './errors';
 export { PipelineLogger } from './orchestrator/pipeline-logger';
-export type {
-  PipelineLog,
-  PipelineStep as PipelineLogStep,
-  PipelineLogSummary,
-} from './orchestrator/pipeline-logger';
+export type { PipelineLog, PipelineLogSummary } from './orchestrator/pipeline-logger';
 export { PipelineEngine } from './orchestrator/pipeline-engine';
 export type {
   PipelineContext,
@@ -85,7 +81,16 @@ export {
 export type { ReelModule, BaseModuleRequest, ModuleResult, ProgressCallback } from './modules';
 
 export { detectLanguage } from './utils/detect-language';
-export { getJobId, runWithJobId, jobContext, addCost, getCosts, getCostSummary } from './context';
+export {
+  getJobId,
+  runWithJobId,
+  jobContext,
+  addCost,
+  getCosts,
+  getCostSummary,
+  setApiCallLogger,
+  logApiCall,
+} from './context';
 export {
   calculateLLMCost,
   calculateToolCost,
@@ -123,22 +128,12 @@ export type {
   WhisperProviderType,
 } from './types';
 
-/**
- * Creates a production agent and runs the full pipeline.
- * Convenience wrapper over produce().
- */
-export async function createProductionAgent() {
-  const { produce: produceFn } = await import('./orchestrator/production-orchestrator');
-  return { produce: produceFn };
-}
-
 // ── Content + Montage system ──────────────────────────────────
 export type {
   ContentPackage,
   ContentSection,
   ContentAsset,
   PrimaryVideo,
-  CaptionCue as ContentCaptionCue,
   ContentMetadata,
   AssetFillMode,
   EffectsMode,
