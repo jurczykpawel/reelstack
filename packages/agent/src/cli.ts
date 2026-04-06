@@ -498,8 +498,8 @@ async function lipsync() {
   await registry.discover();
 
   const toolId = preferredTool === 'seedance' ? 'seedance2-kie' : 'kling-avatar-fal';
-  const tool = registry.get(toolId);
-  if (!tool) {
+  const maybeTool = registry.get(toolId);
+  if (!maybeTool) {
     console.log(`${R}Tool ${toolId} not available. Check API keys.${X}`);
     const available = registry
       .getAvailable()
@@ -507,8 +507,9 @@ async function lipsync() {
       .join(', ');
     console.log(`${D}Available: ${available}${X}`);
     process.exit(1);
-    return; // TS: unreachable but helps narrowing
+    return;
   }
+  const tool = maybeTool;
 
   // Upload character image to storage for URL access
   const { createStorage } = await import('../../storage/src/index');
@@ -561,7 +562,7 @@ async function lipsync() {
     let poll = job;
     for (let p = 0; p < 60; p++) {
       await new Promise((r) => setTimeout(r, 5000));
-      poll = await tool!.poll(job.jobId);
+      poll = await tool.poll(job.jobId);
       if (poll.status === 'completed') {
         console.log(`    ${G}Done${X}: ${poll.durationSeconds?.toFixed(1)}s`);
         results.push({ segmentIndex: i, url: poll.url });
