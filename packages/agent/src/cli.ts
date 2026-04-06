@@ -104,7 +104,7 @@ async function plan() {
 
   // Load private modules for premium templates
   try {
-    await import('@bun run rs/modules');
+    await import('@reelstack/modules');
   } catch {
     try {
       await import('../../modules/src/index');
@@ -505,6 +505,7 @@ async function lipsync() {
       .join(', ');
     console.log(`${D}Available: ${available}${X}`);
     process.exit(1);
+    return; // TS: unreachable but helps narrowing
   }
 
   // Upload character image to storage for URL access
