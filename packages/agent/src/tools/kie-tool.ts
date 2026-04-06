@@ -429,6 +429,7 @@ export const kieSeedance2Tool: ProductionTool = new KieTool({
     resolution: '720p',
     ...(req.imageUrl ? { first_frame_url: req.imageUrl } : {}),
     ...(req.referenceImageUrl ? { reference_image_urls: [req.referenceImageUrl] } : {}),
+    ...(req.audioUrl ? { reference_audio_urls: [req.audioUrl] } : {}),
   }),
 });
 
@@ -455,6 +456,7 @@ export const kieSeedance2FastTool: ProductionTool = new KieTool({
     aspect_ratio: req.aspectRatio ?? '9:16',
     resolution: '720p',
     ...(req.imageUrl ? { first_frame_url: req.imageUrl } : {}),
+    ...(req.audioUrl ? { reference_audio_urls: [req.audioUrl] } : {}),
   }),
 });
 

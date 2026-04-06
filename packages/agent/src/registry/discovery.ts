@@ -177,5 +177,17 @@ export function discoverTools(): ProductionTool[] {
     tools.push(humoTool);
   }
 
+  // External tools registered by private modules via registerExternalTool()
+  tools.push(...externalTools);
+
   return tools;
+}
+
+// ── External tool registration (for private modules) ──────────
+
+const externalTools: ProductionTool[] = [];
+
+/** Register a tool from an external module (e.g. private repo). Called on import. */
+export function registerExternalTool(tool: ProductionTool): void {
+  externalTools.push(tool);
 }

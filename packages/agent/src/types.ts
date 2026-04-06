@@ -75,6 +75,8 @@ export interface AssetGenerationRequest {
   readonly imageUrl?: string;
   /** Reference image for character consistency (last frame of previous clip) */
   readonly referenceImageUrl?: string;
+  /** Audio URL for lip-sync tools (Kling Avatar, Seedance audio-driven) */
+  readonly audioUrl?: string;
   /**
    * HeyGen character params — exact API field names, zero mapping.
    * Docs: https://docs.heygen.com/reference/create-an-avatar-video-v2

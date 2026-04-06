@@ -33,7 +33,7 @@ export type { LLMProvider, LLMCallOptions } from './llm';
 export { getModel } from './config/models';
 export type { ModelRole } from './config/models';
 export { ToolRegistry } from './registry/tool-registry';
-export { discoverTools } from './registry/discovery';
+export { discoverTools, registerExternalTool } from './registry/discovery';
 export { discoverAvailableTools, findFirstAvailableTool } from './registry/tool-helpers';
 export { planProduction, planComposition, revisePlan } from './planner/production-planner';
 export {
