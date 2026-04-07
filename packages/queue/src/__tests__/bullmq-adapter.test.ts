@@ -8,11 +8,11 @@ const mockClose = vi.fn().mockResolvedValue(undefined);
 const mockGetJob = vi.fn();
 
 vi.mock('bullmq', () => ({
-  Queue: vi.fn().mockImplementation(() => ({
-    add: mockAdd,
-    close: mockClose,
-    getJob: mockGetJob,
-  })),
+  Queue: class MockQueue {
+    add = mockAdd;
+    close = mockClose;
+    getJob = mockGetJob;
+  },
 }));
 
 import { BullMQQueueAdapter } from '../bullmq-adapter';

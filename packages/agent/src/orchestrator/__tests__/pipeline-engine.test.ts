@@ -25,16 +25,6 @@ vi.mock('@reelstack/storage', () => ({
     }),
 }));
 
-vi.mock('@reelstack/logger', () => ({
-  createLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-    error: vi.fn(),
-    child: vi.fn().mockReturnThis(),
-  }),
-}));
-
 import { PipelineEngine } from '../pipeline-engine';
 
 // ── Helpers ───────────────────────────────────────────────────

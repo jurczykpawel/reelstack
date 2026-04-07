@@ -38,17 +38,20 @@ vi.mock('@reelstack/logger', () => ({
 }));
 
 // Mock fetch for video download in extractAndUploadLastFrame
-// Also mock fs operations that the frame extraction uses
-import { beforeEach } from 'vitest';
+import { beforeEach, afterAll } from 'vitest';
+const originalFetch = globalThis.fetch;
 const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
 
 beforeEach(() => {
-  // fetch returns a fake video buffer for chain frame extraction
+  globalThis.fetch = mockFetch as typeof fetch;
   mockFetch.mockResolvedValue({
     ok: true,
     arrayBuffer: async () => new ArrayBuffer(100),
   });
+});
+
+afterAll(() => {
+  globalThis.fetch = originalFetch;
 });
 
 import { generateAssets } from '../orchestrator/asset-generator';

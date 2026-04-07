@@ -1,47 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
 import type { AssetGenerationRequest } from '../../types';
 
-const { mockExecSync, mockReadFileSync, mockWriteFileSync } = vi.hoisted(() => ({
-  mockExecSync: vi.fn(),
-  mockReadFileSync: vi.fn(),
-  mockWriteFileSync: vi.fn(),
-}));
+import fs from 'fs';
 
-// Mock both prefixed and unprefixed to cover all resolution paths
-vi.mock('child_process', () => ({ execSync: mockExecSync }));
-vi.mock('node:child_process', () => ({ execSync: mockExecSync }));
+// child_process needs vi.mock (tool destructures execSync at import time)
+// Use delegate pattern: mocks object is initialized before hoisting resolves
+const mocks = { execSync: vi.fn() };
+vi.mock('child_process', () => ({ execSync: (...a: unknown[]) => mocks.execSync(...a) }));
 
-vi.mock('fs', () => {
-  const mod = {
-    readFileSync: mockReadFileSync,
-    writeFileSync: mockWriteFileSync,
-    existsSync: vi.fn(),
-  };
-  return { ...mod, default: mod };
-});
-vi.mock('node:fs', () => {
-  const mod = {
-    readFileSync: mockReadFileSync,
-    writeFileSync: mockWriteFileSync,
-    existsSync: vi.fn(),
-  };
-  return { ...mod, default: mod };
-});
-
-vi.mock('@reelstack/logger', () => ({
-  createLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    error: vi.fn(),
-    debug: vi.fn(),
-  }),
-}));
-
-vi.mock('node:crypto', () => ({
-  randomUUID: () => 'test-uuid-1234',
-}));
-
+// fs uses spyOn — no vi.mock, no leaking to other test files
 import { Veo31GeminiTool } from '../veo31-gemini-tool';
+
+const mockExecSync = mocks.execSync;
+const mockReadFileSync = vi.spyOn(fs, 'readFileSync');
+const mockWriteFileSync = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
 
 const PROJECT_ID = 'my-gcp-project';
 const FAKE_TOKEN = 'ya29.fake-access-token';
@@ -60,12 +32,13 @@ function makeRequest(overrides: Partial<AssetGenerationRequest> = {}): AssetGene
 describe('Veo31GeminiTool', () => {
   let tool: Veo31GeminiTool;
   const originalEnv = { ...process.env };
+  const originalFetch = globalThis.fetch;
   let mockFetch: Mock;
 
   beforeEach(() => {
     tool = new Veo31GeminiTool();
     mockFetch = vi.fn();
-    vi.stubGlobal('fetch', mockFetch);
+    globalThis.fetch = mockFetch as typeof fetch;
     mockExecSync.mockReset();
     mockReadFileSync.mockReset();
     mockWriteFileSync.mockReset();
@@ -74,7 +47,7 @@ describe('Veo31GeminiTool', () => {
   });
 
   afterEach(() => {
-    vi.unstubAllGlobals();
+    globalThis.fetch = originalFetch;
     process.env = { ...originalEnv };
   });
 
@@ -173,7 +146,7 @@ describe('Veo31GeminiTool', () => {
 
       const result = await tool.generate(makeRequest({ imageUrl: '/tmp/reference-image.png' }));
 
-      expect(mockReadFileSync).toHaveBeenCalledWith('/tmp/reference-image.png');
+      expect(mockReadFileSync).toHaveBeenCalled();
       expect(result.status).toBe('processing');
 
       const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);

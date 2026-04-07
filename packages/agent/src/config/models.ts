@@ -123,25 +123,25 @@ const PRESETS: Record<string, PresetModels> = {
     director: { anthropic: MODELS.SONNET, openrouter: MODELS.OR_SONNET, openai: MODELS.GPT_MINI },
   },
 
-  /** Testing — cheapest possible, for smoke tests */
+  /** Testing — cheapest possible, for smoke tests and integration tests */
   testing: {
-    planner: { anthropic: MODELS.SONNET, openrouter: MODELS.OR_GPT_MINI, openai: MODELS.GPT_MINI },
+    planner: { anthropic: MODELS.HAIKU, openrouter: MODELS.OR_GPT_MINI, openai: MODELS.GPT_MINI },
     supervisor: {
-      anthropic: MODELS.SONNET,
+      anthropic: MODELS.HAIKU,
       openrouter: MODELS.OR_GPT_MINI,
       openai: MODELS.GPT_MINI,
     },
     promptWriter: {
-      anthropic: MODELS.SONNET,
+      anthropic: MODELS.HAIKU,
       openrouter: MODELS.OR_GPT_MINI,
       openai: MODELS.GPT_MINI,
     },
     scriptReviewer: {
-      anthropic: MODELS.SONNET,
+      anthropic: MODELS.HAIKU,
       openrouter: MODELS.OR_GPT_NANO,
       openai: MODELS.GPT_MINI,
     },
-    director: { anthropic: MODELS.SONNET, openrouter: MODELS.OR_GPT_MINI, openai: MODELS.GPT_MINI },
+    director: { anthropic: MODELS.HAIKU, openrouter: MODELS.OR_GPT_MINI, openai: MODELS.GPT_MINI },
   },
 };
 

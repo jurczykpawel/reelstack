@@ -1,14 +1,15 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { HeyGenTool } from '../tools/heygen-tool';
 
-// Mock fetch globally
+// Mock fetch with proper restore
+const originalFetch = globalThis.fetch;
 const mockFetch = vi.fn();
-vi.stubGlobal('fetch', mockFetch);
 
 describe('HeyGenTool', () => {
   const tool = new HeyGenTool();
 
   beforeEach(() => {
+    globalThis.fetch = mockFetch as typeof fetch;
     mockFetch.mockReset();
     process.env.HEYGEN_API_KEY = 'test-key';
     delete process.env.HEYGEN_AVATAR_ID;
@@ -17,6 +18,7 @@ describe('HeyGenTool', () => {
   });
 
   afterEach(() => {
+    globalThis.fetch = originalFetch;
     delete process.env.HEYGEN_API_KEY;
   });
 

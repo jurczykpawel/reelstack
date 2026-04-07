@@ -3,16 +3,6 @@ import type { PipelineContext, PipelineDefinition } from '../pipeline-engine';
 
 // ── Mocks ────────────────────────────────────────────────────
 
-vi.mock('@reelstack/logger', () => ({
-  createLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-    error: vi.fn(),
-    child: vi.fn().mockReturnThis(),
-  }),
-}));
-
 vi.mock('@reelstack/storage', () => ({
   createStorage: () =>
     Promise.resolve({
