@@ -16,7 +16,7 @@ vi.mock('@/lib/api/v1/middleware', () => {
       if (!ctx) {
         return NextResponse.json(
           { error: { code: 'UNAUTHORIZED', message: 'Unauthorized' } },
-          { status: 401 },
+          { status: 401 }
         );
       }
       try {
@@ -25,7 +25,7 @@ vi.mock('@/lib/api/v1/middleware', () => {
         console.error(err);
         return NextResponse.json(
           { error: { code: 'INTERNAL_ERROR', message: 'Internal server error' } },
-          { status: 500 },
+          { status: 500 }
         );
       }
     };
@@ -57,8 +57,8 @@ vi.mock('@reelstack/database', () => ({
   },
 }));
 
-vi.mock('@reelstack/types', async (importOriginal) => {
-  const original = await importOriginal<typeof import('@reelstack/types')>();
+vi.mock('@reelstack/types', async () => {
+  const original = await import('@reelstack/types');
   return { ...original };
 });
 

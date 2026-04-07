@@ -349,7 +349,15 @@ function parseResponse(text: string, input: PlannerInput): ProductionPlan {
   } catch {
     const jsonMatch = text.match(/```(?:json)?\s*([\s\S]*?)```/) ?? text.match(/(\{[\s\S]*\})/);
     if (!jsonMatch) throw new PlanningError('No JSON found in planner response');
-    parsed = JSON.parse(jsonMatch[1] ?? jsonMatch[0]);
+    const jsonStr = jsonMatch[1] ?? jsonMatch[0];
+    if (!jsonStr) throw new PlanningError('Empty JSON match in planner response');
+    try {
+      parsed = JSON.parse(jsonStr);
+    } catch (parseErr) {
+      throw new PlanningError(
+        `Invalid JSON in planner response: ${parseErr instanceof Error ? parseErr.message : 'parse error'}`
+      );
+    }
   }
 
   if (!parsed || typeof parsed !== 'object') {

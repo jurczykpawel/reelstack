@@ -178,23 +178,19 @@ async function extractAndUploadLastFrame(videoUrl: string): Promise<string | und
     await storage.upload(fs.readFileSync(framePath), key);
     const url = await storage.getSignedUrl(key, 7200);
 
-    // Cleanup temp files
-    fs.unlinkSync(framePath);
-    fs.unlinkSync(videoPath);
-    fs.rmdirSync(tmpDir);
-
     return url;
   } catch (err) {
     log.warn(
       { videoUrl: videoUrl.substring(0, 80), err },
       'Failed to extract last frame for chain'
     );
-    try {
-      fs.rmSync(tmpDir, { recursive: true });
-    } catch {
-      /* ignore */
-    }
     return undefined;
+  } finally {
+    try {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    } catch {
+      /* cleanup best-effort */
+    }
   }
 }
 

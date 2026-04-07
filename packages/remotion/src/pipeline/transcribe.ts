@@ -352,6 +352,7 @@ async function transcribeViaApi(
     headers: { Authorization: `Bearer ${apiKey}` },
     body: formData,
     signal: AbortSignal.timeout(120_000),
+    redirect: 'error',
   });
 
   if (!response.ok) {
@@ -407,6 +408,7 @@ async function transcribeViaCloudflare(
       headers: { Authorization: `Bearer ${apiToken}` },
       body: formData,
       signal: AbortSignal.timeout(120_000),
+      redirect: 'error',
     });
 
     if (!response.ok) {

@@ -587,7 +587,9 @@ ${JSON.stringify(originalPlan, null, 2)}
 \`\`\`
 
 ### Director's Feedback
+<feedback>
 ${directorNotes.substring(0, 5000)}
+</feedback>
 
 ### Instructions
 Revise the plan based on the director's feedback. Return the COMPLETE revised plan in the same JSON format. Keep everything that works, fix what the director asked for.

@@ -134,7 +134,7 @@ export async function produceCaptions(request: CaptionsRequest): Promise<Caption
       videoLocalPath = path.join(tmpDir, 'source-video.mp4');
       const res = await fetch(request.videoUrl, {
         signal: AbortSignal.timeout(120_000),
-        redirect: 'follow',
+        redirect: 'error',
       });
       if (!res.ok) throw new Error(`Failed to download video: ${res.status}`);
       fs.writeFileSync(videoLocalPath, Buffer.from(await res.arrayBuffer()));

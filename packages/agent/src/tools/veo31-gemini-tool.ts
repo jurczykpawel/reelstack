@@ -103,7 +103,21 @@ export class Veo31GeminiTool implements ProductionTool {
         let imgBuffer: Buffer | undefined;
 
         if (sourceImageUrl.startsWith('/') || sourceImageUrl.startsWith('file:')) {
-          imgBuffer = fs.readFileSync(sourceImageUrl.replace('file://', ''));
+          const resolvedPath = path.resolve(sourceImageUrl.replace('file://', ''));
+          const tmpRoot = path.resolve(os.tmpdir());
+          const isSafePath =
+            resolvedPath.startsWith(tmpRoot) ||
+            resolvedPath.startsWith('/tmp/') ||
+            resolvedPath.startsWith('/private/tmp/');
+          if (!isSafePath) {
+            log.warn({ path: resolvedPath }, 'Image path outside tmpdir, skipping');
+          } else {
+            try {
+              imgBuffer = fs.readFileSync(resolvedPath);
+            } catch {
+              /* file not found */
+            }
+          }
         } else if (sourceImageUrl.startsWith('http')) {
           const imgRes = await fetch(sourceImageUrl, {
             signal: AbortSignal.timeout(30_000),
@@ -122,11 +136,25 @@ export class Veo31GeminiTool implements ProductionTool {
       }
 
       // Last frame for seamless loops: same image as first frame
-      if ((request as unknown as Record<string, unknown>).endImageUrl) {
-        const endUrl = (request as unknown as Record<string, unknown>).endImageUrl as string;
+      if (request.endImageUrl) {
+        const endUrl = request.endImageUrl;
         let endBuffer: Buffer | undefined;
         if (endUrl.startsWith('/') || endUrl.startsWith('file:')) {
-          endBuffer = fs.readFileSync(endUrl.replace('file://', ''));
+          const resolvedEnd = path.resolve(endUrl.replace('file://', ''));
+          const tmpRoot2 = path.resolve(os.tmpdir());
+          const isSafeEnd =
+            resolvedEnd.startsWith(tmpRoot2) ||
+            resolvedEnd.startsWith('/tmp/') ||
+            resolvedEnd.startsWith('/private/tmp/');
+          if (!isSafeEnd) {
+            log.warn({ path: resolvedEnd }, 'End image path outside tmpdir, skipping');
+          } else {
+            try {
+              endBuffer = fs.readFileSync(resolvedEnd);
+            } catch {
+              /* file not found */
+            }
+          }
         } else if (endUrl.startsWith('http')) {
           const res = await fetch(endUrl, {
             signal: AbortSignal.timeout(30_000),

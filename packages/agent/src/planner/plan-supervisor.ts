@@ -236,8 +236,10 @@ async function callSupervisor(systemPrompt: string, userMessage: string): Promis
     };
   }
 
-  const data = (await res.json()) as any;
-  const text = data.content?.[0]?.text ?? '';
+  const data = (await res.json()) as {
+    content?: Array<{ type: string; text?: string }>;
+  };
+  const text = data.content?.find((b) => b.type === 'text')?.text ?? '';
 
   try {
     // Extract JSON from response (may be wrapped in markdown)
@@ -252,7 +254,11 @@ async function callSupervisor(systemPrompt: string, userMessage: string): Promis
     };
   } catch (e) {
     log.warn({ text: text.substring(0, 300) }, 'Failed to parse supervisor response');
-    return { verdict: 'approved', score: 7, notes: 'Parse error — auto-approved' };
+    return {
+      verdict: 'needs-revision',
+      score: 5,
+      notes: 'Supervisor response parse error - requesting revision for safety',
+    };
   }
 }
 

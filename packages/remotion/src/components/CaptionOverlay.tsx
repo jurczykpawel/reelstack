@@ -120,7 +120,8 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({ cues, style: sty
               captionStyle.shadowBlur + 4,
               captionStyle.shadowColor
             ),
-            textTransform: (captionStyle.textTransform ?? 'none') as any,
+            textTransform: (captionStyle.textTransform ??
+              'none') as React.CSSProperties['textTransform'],
           }}
         >
           {displayText}
@@ -218,7 +219,7 @@ export const CaptionOverlay: React.FC<CaptionOverlayProps> = ({ cues, style: sty
           color: captionStyle.fontColor,
           textAlign: 'center',
           textShadow,
-          textTransform: textTransform as any,
+          textTransform: textTransform as React.CSSProperties['textTransform'],
           lineHeight: captionStyle.lineHeight,
           maxWidth: '90%',
           margin: 0,

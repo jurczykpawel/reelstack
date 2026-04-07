@@ -66,10 +66,11 @@ export class NanoBananaTool implements ProductionTool {
         'NanoBanana generate request'
       );
 
-      const res = await fetch(`${GEMINI_API}/models/${model}:generateContent?key=${this.apiKey}`, {
+      const res = await fetch(`${GEMINI_API}/models/${model}:generateContent`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'x-goog-api-key': this.apiKey,
         },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }],

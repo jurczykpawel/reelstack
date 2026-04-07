@@ -7,6 +7,8 @@ import type {
   AssetGenerationStatus,
 } from '../types';
 import { createLogger } from '@reelstack/logger';
+import { addCost } from '../context';
+import { calculateToolCost } from '../config/pricing';
 import { RUNWAY_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('runway-tool');
@@ -177,6 +179,14 @@ export class RunwayTool implements ProductionTool {
             error: 'No video URL in Runway result',
           };
         }
+        addCost({
+          step: `asset:${this.id}`,
+          provider: 'runway',
+          model: 'gen4_turbo',
+          type: 'video',
+          costUSD: calculateToolCost(this.id, 10),
+          inputUnits: 1,
+        });
         return { jobId, toolId: this.id, status: 'completed', url };
       }
 

@@ -66,6 +66,7 @@ export class PostizPublisher implements Publisher {
             type: request.scheduleDate ? 'schedule' : 'now',
           }),
           signal: AbortSignal.timeout(30_000),
+          redirect: 'error',
         });
 
         if (!response.ok) {
@@ -112,6 +113,7 @@ export class PostizPublisher implements Publisher {
       const response = await fetch(`${this.baseUrl}/api/integrations`, {
         headers: { Authorization: `Bearer ${this.apiKey}` },
         signal: AbortSignal.timeout(10_000),
+        redirect: 'error',
       });
 
       if (!response.ok) return [];
