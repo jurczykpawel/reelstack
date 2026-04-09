@@ -1,16 +1,5 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-
-vi.mock('../render/local-renderer', () => ({
-  LocalRenderer: vi.fn(),
-}));
-
-vi.mock('../render/lambda-renderer', () => ({
-  LambdaRenderer: vi.fn(),
-}));
-
-const { createRenderer } = await import('../render/index');
-const { LocalRenderer } = await import('../render/local-renderer');
-const { LambdaRenderer } = await import('../render/lambda-renderer');
+import { describe, it, expect, afterEach } from 'vitest';
+import { createRenderer } from '../render/index';
 
 describe('createRenderer', () => {
   const originalEnv = process.env.REMOTION_RENDERER;
@@ -26,18 +15,18 @@ describe('createRenderer', () => {
   it('returns LocalRenderer by default', () => {
     delete process.env.REMOTION_RENDERER;
     const renderer = createRenderer();
-    expect(renderer).toBeInstanceOf(LocalRenderer);
+    expect(renderer.constructor.name).toBe('LocalRenderer');
   });
 
   it('returns LocalRenderer when REMOTION_RENDERER=local', () => {
     process.env.REMOTION_RENDERER = 'local';
     const renderer = createRenderer();
-    expect(renderer).toBeInstanceOf(LocalRenderer);
+    expect(renderer.constructor.name).toBe('LocalRenderer');
   });
 
   it('returns LambdaRenderer when REMOTION_RENDERER=lambda', () => {
     process.env.REMOTION_RENDERER = 'lambda';
     const renderer = createRenderer();
-    expect(renderer).toBeInstanceOf(LambdaRenderer);
+    expect(renderer.constructor.name).toBe('LambdaRenderer');
   });
 });

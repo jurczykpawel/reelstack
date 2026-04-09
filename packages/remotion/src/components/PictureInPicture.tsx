@@ -1,11 +1,4 @@
-import {
-  useCurrentFrame,
-  useVideoConfig,
-  spring,
-  interpolate,
-  OffthreadVideo,
-  Loop,
-} from 'remotion';
+import { useCurrentFrame, useVideoConfig, spring, interpolate, OffthreadVideo } from 'remotion';
 import type { PipSegment } from '@reelstack/types';
 import { resolveMediaUrl } from '../utils/resolve-media-url';
 
@@ -78,6 +71,7 @@ export const PictureInPicture: React.FC<PictureInPictureProps> = ({ segment }) =
   const videoElement = (
     <OffthreadVideo
       muted
+      loop={!!loopFrames}
       src={resolveMediaUrl(segment.videoUrl)}
       style={{ width: '100%', height: '100%', objectFit: 'cover' }}
     />
@@ -99,7 +93,7 @@ export const PictureInPicture: React.FC<PictureInPictureProps> = ({ segment }) =
         boxShadow: '0 4px 20px rgba(0,0,0,0.4)',
       }}
     >
-      {loopFrames ? <Loop durationInFrames={loopFrames}>{videoElement}</Loop> : videoElement}
+      {videoElement}
     </div>
   );
 };

@@ -1,7 +1,6 @@
 import {
   AbsoluteFill,
   Audio,
-  Loop,
   Sequence,
   OffthreadVideo,
   useCurrentFrame,
@@ -200,9 +199,10 @@ export const ReelComposition: React.FC<ReelProps> = ({
     if (!primaryVideoUrl) {
       return <div style={{ width: '100%', height: '100%', backgroundColor: '#0a0a14' }} />;
     }
-    const vid = (
+    return (
       <OffthreadVideo
         muted
+        loop={!!primaryLoopFrames}
         src={resolveMediaUrl(primaryVideoUrl)}
         style={{
           width: '100%',
@@ -212,10 +212,6 @@ export const ReelComposition: React.FC<ReelProps> = ({
         }}
       />
     );
-    if (primaryLoopFrames) {
-      return <Loop durationInFrames={primaryLoopFrames}>{vid}</Loop>;
-    }
-    return vid;
   };
 
   const hasBRoll = bRollSegments.length > 0;

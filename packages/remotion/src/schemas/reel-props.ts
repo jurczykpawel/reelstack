@@ -199,7 +199,7 @@ export const reelPropsSchema = z.object({
 
   // Media
   primaryVideoUrl: z.string().optional(),
-  /** Duration of the primary video in seconds. When set, the video loops via <Loop>. */
+  /** Duration of the primary video in seconds. When set, the video loops via the loop prop. */
   primaryVideoDurationSeconds: z.number().positive().optional(),
   /** CSS objectPosition for primary video (e.g. 'center bottom' for bottom-aligned avatars). */
   primaryVideoObjectPosition: z.string().default('center'),
