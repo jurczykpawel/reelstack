@@ -47,6 +47,7 @@ const TOOL_PRICING: Record<string, ToolPricing> = {
   nanobanana: { perRequest: 0.01 },
   pexels: { perRequest: 0 },
   heygen: { perSecond: 0.15 },
+  'heygen-agent': { perSecond: 0.0333 },
   humo: { perRequest: 0.1 },
   replicate: { perSecond: 0.05 },
   minimax: { perSecond: 0.08 },

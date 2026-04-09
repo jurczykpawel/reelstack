@@ -55,13 +55,36 @@ function elapsed(start: number): string {
 
 // ── Commands ─────────────────────────────────────────────────
 
+/** Strip reel-script timing markers, convert pause annotations to ellipsis for TTS/HeyGen. */
+function cleanScriptFile(raw: string): string {
+  return raw
+    .split('\n')
+    .filter((l) => !l.startsWith('[') || l.startsWith('[Pauza'))
+    .map((l) => l.replace(/\[Pauza[\s\d.s]*\]/gi, '...').trim())
+    .filter(Boolean)
+    .join('\n');
+}
+
 async function tts() {
-  const script = positional(1);
+  let script = positional(1);
   if (!script) {
     console.log(
-      `Usage: bun run rs tts "Tekst do mówienia" [--voice pl-PL-MarekNeural] [--lang pl-PL]`
+      `Usage: bun run rs tts "Tekst do mówienia" [--voice pl-PL-MarekNeural] [--lang pl-PL]\n       bun run rs tts --file skrypt.txt`
     );
     process.exit(1);
+  }
+
+  // --file flag: read script from file, strip timing markers
+  const filePath = opt('file');
+  if (filePath) {
+    if (!fs.existsSync(filePath)) {
+      console.log(`${R}File not found: ${filePath}${X}`);
+      process.exit(1);
+    }
+    script = cleanScriptFile(fs.readFileSync(filePath, 'utf-8'));
+  } else if (script && fs.existsSync(script)) {
+    // Positional arg is a file path
+    script = cleanScriptFile(fs.readFileSync(script, 'utf-8'));
   }
 
   const { runTTSPipeline } = await import('./index');
@@ -98,7 +121,9 @@ async function tts() {
 async function plan() {
   const ttsFile = positional(1);
   if (!ttsFile || !fs.existsSync(ttsFile)) {
-    console.log(`Usage: bun run rs plan <tts.json> [--template jump-cut-dynamic]`);
+    console.log(
+      `Usage: bun run rs plan <tts.json> [--template jump-cut-dynamic]\n       bun run rs plan <tts.json> --director [--style dynamic]`
+    );
     process.exit(1);
   }
 
@@ -186,7 +211,46 @@ async function plan() {
     metadata: { language: 'pl' },
   };
 
-  const planResult = buildTemplatePlan(content as never, templateId);
+  let planResult;
+
+  if (flag('director')) {
+    // AI Director path — LLM plans shots based on script + timing
+    const { planProduction } = await import('./planner/production-planner');
+    const { buildTimingReference } = await import('./orchestrator/base-orchestrator');
+    const { ToolRegistry } = await import('./registry/tool-registry');
+    const { discoverTools } = await import('./registry/discovery');
+
+    console.log(`${B}AI Director${X}`);
+    console.log(`  ${D}Discovering tools...${X}`);
+    const registry = new ToolRegistry();
+    for (const tool of discoverTools()) registry.register(tool);
+    await registry.discover();
+    const manifest = registry.getToolManifest();
+    console.log(
+      `  ${D}Tools: ${manifest.tools
+        .filter((t: { available: boolean }) => t.available)
+        .map((t: { id: string }) => t.id)
+        .join(', ')}${X}`
+    );
+
+    const timingReference = buildTimingReference(words);
+    const style = (opt('style') ?? 'dynamic') as 'dynamic' | 'calm' | 'cinematic' | 'educational';
+
+    console.log(`  ${D}Planning (${style})...${X}`);
+    planResult = await planProduction({
+      script: content.script,
+      durationEstimate: ttsData.audioDuration,
+      style,
+      toolManifest: manifest,
+      primaryVideoUrl: primaryVideo?.url as string | undefined,
+      layout: (opt('layout') as 'fullscreen' | undefined) ?? 'fullscreen',
+      timingReference,
+    });
+  } else {
+    // Template path — deterministic, zero LLM
+    planResult = buildTemplatePlan(content as never, templateId);
+  }
+
   save('plan.json', planResult);
   save('content.json', content);
 
@@ -195,7 +259,7 @@ async function plan() {
     `Shots: ${planResult.shots.length} (${planResult.shots.map((s: { shotLayout?: string }) => s.shotLayout).join(', ')})`
   );
   console.log(
-    `Zooms: ${planResult.zoomSegments.length}, SFX: ${planResult.sfxSegments?.length ?? 0}`
+    `Zooms: ${planResult.zoomSegments?.length ?? 0}, SFX: ${planResult.sfxSegments?.length ?? 0}`
   );
   console.log(`${G}Done${X}`);
   console.log(`${D}Next: bun run rs assemble ${outDir}/plan.json ${outDir}/tts.json${X}`);
@@ -213,20 +277,34 @@ async function assemble() {
   const planData = JSON.parse(fs.readFileSync(planFile, 'utf-8'));
   const ttsData = JSON.parse(fs.readFileSync(ttsFile, 'utf-8'));
 
-  // Load content.json for assets
-  const contentFile = path.join(outDir, 'content.json');
-  const content = fs.existsSync(contentFile)
-    ? JSON.parse(fs.readFileSync(contentFile, 'utf-8'))
-    : { assets: [] };
-
   console.log(`${B}Assemble Composition${X}`);
 
-  const genAssets: Array<Record<string, unknown>> = [];
-  for (const shot of planData.shots) {
-    if (shot.visual?.type !== 'b-roll') continue;
-    const ca = content.assets?.find((a: { id: string }) => a.id === shot.visual.searchQuery);
-    if (ca)
-      genAssets.push({ toolId: 'placeholder', shotId: shot.id, url: ca.url, type: 'stock-image' });
+  // Load generated assets (from `bun run rs assets`) if available
+  const assetsFile = path.join(outDir, 'assets.json');
+  const contentFile = path.join(outDir, 'content.json');
+  let genAssets: Array<Record<string, unknown>> = [];
+
+  if (fs.existsSync(assetsFile)) {
+    // Real AI-generated assets — use these
+    genAssets = JSON.parse(fs.readFileSync(assetsFile, 'utf-8'));
+    console.log(`Assets: ${genAssets.length} from assets.json`);
+  } else {
+    // Fallback to content.json placeholders
+    const content = fs.existsSync(contentFile)
+      ? JSON.parse(fs.readFileSync(contentFile, 'utf-8'))
+      : { assets: [] };
+    for (const shot of planData.shots) {
+      if (shot.visual?.type !== 'b-roll') continue;
+      const ca = content.assets?.find((a: { id: string }) => a.id === shot.visual.searchQuery);
+      if (ca)
+        genAssets.push({
+          toolId: 'placeholder',
+          shotId: shot.id,
+          url: ca.url,
+          type: 'stock-image',
+        });
+    }
+    console.log(`Assets: ${genAssets.length} placeholders from content.json`);
   }
 
   const props = assembleComposition({
@@ -274,10 +352,24 @@ async function render() {
 }
 
 async function heygen() {
-  const script = positional(1);
+  let script = positional(1);
   if (!script) {
-    console.log(`Usage: bun run rs heygen "Tekst" [--iv] [--emotion Friendly] [--speed 1.1]`);
+    console.log(
+      `Usage: bun run rs heygen "Tekst" [--iv] [--emotion Friendly] [--speed 1.1]\n       bun run rs heygen skrypt.txt`
+    );
     process.exit(1);
+  }
+
+  // File support: read script from file, strip timing markers
+  const filePath = opt('file');
+  if (filePath) {
+    if (!fs.existsSync(filePath)) {
+      console.log(`${R}File not found: ${filePath}${X}`);
+      process.exit(1);
+    }
+    script = cleanScriptFile(fs.readFileSync(filePath, 'utf-8'));
+  } else if (script && fs.existsSync(script)) {
+    script = cleanScriptFile(fs.readFileSync(script, 'utf-8'));
   }
 
   const { HeyGenTool } = await import('./tools/heygen-tool');
@@ -336,8 +428,22 @@ async function heygen() {
         durationSeconds: poll.durationSeconds,
         jobId: result.jobId,
       });
-      console.log(`${G}Done${X} (${sec}s): ${poll.durationSeconds?.toFixed(1)}s video`);
-      console.log(`${D}URL: ${poll.url?.substring(0, 80)}...${X}`);
+      // Download video
+      if (poll.url) {
+        const videoPath = path.join(outDir, 'heygen.mp4');
+        const res = await fetch(poll.url);
+        if (res.ok) {
+          fs.writeFileSync(videoPath, Buffer.from(await res.arrayBuffer()));
+          console.log(`${G}Done${X} (${sec}s): ${poll.durationSeconds?.toFixed(1)}s video`);
+          console.log(`${D}Saved: ${videoPath}${X}`);
+          console.log(`${D}Open:  open ${videoPath}${X}`);
+        } else {
+          console.log(`${G}Done${X} (${sec}s): ${poll.durationSeconds?.toFixed(1)}s video`);
+          console.log(
+            `${Y}Download failed (${res.status}), URL:${X} ${poll.url?.substring(0, 80)}...`
+          );
+        }
+      }
       console.log(`${D}Next: bun run rs plan ${outDir}/tts.json${X}`);
       return;
     }
@@ -366,8 +472,19 @@ async function heygenPoll() {
     const poll = await tool.poll(jobId);
     if (poll.status === 'completed') {
       save('heygen.json', { url: poll.url, durationSeconds: poll.durationSeconds, jobId });
-      console.log(`${G}Done${X}: ${poll.durationSeconds?.toFixed(1)}s video`);
-      console.log(`${D}URL: ${poll.url?.substring(0, 80)}...${X}`);
+      if (poll.url) {
+        const videoPath = path.join(outDir, 'heygen.mp4');
+        const res = await fetch(poll.url);
+        if (res.ok) {
+          fs.writeFileSync(videoPath, Buffer.from(await res.arrayBuffer()));
+          console.log(`${G}Done${X}: ${poll.durationSeconds?.toFixed(1)}s video`);
+          console.log(`${D}Saved: ${videoPath}${X}`);
+          console.log(`${D}Open:  open ${videoPath}${X}`);
+        } else {
+          console.log(`${G}Done${X}: ${poll.durationSeconds?.toFixed(1)}s video`);
+          console.log(`${D}URL: ${poll.url?.substring(0, 80)}...${X}`);
+        }
+      }
       return;
     }
     if (poll.status === 'failed') {
@@ -586,11 +703,205 @@ async function lipsync() {
     );
 }
 
+// ── Assets (generate images/videos from plan) ──
+
+async function assets() {
+  const planFile = positional(1);
+  if (!planFile || !fs.existsSync(planFile)) {
+    console.log(
+      `Usage: bun run rs assets <plan.json>\n\nGenerates images/videos for all b-roll shots in the plan.\nRequires API keys for video/image tools (fal.ai, Kling, etc.).`
+    );
+    process.exit(1);
+  }
+
+  const { generateAssets } = await import('./orchestrator/asset-generator');
+  const { ToolRegistry } = await import('./registry/tool-registry');
+  const { discoverTools } = await import('./registry/discovery');
+
+  // Load private modules
+  try {
+    // @ts-expect-error — private module
+    await import('@reelstack/modules');
+  } catch {
+    try {
+      await import('../../modules/src/index');
+    } catch {
+      /* no private modules */
+    }
+  }
+
+  const plan = JSON.parse(fs.readFileSync(planFile, 'utf-8'));
+
+  console.log(`${B}Asset Generation${X}`);
+  const t0 = performance.now();
+
+  // Discover tools
+  console.log(`  ${D}Discovering tools...${X}`);
+  const registry = new ToolRegistry();
+  for (const tool of discoverTools()) registry.register(tool);
+  await registry.discover();
+
+  const available = registry
+    .getToolManifest()
+    .tools.filter((t: { available: boolean }) => t.available);
+  console.log(`  ${D}${available.length} tools available${X}`);
+
+  // Count shots that need assets
+  const brollShots = plan.shots.filter(
+    (s: { visual?: { type?: string } }) =>
+      s.visual?.type === 'b-roll' || s.visual?.type === 'ai-video' || s.visual?.type === 'ai-image'
+  );
+  console.log(`  ${D}${brollShots.length} shots need assets${X}`);
+
+  // Generate
+  const generated = await generateAssets(plan, registry, (msg) => console.log(`  ${D}${msg}${X}`));
+
+  // Copy assets to out/assets/ and enrich with prompts from plan
+  const assetsDir = path.join(outDir, 'assets');
+  fs.mkdirSync(assetsDir, { recursive: true });
+
+  for (const asset of generated) {
+    // Copy local file to out/assets/
+    if (asset.url && !asset.url.startsWith('http') && fs.existsSync(asset.url)) {
+      const ext = path.extname(asset.url) || '.mp4';
+      const localPath = path.join(assetsDir, `${asset.shotId}${ext}`);
+      fs.copyFileSync(asset.url, localPath);
+      (asset as Record<string, unknown>).localPath = localPath;
+    }
+
+    // Enrich with prompt from plan
+    const shot = plan.shots.find((s: { id: string }) => s.id === asset.shotId);
+    if (shot?.visual?.prompt) {
+      (asset as Record<string, unknown>).prompt = shot.visual.prompt;
+    }
+  }
+
+  // Upload to R2 (Lambda needs remote URLs)
+  const { createStorage } = await import('@reelstack/storage');
+  const storage = await createStorage();
+  console.log(`  ${D}Uploading ${generated.length} assets to R2...${X}`);
+
+  for (const asset of generated) {
+    const localFile = ((asset as Record<string, unknown>).localPath as string) ?? asset.url;
+    if (localFile && !localFile.startsWith('http') && fs.existsSync(localFile)) {
+      try {
+        const ext = path.extname(localFile) || '.mp4';
+        const key = `assets/asset-${asset.shotId}-${Date.now()}${ext}`;
+        await storage.upload(fs.readFileSync(localFile), key);
+        const signedUrl = await storage.getSignedUrl(key, 7200);
+        asset.url = signedUrl;
+        console.log(`  ${D}  ${asset.shotId}: uploaded${X}`);
+      } catch (err) {
+        console.log(`  ${Y}  ${asset.shotId}: upload failed (${(err as Error).message})${X}`);
+      }
+    }
+  }
+
+  // Save asset map with prompts + local paths + R2 URLs
+  save('assets.json', generated);
+
+  const ok = generated.filter((a) => a.url?.startsWith('http')).length;
+  console.log(`${G}Done${X} (${elapsed(t0)}): ${ok}/${generated.length} assets uploaded`);
+  console.log(`${D}Local copies: ${assetsDir}/${X}`);
+  console.log(`${D}Next: bun run rs assemble ${outDir}/plan.json ${outDir}/tts.json${X}`);
+}
+
+// ── Transcribe (extract audio from video → Whisper → tts.json) ──
+
+async function transcribe() {
+  const videoFile = positional(1);
+  if (!videoFile || !fs.existsSync(videoFile)) {
+    console.log(
+      `Usage: bun run rs transcribe <video.mp4>\n\nExtracts audio from video (e.g. HeyGen), runs Whisper, outputs tts.json.\nUse this instead of 'tts' when you already have audio (HeyGen, screen recording, etc.).`
+    );
+    process.exit(1);
+  }
+
+  const { normalizeAudioForWhisper, getAudioDuration, transcribeAudio } =
+    await import('@reelstack/remotion/pipeline');
+  const { groupWordsIntoCues, alignWordsWithScript } = await import('@reelstack/transcription');
+
+  console.log(`${B}Transcribe${X} ${videoFile}`);
+  const t0 = performance.now();
+
+  // Extract audio from video using ffmpeg
+  const audioPath = path.join(outDir, 'extracted-audio.wav');
+  const { execSync } = await import('child_process');
+  console.log(`  ${D}Extracting audio...${X}`);
+  execSync(`ffmpeg -y -i "${videoFile}" -vn -acodec pcm_s16le -ar 16000 -ac 1 "${audioPath}"`, {
+    stdio: 'pipe',
+  });
+
+  const audioBuffer = fs.readFileSync(audioPath);
+  const audioDuration = getAudioDuration(audioBuffer, 'wav');
+  console.log(`  ${D}Audio: ${audioDuration.toFixed(1)}s${X}`);
+
+  // Run Whisper
+  console.log(`  ${D}Running Whisper...${X}`);
+  const transcription = await transcribeAudio(audioBuffer, {
+    language: opt('lang')?.split('-')[0] ?? 'pl',
+  });
+  console.log(`  ${D}Whisper: ${transcription.words.length} words${X}`);
+
+  // Group into cues
+  const cues = groupWordsIntoCues(transcription.words, {
+    maxWordsPerCue: 5,
+    maxDurationPerCue: 3,
+    breakOnPunctuation: true,
+  });
+
+  // Copy source video to out dir
+  const videoOutPath = path.join(outDir, 'heygen.mp4');
+  if (path.resolve(videoFile) !== path.resolve(videoOutPath)) {
+    fs.copyFileSync(videoFile, videoOutPath);
+  }
+
+  // Upload video to R2 so Lambda can access it during render
+  console.log(`  ${D}Uploading to R2...${X}`);
+  const { createStorage } = await import('@reelstack/storage');
+  const storage = await createStorage();
+  const videoKey = `heygen/heygen-${Date.now()}.mp4`;
+  await storage.upload(fs.readFileSync(videoOutPath), videoKey);
+  const videoUrl = await storage.getSignedUrl(videoKey, 7200);
+  console.log(`  ${D}R2: ${videoKey}${X}`);
+
+  // Save tts.json (compatible with plan/assemble)
+  // voiceoverPath = signed R2 URL (Lambda needs remote access)
+  save('tts.json', {
+    voiceoverPath: videoUrl,
+    audioDuration,
+    cues,
+    words: transcription.words,
+    source: 'transcribe',
+    sourceVideo: videoUrl,
+  });
+
+  // Update heygen.json with R2 URL so plan uses accessible URL for primaryVideo
+  const heygenJsonPath = path.join(outDir, 'heygen.json');
+  if (fs.existsSync(heygenJsonPath)) {
+    const hg = JSON.parse(fs.readFileSync(heygenJsonPath, 'utf-8'));
+    hg.url = videoUrl;
+    fs.writeFileSync(heygenJsonPath, JSON.stringify(hg, null, 2));
+    console.log(`  ${D}Updated heygen.json with R2 URL${X}`);
+  } else {
+    // No heygen.json yet (e.g. transcribing screen recording) - create one
+    save('heygen.json', { url: videoUrl, durationSeconds: audioDuration });
+  }
+
+  // Clean up temp audio
+  fs.unlinkSync(audioPath);
+
+  console.log(`${G}Done${X} (${elapsed(t0)}): ${audioDuration.toFixed(1)}s, ${cues.length} cues`);
+  console.log(`${D}Next: bun run rs plan ${outDir}/tts.json${X}`);
+}
+
 // ── Dispatch ─────────────────────────────────────────────────
 
 const commands: Record<string, () => Promise<void>> = {
   tts,
+  transcribe,
   plan,
+  assets,
   assemble,
   render,
   heygen,
@@ -603,21 +914,33 @@ const commands: Record<string, () => Promise<void>> = {
 if (!command || !commands[command]) {
   console.log(`${B}ReelStack CLI${X}
 
-${Y}Step-by-step pipeline:${X}
+${Y}Pipeline A: Voiceover (TTS + przebitki):${X}
   bun run rs tts "Tekst"                    Generate voiceover + transcription
-  bun run rs split-audio tts.json           Split audio into per-scene segments
+  bun run rs tts skrypt.txt                 Read script from file
   bun run rs plan tts.json                  Build template montage plan
   bun run rs assemble plan.json tts.json    Compose Remotion props
   bun run rs render composition.json        Render to MP4
 
-${Y}Lip sync (AI talking head):${X}
+${Y}Pipeline B: HeyGen avatar (talking head + przebitki):${X}
+  bun run rs heygen "Tekst" [--iv]          Generate avatar video (has audio+video)
+  bun run rs heygen-poll <job-id>           Check/resume generation
+  bun run rs transcribe heygen.mp4          Extract audio → Whisper transcription
+  bun run rs plan tts.json                  Build montage plan (template, deterministic)
+  bun run rs plan tts.json --director       Build montage plan (AI director, LLM)
+  bun run rs assets plan.json               Generate images/videos for b-roll shots
+  bun run rs assemble plan.json tts.json    Compose Remotion props
+  bun run rs render composition.json        Render to MP4
+
+  NOTE: HeyGen gives you audio+video in one file. Do NOT run tts.
+  Use 'transcribe' to get word timestamps from the existing audio.
+
+${Y}Lip sync (AI talking head from image):${X}
   bun run rs lipsync <image.jpg>            Generate lip-synced clips per scene
   bun run rs lipsync img.jpg --tool seedance  Use Seedance instead of Kling
 
-${Y}HeyGen:${X}
-  bun run rs heygen "Tekst" [--iv]          Generate avatar video
-  bun run rs heygen-poll <job-id>           Check generation status
-  bun run rs heygen-status                  Check quota
+${Y}Utilities:${X}
+  bun run rs split-audio tts.json           Split audio into per-scene segments
+  bun run rs heygen-status                  Check HeyGen quota
 
 ${Y}Options:${X}
   --template <id>    Template (default: jump-cut-dynamic)

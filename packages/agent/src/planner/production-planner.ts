@@ -37,6 +37,8 @@ export interface PlannerInput {
   readonly timingReference?: string;
   /** Montage profile for per-profile director rules, pacing, SFX, transitions */
   readonly montageProfile?: MontageProfileEntry;
+  /** Preferred tool IDs — planner will strongly favor these tools */
+  readonly preferredToolIds?: readonly string[];
 }
 
 // detectProvider is now imported from ../llm
@@ -59,7 +61,11 @@ export async function planProduction(input: PlannerInput): Promise<ProductionPla
     return ruleBasedPlan(input);
   }
 
-  const systemPrompt = buildPlannerPrompt(input.toolManifest, input.montageProfile);
+  const systemPrompt = buildPlannerPrompt(
+    input.toolManifest,
+    input.montageProfile,
+    input.preferredToolIds
+  );
   const userMessage = buildUserMessage(input);
 
   try {

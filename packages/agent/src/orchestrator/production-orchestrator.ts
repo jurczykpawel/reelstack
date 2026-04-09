@@ -190,6 +190,7 @@ async function produceInner(request: ProductionRequest): Promise<ProductionResul
     layout: request.layout,
     timingReference,
     montageProfile,
+    preferredToolIds: request.preferredToolIds,
   });
 
   steps.push({

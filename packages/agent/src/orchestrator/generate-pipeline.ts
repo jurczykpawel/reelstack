@@ -248,6 +248,7 @@ function createPlanStep(deps: GeneratePipelineDeps): StepDefinition {
         layout: ctx.input.layout as string | undefined,
         timingReference: timingResult.timingReference,
         montageProfile: timingResult.montageProfile,
+        preferredToolIds: ctx.input.preferredToolIds as string[] | undefined,
       });
 
       return { plan };

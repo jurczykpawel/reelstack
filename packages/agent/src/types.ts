@@ -339,6 +339,12 @@ export interface ProductionRequest {
     readonly avatarId?: string;
     readonly voice?: string;
   };
+  /**
+   * Preferred tool IDs for the LLM planner.
+   * When set, the planner will strongly prefer these tools over alternatives.
+   * Example: ['heygen-agent'] to force Video Agent, ['heygen'] for Studio.
+   */
+  readonly preferredToolIds?: readonly string[];
   /** Output path */
   readonly outputPath?: string;
   /** Montage profile ID (auto-selected from script if not provided) */

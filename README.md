@@ -101,6 +101,37 @@ ReelStack replaces manual editing workflows in tools like **Kapwing**, **Descrip
 
 ---
 
+## Why Not HeyGen, Synthesia, or Other AI Video SaaS?
+
+Tools like **HeyGen** (with Seedance 2.0), **Synthesia**, and **Colossyan** generate avatar-based videos from a prompt. They are impressive for talking-head clips -- but they are closed platforms with fundamental trade-offs:
+
+|                          | AI Video SaaS (HeyGen, Synthesia)                                                                        | ReelStack                                                                           |
+| ------------------------ | -------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| **Control**              | Prompt in, video out. No timeline, no cuts, no pacing control                                            | Full programmatic control -- templates, effects, transitions, frame-level precision |
+| **Output style**         | Generic, formulaic. B-roll "feels off-brand" ([source](https://www.roborhythms.com/heygen-review-2026/)) | Your templates, your brand, your compositions. Every pixel is configurable          |
+| **Cost at scale**        | $1-5+ per reel (credit-based, credits expire monthly)                                                    | ~$0.10-0.50 per reel (self-hosted TTS + Remotion Lambda)                            |
+| **Automation**           | Limited API, no webhook pipeline, no queue system                                                        | REST API + BullMQ + n8n webhooks. Zero-click batch production                       |
+| **Data ownership**       | Your avatar, your voice, their servers                                                                   | Your infrastructure, your storage, your data. AGPL-3.0                              |
+| **Vendor lock-in**       | Locked to their platform, pricing, and roadmap                                                           | Swap any component: TTS provider, storage backend, render target                    |
+| **Customization**        | Choose from their templates                                                                              | Build your own Remotion compositions in React. 11 composable effects, 5 transitions |
+| **Offline / air-gapped** | Requires internet, their servers                                                                         | Runs on a Raspberry Pi if you want                                                  |
+
+### When to use AI Video SaaS instead
+
+Avatar-based talking head videos with AI lip sync are genuinely hard. If your use case is "realistic human avatar speaks to camera", tools like HeyGen have years of specialized infrastructure for that. ReelStack does not do AI avatars -- and does not plan to.
+
+### When ReelStack wins
+
+- **Batch content production** -- 50 reels/day from a spreadsheet, zero manual clicks
+- **Brand-consistent output** -- pixel-perfect templates, not generic AI guesses
+- **Pipeline integration** -- n8n triggers ReelStack, ReelStack publishes to Postiz, no human in the loop
+- **Cost predictability** -- flat infrastructure cost, no per-reel credits that expire
+- **Full creative control** -- you define every cut, transition, overlay, caption style, and timing
+
+> ReelStack is video infrastructure. AI Video SaaS is a video vending machine. Both have their place -- but if you need control, scale, and ownership, you need infrastructure.
+
+---
+
 ## Features
 
 ### Reel & YouTube Pipeline

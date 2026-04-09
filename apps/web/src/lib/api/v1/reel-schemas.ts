@@ -347,6 +347,8 @@ export const generateReelSchema = z
     variant: z.enum(['multi-object', 'single-object', 'cutaway-demo']).optional(),
     /** Montage profile ID (auto-selected from script if not provided) */
     montageProfile: z.string().max(50).optional(),
+    /** Preferred tool IDs — planner will strongly favor these tools (e.g. ["heygen-agent"] for Video Agent) */
+    preferredToolIds: z.array(z.string().max(50)).max(10).optional(),
     callbackUrl: callbackUrlSchema.optional(),
   })
   .refine(

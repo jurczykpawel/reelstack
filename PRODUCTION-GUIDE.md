@@ -29,7 +29,7 @@ packages/modules  Private module implementations (separate repo)
 
 1. **script-review** - Review script for factual errors (optional)
 2. **discover-tools** - Scan env for available video/image tools
-3. **tts** - Text-to-speech + Whisper word-level timing
+3. **audio** - Get audio + word-level timestamps (two paths, see below)
 4. **plan** - Build production plan (template montage or AI director)
 5. **supervisor** - Validate plan quality, virality score
 6. **prompt-expansion** - Expand shot briefs into detailed prompts
@@ -41,10 +41,25 @@ packages/modules  Private module implementations (separate repo)
 
 All commands output to `out/` (or `--out <dir>`).
 
-### Full pipeline (step by step)
+### Pipeline A: Voiceover (TTS generates audio)
+
+Use when: no talking head, voiceover only, AI-generated przebitki.
 
 ```bash
-bun run rs tts "Your script text here" --voice en-US-AriaNeural --lang en-US
+bun run rs tts "Your script text here" --voice pl-PL-MarekNeural --lang pl-PL
+bun run rs plan out/tts.json --template jump-cut-dynamic
+bun run rs assemble out/plan.json out/tts.json
+bun run rs render out/composition.json
+```
+
+### Pipeline B: HeyGen avatar (audio already exists)
+
+Use when: HeyGen talking head + przebitki. Do NOT run tts - audio is already in the HeyGen video.
+
+```bash
+bun run rs heygen "Skrypt" --emotion Friendly
+bun run rs heygen-poll <job-id>            # wait for video
+bun run rs transcribe out/heygen.mp4       # extract audio → Whisper → tts.json
 bun run rs plan out/tts.json --template jump-cut-dynamic
 bun run rs assemble out/plan.json out/tts.json
 bun run rs render out/composition.json

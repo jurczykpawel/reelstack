@@ -302,6 +302,7 @@ async function buildGeneratePipelineSetup(
       whisper: config.whisper,
       brandPreset: config.brandPreset,
       montageProfile: config.montageProfile,
+      preferredToolIds: config.preferredToolIds,
     },
     stepProgressMap: {
       'script-review': 10,
@@ -485,6 +486,7 @@ async function runLegacyGenerate(
     brandPreset: config.brandPreset as BrandPreset | undefined,
     avatar: config.avatar as { avatarId?: string; voice?: string } | undefined,
     montageProfile: config.montageProfile as string | undefined,
+    preferredToolIds: config.preferredToolIds as string[] | undefined,
     onProgress: makeProgressCallback(jobId, {
       'Discovering available tools...': 5,
       'Planning production...': 10,

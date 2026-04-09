@@ -233,6 +233,18 @@ VIDEO vs IMAGE search:
 - Images work great for: establishing shots, backgrounds, tech setups, abstract concepts, data moments
 - Videos are better for: action sequences (typing, walking, cooking), dynamic lifestyle shots`;
 
+export const HEYGEN_AGENT_GUIDELINES = `HeyGen Video Agent (Seedance 2.0) prompt guidelines:
+- This is a PROMPT-BASED tool — describe the video you want, not a script for the avatar to read
+- The AI decides shots, cuts, camera angles, and B-roll automatically
+- Seedance 2.0 generates cinematic footage with physics-accurate motion and dynamic lighting
+- Good prompt: "A tech entrepreneur explains why self-hosting beats SaaS, walking through a modern home office, camera follows them naturally"
+- Bad prompt: "Hello, today I want to talk about..." (that's a script, use heygen Studio tool instead)
+- Include scene descriptions, mood, and visual style — the agent interprets these into shots
+- Max 12 seconds per Seedance clip, stitched up to 3 minutes total
+- Orientation: portrait (9:16) or landscape (16:9)
+- Best for: cinematic intros, dynamic B-roll with avatar, multi-shot sequences
+- NOT for: precise script delivery (use heygen Studio tool), detailed scene control`;
+
 export const HEYGEN_GUIDELINES = `HeyGen avatar script guidelines:
 - Write natural spoken language, not written prose — contractions, short sentences
 - One idea per sentence: "This is huge. And here's why." not "This is huge because of several reasons."

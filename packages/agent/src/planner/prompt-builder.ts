@@ -127,7 +127,8 @@ function buildStyleGuidelines(): string {
  */
 export function buildPlannerPrompt(
   manifest: ToolManifest,
-  montageProfile?: MontageProfileEntry
+  montageProfile?: MontageProfileEntry,
+  preferredToolIds?: readonly string[]
 ): string {
   const {
     toolSection,
@@ -143,13 +144,17 @@ export function buildPlannerPrompt(
 
   const profileSection = montageProfile ? `\n${buildProfileGuidelines(montageProfile)}\n` : '';
 
+  const preferredSection = preferredToolIds?.length
+    ? `\n## PREFERRED TOOLS (MUST USE)\n\nThe user has explicitly requested these tools: ${preferredToolIds.map((id) => `"${id}"`).join(', ')}.\nYou MUST use these tools for the primary source and shots where applicable. Only use other tools if the preferred ones cannot handle a specific asset type.\n`
+    : '';
+
   return `You are an AI video production planner. Given a script and available tools, create a complete production plan.
 ${profileSection}
 
 ## AVAILABLE TOOLS
 
 ${toolSection || 'No tools available - use text cards and effects only.'}
-
+${preferredSection}
 ## PROMPT WRITING GUIDELINES PER TOOL
 
 When writing prompts for ai-video, ai-image, or b-roll shots, follow the guidelines for each tool:
@@ -201,6 +206,22 @@ Available BGM tracks:
 ${bgmSection}
 
 Rules: volume 0.15-0.25, silence before reveals, match BPM to content energy.
+
+## CRITICAL: NO TEXT REDUNDANCY WITH CAPTIONS
+
+The reel ALWAYS has word-by-word captions showing EXACTLY what the narrator says. Captions are automatic and ALWAYS visible.
+
+RULE: If text appears in the script, it WILL appear in captions. Do NOT put the same text in a text-emphasis or lower-third.
+
+BAD: Narrator says "Appka nazywa się AI Edge Gallery" → you add text-emphasis "AI EDGE GALLERY" → viewer sees same words TWICE (captions + effect). This is redundant and looks broken.
+BAD: Narrator says "Gemma 4" → you add text-emphasis "GEMMA 4" → same problem.
+GOOD: Narrator says "Appka nazywa się AI Edge Gallery" → you add NO text effect for those words. Captions handle it.
+GOOD: You add text-emphasis "97% ACCURACY" — a stat NOT spoken in the script. This ADDS information.
+
+text-emphasis = ONLY for stats, numbers, keywords NOT in the script.
+lower-thirds = ONLY when subtitle adds context NOT spoken (e.g. title="Tool Name" subtitle="open source, Apache 2.0" where subtitle is not in script).
+
+ONE TEXT PER MOMENT: The same word/name must NEVER appear in more than one layer at the same time. If "Gemma 4" is in a lower-third, it cannot also be in a text-emphasis. If it's in captions, it cannot be in either. Max one source of any given text on screen at any time.
 
 ## CAPTION STYLE
 
@@ -450,6 +471,22 @@ ${segmentSection}
 ## LAYOUTS
 
 ${LAYOUT_CATALOG.map((l) => `- "${l.type}": ${l.description}`).join('\n')}
+
+## CRITICAL: NO TEXT REDUNDANCY WITH CAPTIONS
+
+The reel ALWAYS has word-by-word captions showing EXACTLY what the narrator says. Captions are automatic and ALWAYS visible.
+
+RULE: If text appears in the script, it WILL appear in captions. Do NOT put the same text in a text-emphasis or lower-third.
+
+BAD: Narrator says "Appka nazywa się AI Edge Gallery" → you add text-emphasis "AI EDGE GALLERY" → viewer sees same words TWICE (captions + effect). This is redundant and looks broken.
+BAD: Narrator says "Gemma 4" → you add text-emphasis "GEMMA 4" → same problem.
+GOOD: Narrator says "Appka nazywa się AI Edge Gallery" → you add NO text effect for those words. Captions handle it.
+GOOD: You add text-emphasis "97% ACCURACY" — a stat NOT spoken in the script. This ADDS information.
+
+text-emphasis = ONLY for stats, numbers, keywords NOT in the script.
+lower-thirds = ONLY when subtitle adds context NOT spoken (e.g. title="Tool Name" subtitle="open source, Apache 2.0" where subtitle is not in script).
+
+ONE TEXT PER MOMENT: The same word/name must NEVER appear in more than one layer at the same time. If "Gemma 4" is in a lower-third, it cannot also be in a text-emphasis. If it's in captions, it cannot be in either. Max one source of any given text on screen at any time.
 
 ## CAPTION STYLE
 

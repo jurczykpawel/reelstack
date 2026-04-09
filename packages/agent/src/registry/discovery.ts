@@ -2,6 +2,7 @@ import type { ProductionTool } from './tool-interface';
 import { PexelsTool } from '../tools/pexels-tool';
 import { UserUploadTool } from '../tools/user-upload-tool';
 import { HeyGenTool } from '../tools/heygen-tool';
+import { HeyGenAgentTool } from '../tools/heygen-agent-tool';
 import { Veo3Tool } from '../tools/veo3-tool';
 import { KlingTool } from '../tools/kling-tool';
 import { SeedanceTool } from '../tools/seedance-tool';
@@ -71,6 +72,7 @@ export function discoverTools(): ProductionTool[] {
 
   if (process.env.HEYGEN_API_KEY) {
     tools.push(new HeyGenTool());
+    tools.push(new HeyGenAgentTool());
   }
 
   if (process.env.VEO3_API_KEY) {
