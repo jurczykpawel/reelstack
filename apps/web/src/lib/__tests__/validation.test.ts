@@ -75,7 +75,7 @@ describe('getTierLimits (DB fallback)', () => {
 
   it('falls back to FREE defaults when DB returns null', async () => {
     const { prisma } = await import('@reelstack/database');
-    vi.mocked(prisma.tierConfig.findUnique).mockResolvedValueOnce(null);
+    (prisma.tierConfig.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
 
     const limits = await getTierLimits('FREE');
     expect(limits.maxFileSize).toBe(100 * 1024 * 1024);
@@ -84,7 +84,7 @@ describe('getTierLimits (DB fallback)', () => {
 
   it('uses DB value when TierConfig row exists', async () => {
     const { prisma } = await import('@reelstack/database');
-    vi.mocked(prisma.tierConfig.findUnique).mockResolvedValueOnce({
+    (prisma.tierConfig.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       tier: 'FREE',
       productSlug: 'reelstack',
       creditsPerMonth: 10,
@@ -102,7 +102,7 @@ describe('getTierLimits (DB fallback)', () => {
 
   it('returns Infinity maxDuration when maxDurationSec is -1', async () => {
     const { prisma } = await import('@reelstack/database');
-    vi.mocked(prisma.tierConfig.findUnique).mockResolvedValueOnce({
+    (prisma.tierConfig.findUnique as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
       tier: 'AGENCY',
       productSlug: 'reelstack',
       creditsPerMonth: 5000,
@@ -118,7 +118,9 @@ describe('getTierLimits (DB fallback)', () => {
 
   it('falls back to defaults when DB throws', async () => {
     const { prisma } = await import('@reelstack/database');
-    vi.mocked(prisma.tierConfig.findUnique).mockRejectedValueOnce(new Error('DB down'));
+    (prisma.tierConfig.findUnique as ReturnType<typeof vi.fn>).mockRejectedValueOnce(
+      new Error('DB down')
+    );
 
     const limits = await getTierLimits('PRO');
     expect(limits.creditsPerMonth).toBe(1000);

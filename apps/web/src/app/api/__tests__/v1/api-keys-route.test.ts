@@ -57,10 +57,10 @@ vi.mock('@reelstack/database', () => ({
   },
 }));
 
-vi.mock('@reelstack/types', async () => {
-  const original = await import('@reelstack/types');
-  return { ...original };
-});
+// Note: @reelstack/types passthrough — bun can't do `await import()` inside vi.mock factory.
+// Importing directly works because bun resolves workspace packages before mock hoisting.
+import * as reelstackTypes from '@reelstack/types';
+vi.mock('@reelstack/types', () => reelstackTypes);
 
 const mockGenerateApiKey = vi.fn();
 vi.mock('@/lib/api/v1/api-keys', () => ({

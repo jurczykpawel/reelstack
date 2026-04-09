@@ -1,5 +1,5 @@
 // @vitest-environment node
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
 
 const mockQueryRaw = vi.fn();
@@ -16,10 +16,9 @@ vi.mock('@reelstack/queue', () => ({
 // --- Redis mock (net.createConnection) ---
 let mockSocketBehavior: 'pong' | 'error' | 'connect-error' = 'pong';
 
-vi.mock('net', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('net')>();
+vi.mock('net', () => {
+  const { EventEmitter } = require('events');
   return {
-    ...actual,
     createConnection: (_opts: unknown, onConnect?: () => void) => {
       const socket = new EventEmitter() as EventEmitter & {
         write: ReturnType<typeof vi.fn>;
@@ -76,32 +75,40 @@ function createMockRequestFn() {
   };
 }
 
-vi.mock('http', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('http')>();
-  return {
-    ...actual,
-    request: createMockRequestFn(),
-  };
+vi.mock('http', () => {
+  const http = require('http');
+  return { ...http, request: createMockRequestFn() };
 });
 
-vi.mock('https', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('https')>();
-  return {
-    ...actual,
-    request: createMockRequestFn(),
-  };
+vi.mock('https', () => {
+  const https = require('https');
+  return { ...https, request: createMockRequestFn() };
 });
 
 const { GET } = await import('../health/route');
 
 describe('GET /api/health', () => {
+  const envBackup: Record<string, string | undefined> = {};
+
   beforeEach(() => {
     vi.clearAllMocks();
     mockSocketBehavior = 'pong';
     mockMinioStatus = 200;
     mockMinioError = null;
-    vi.stubEnv('REDIS_URL', 'redis://:password@localhost:6379');
-    vi.stubEnv('MINIO_ENDPOINT', '');
+    // Save + set env (vi.stubEnv not available in bun)
+    for (const key of ['REDIS_URL', 'MINIO_ENDPOINT', 'MINIO_PORT', 'MINIO_USE_SSL']) {
+      envBackup[key] = process.env[key];
+    }
+    process.env['REDIS_URL'] = 'redis://:password@localhost:6379';
+    process.env['MINIO_ENDPOINT'] = '';
+  });
+
+  afterEach(() => {
+    // Restore env
+    for (const [key, val] of Object.entries(envBackup)) {
+      if (val === undefined) delete process.env[key];
+      else process.env[key] = val;
+    }
   });
 
   it('returns ok when all checks pass', async () => {
@@ -153,9 +160,9 @@ describe('GET /api/health', () => {
   });
 
   it('includes storage check when MINIO_ENDPOINT is set', async () => {
-    vi.stubEnv('MINIO_ENDPOINT', 'localhost');
-    vi.stubEnv('MINIO_PORT', '9000');
-    vi.stubEnv('MINIO_USE_SSL', 'false');
+    process.env['MINIO_ENDPOINT'] = 'localhost';
+    process.env['MINIO_PORT'] = '9000';
+    process.env['MINIO_USE_SSL'] = 'false';
     mockQueryRaw.mockResolvedValue([{ '?column?': 1 }]);
 
     const response = await GET();
@@ -165,9 +172,9 @@ describe('GET /api/health', () => {
   });
 
   it('returns degraded when storage is down', async () => {
-    vi.stubEnv('MINIO_ENDPOINT', 'localhost');
-    vi.stubEnv('MINIO_PORT', '9000');
-    vi.stubEnv('MINIO_USE_SSL', 'false');
+    process.env['MINIO_ENDPOINT'] = 'localhost';
+    process.env['MINIO_PORT'] = '9000';
+    process.env['MINIO_USE_SSL'] = 'false';
     mockQueryRaw.mockResolvedValue([{ '?column?': 1 }]);
     mockMinioError = new Error('ECONNREFUSED');
 
@@ -178,7 +185,7 @@ describe('GET /api/health', () => {
   });
 
   it('returns redis error when REDIS_URL is not set', async () => {
-    vi.stubEnv('REDIS_URL', '');
+    process.env['REDIS_URL'] = '';
     mockQueryRaw.mockResolvedValue([{ '?column?': 1 }]);
 
     const response = await GET();
