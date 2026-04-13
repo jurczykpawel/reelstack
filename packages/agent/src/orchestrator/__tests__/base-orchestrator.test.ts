@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { buildTimingReference, resolvePresetConfig } from '../base-orchestrator';
 
 // ── renderVideo: compositionId routing ───────────────────────
@@ -12,7 +12,10 @@ vi.mock('@reelstack/remotion/render', () => ({
 }));
 
 import fs from 'fs';
-vi.spyOn(fs, 'mkdirSync').mockImplementation(() => '' as any);
+const mkdirSpy = vi.spyOn(fs, 'mkdirSync').mockImplementation(() => '' as any);
+afterAll(() => {
+  mkdirSpy.mockRestore();
+});
 
 describe('renderVideo', () => {
   beforeEach(() => {

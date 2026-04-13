@@ -165,6 +165,7 @@ export const ReelComposition: React.FC<ReelProps> = ({
   primaryVideoDurationSeconds,
   primaryVideoObjectPosition = 'center',
   secondaryVideoUrl,
+  primaryVideoTransparent = false,
   bRollSegments,
   pipSegments = [],
   lowerThirds = [],
@@ -308,9 +309,34 @@ export const ReelComposition: React.FC<ReelProps> = ({
     scrollStopper as { preset: any; durationSeconds?: number } | undefined
   );
 
+  // Transparent avatar: primary video is an overlay, b-roll fills the background.
+  // Opaque avatar: primary video IS the background (standard behavior).
+  const renderTransparentAvatarOverlay = () => {
+    if (!primaryVideoTransparent || !primaryVideoUrl) return null;
+    return (
+      <AbsoluteFill style={{ zIndex: 2 }}>
+        <OffthreadVideo
+          muted
+          loop={!!primaryLoopFrames}
+          src={resolveMediaUrl(primaryVideoUrl)}
+          transparent
+          style={{
+            width: '100%',
+            height: '100%',
+            objectFit: 'contain',
+            objectPosition: primaryVideoObjectPosition,
+          }}
+        />
+      </AbsoluteFill>
+    );
+  };
+
   const baseContent =
     layout === 'split-screen' ? (
       <SplitScreenLayout primaryVideoUrl={primaryVideoUrl} secondaryVideoUrl={secondaryVideoUrl} />
+    ) : primaryVideoTransparent ? (
+      // Background = black (b-roll overlays will cover it)
+      <AbsoluteFill style={{ backgroundColor }} />
     ) : (
       <FullscreenLayout
         primaryVideoUrl={primaryVideoUrl}
@@ -1071,6 +1097,9 @@ export const ReelComposition: React.FC<ReelProps> = ({
             />
           ) : null;
         })()}
+
+      {/* LAYER 2.5: Transparent avatar overlay (rmbg/greenscreen — renders ON TOP of b-roll) */}
+      {renderTransparentAvatarOverlay()}
 
       {/* LAYER 3: Picture-in-Picture */}
       {pipSegments.map((seg, i) => (

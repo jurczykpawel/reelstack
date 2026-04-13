@@ -142,7 +142,7 @@ describe('Replicate Tools', () => {
         const result = await replicateWanTool.generate(makeRequest());
 
         expect(result.status).toBe('failed');
-        expect(result.error).toBe('No prediction id returned');
+        expect(result.error).toBe('No job ID returned');
       });
 
       it('returns failed on API error', async () => {
@@ -151,7 +151,7 @@ describe('Replicate Tools', () => {
         const result = await replicateWanTool.generate(makeRequest());
 
         expect(result.status).toBe('failed');
-        expect(result.error).toBe('Replicate API error (401)');
+        expect(result.error).toBe('replicate API error (401)');
       });
 
       it('returns failed on 422 validation error', async () => {
@@ -160,7 +160,7 @@ describe('Replicate Tools', () => {
         const result = await replicateWanTool.generate(makeRequest());
 
         expect(result.status).toBe('failed');
-        expect(result.error).toBe('Replicate API error (422)');
+        expect(result.error).toBe('replicate API error (422)');
       });
 
       it('handles network error gracefully', async () => {
@@ -203,14 +203,14 @@ describe('Replicate Tools', () => {
         expect(result.error).toBe('Invalid jobId format');
       });
 
-      it('returns failed for jobId exceeding 256 chars', async () => {
-        const result = await replicateWanTool.poll!('a'.repeat(257));
+      it('returns failed for jobId exceeding max length', async () => {
+        const result = await replicateWanTool.poll!('a'.repeat(513));
         expect(result.status).toBe('failed');
         expect(result.error).toBe('Invalid jobId format');
       });
 
-      it('returns failed for jobId with path traversal characters', async () => {
-        const result = await replicateWanTool.poll!('pred/../../etc');
+      it('returns failed for jobId with invalid characters', async () => {
+        const result = await replicateWanTool.poll!('pred<script>alert(1)</script>');
         expect(result.status).toBe('failed');
         expect(result.error).toBe('Invalid jobId format');
       });
@@ -285,7 +285,7 @@ describe('Replicate Tools', () => {
           expect.objectContaining({
             step: 'asset:wan-replicate',
             provider: 'replicate',
-            model: 'wan-replicate',
+            model: 'wan-video/wan-2.1-t2v-480p',
             type: 'video',
             inputUnits: 1,
           })
@@ -302,7 +302,7 @@ describe('Replicate Tools', () => {
         const result = await replicateWanTool.poll!('pred-abc');
 
         expect(result.status).toBe('failed');
-        expect(result.error).toBe('No URL in Replicate result');
+        expect(result.error).toBe('No URL in result');
       });
 
       it('returns failed when succeeded but output is empty array', async () => {
@@ -315,7 +315,7 @@ describe('Replicate Tools', () => {
         const result = await replicateWanTool.poll!('pred-abc');
 
         expect(result.status).toBe('failed');
-        expect(result.error).toBe('No URL in Replicate result');
+        expect(result.error).toBe('No URL in result');
       });
 
       it('returns failed with error when status is failed', async () => {
@@ -340,7 +340,7 @@ describe('Replicate Tools', () => {
         const result = await replicateWanTool.poll!('pred-abc');
 
         expect(result.status).toBe('failed');
-        expect(result.error).toBe('Replicate generation failed');
+        expect(result.error).toBe('replicate generation failed');
       });
 
       it('returns failed when status is canceled', async () => {
@@ -351,7 +351,7 @@ describe('Replicate Tools', () => {
         const result = await replicateWanTool.poll!('pred-abc');
 
         expect(result.status).toBe('failed');
-        expect(result.error).toBe('Replicate generation failed');
+        expect(result.error).toBe('replicate generation failed');
       });
 
       it('returns processing for starting status', async () => {

@@ -65,10 +65,11 @@ export async function callLLMWithSystem(
   if (provider === 'anthropic') {
     try {
       return await callAnthropic(systemPrompt, userMessage, opts);
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Fallback to OpenRouter if Anthropic fails (credits exhausted, rate limit, etc.)
       if (process.env.OPENROUTER_API_KEY) {
-        log.warn({ error: err.message }, 'Anthropic failed, falling back to OpenRouter');
+        const message = err instanceof Error ? err.message : String(err);
+        log.warn({ error: message }, 'Anthropic failed, falling back to OpenRouter');
         return callOpenAICompatible('openrouter', systemPrompt, userMessage, opts);
       }
       throw err;
@@ -112,11 +113,14 @@ async function callAnthropic(
 
   log.info({ provider: 'anthropic', model, role: opts.modelRole, jobId }, 'Calling LLM');
 
+  const anthropicKey = process.env.ANTHROPIC_API_KEY;
+  if (!anthropicKey) throw new Error('ANTHROPIC_API_KEY is not set');
+
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-api-key': process.env.ANTHROPIC_API_KEY!,
+      'x-api-key': anthropicKey,
       'anthropic-version': '2023-06-01',
     },
     body: JSON.stringify({
@@ -213,7 +217,8 @@ async function callOpenAICompatible(
 ): Promise<string> {
   const isOpenRouter = provider === 'openrouter';
   const baseUrl = isOpenRouter ? 'https://openrouter.ai/api/v1' : 'https://api.openai.com/v1';
-  const apiKey = getApiKey(provider)!;
+  const apiKey = getApiKey(provider);
+  if (!apiKey) throw new Error(`API key for ${provider} is not set`);
   const model = getModel(opts.modelRole, provider);
   const startTime = performance.now();
   const jobId = getJobId();

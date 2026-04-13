@@ -116,7 +116,7 @@ describe('WavespeedTool (Seedance instance)', () => {
       const result = await tool.generate(makeRequest());
 
       expect(result.status).toBe('failed');
-      expect(result.error).toBe('WaveSpeed API error (401)');
+      expect(result.error).toBe('wavespeed API error (401)');
     });
 
     it('returns failed when no task id in response', async () => {
@@ -125,7 +125,7 @@ describe('WavespeedTool (Seedance instance)', () => {
       const result = await tool.generate(makeRequest());
 
       expect(result.status).toBe('failed');
-      expect(result.error).toBe('No task id returned');
+      expect(result.error).toBe('No job ID returned');
     });
 
     it('returns failed when data is null', async () => {
@@ -134,7 +134,7 @@ describe('WavespeedTool (Seedance instance)', () => {
       const result = await tool.generate(makeRequest());
 
       expect(result.status).toBe('failed');
-      expect(result.error).toBe('No task id returned');
+      expect(result.error).toBe('No job ID returned');
     });
 
     it('handles network error', async () => {
@@ -257,7 +257,7 @@ describe('WavespeedTool (Seedance instance)', () => {
       const result = await tool.poll(JOB_ID);
 
       expect(result.status).toBe('failed');
-      expect(result.error).toBe('WaveSpeed generation failed');
+      expect(result.error).toBe('wavespeed generation failed');
     });
 
     it('returns failed when completed but no output URL', async () => {
@@ -270,7 +270,7 @@ describe('WavespeedTool (Seedance instance)', () => {
       const result = await tool.poll(JOB_ID);
 
       expect(result.status).toBe('failed');
-      expect(result.error).toBe('No output URL in WaveSpeed result');
+      expect(result.error).toBe('No URL in result');
     });
 
     it('returns processing on non-ok HTTP status', async () => {
@@ -300,8 +300,10 @@ describe('WavespeedTool (Seedance instance)', () => {
 
     // ── jobId validation ─────────────────────────────────────
 
-    it('rejects path traversal in jobId', async () => {
-      const result = await tool.poll('../../../etc/passwd');
+    it('rejects jobId with disallowed characters', async () => {
+      // ProviderTool regex allows alphanumeric, -, _, ., ~, :, /
+      // but rejects spaces, brackets, etc.
+      const result = await tool.poll('job id [bad]');
 
       expect(result.status).toBe('failed');
       expect(result.error).toBe('Invalid jobId format');
@@ -315,8 +317,8 @@ describe('WavespeedTool (Seedance instance)', () => {
       expect(result.error).toBe('Invalid jobId format');
     });
 
-    it('rejects jobId exceeding 256 chars', async () => {
-      const result = await tool.poll('a'.repeat(257));
+    it('rejects jobId exceeding 512 chars', async () => {
+      const result = await tool.poll('a'.repeat(513));
 
       expect(result.status).toBe('failed');
       expect(result.error).toBe('Invalid jobId format');

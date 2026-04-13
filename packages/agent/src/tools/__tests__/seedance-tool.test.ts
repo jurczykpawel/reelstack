@@ -4,9 +4,7 @@ import type { AssetGenerationRequest } from '../../types';
 import * as contextModule from '../../context';
 const mockAddCost = vi.spyOn(contextModule, 'addCost');
 
-vi.mock('../../planner/production-planner', () => ({
-  isPublicUrl: (url: string) => url.startsWith('https://'),
-}));
+// isPublicUrl not mocked - real implementation works with test URLs.
 
 import { SeedanceTool } from '../seedance-tool';
 

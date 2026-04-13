@@ -18,6 +18,7 @@ import {
   PipelineEngine,
   createGeneratePipeline,
   getCostSummary,
+  isPublicUrl,
 } from '@reelstack/agent';
 import type {
   UserAsset,
@@ -56,6 +57,15 @@ async function deliverCallback(
   const secret = process.env.WEBHOOK_CALLBACK_SECRET;
   if (!secret) {
     log.warn({ jobId }, 'WEBHOOK_CALLBACK_SECRET not set, skipping callback');
+    return;
+  }
+
+  // Re-validate callback URL at delivery time (SSRF protection against TOCTOU)
+  if (!isPublicUrl(callbackUrl)) {
+    log.warn(
+      { jobId, callbackUrl },
+      'Callback URL failed SSRF validation at delivery time, skipping'
+    );
     return;
   }
 

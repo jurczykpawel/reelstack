@@ -1,10 +1,13 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll, type Mock } from 'vitest';
 import type { AssetGenerationRequest } from '../../types';
 
 import fs from 'fs';
 import * as contextModule from '../../context';
 
 const mockWriteFileSync = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+afterAll(() => {
+  mockWriteFileSync.mockRestore();
+});
 const mockAddCost = vi.spyOn(contextModule, 'addCost');
 
 import { NanoBananaTool } from '../nanobanana-tool';

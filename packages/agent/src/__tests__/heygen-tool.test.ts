@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { HeyGenTool } from '../tools/heygen-tool';
+import { HeyGenTool, HeyGenV3Tool } from '../tools/heygen-tool';
 
 // Mock fetch with proper restore
 const originalFetch = globalThis.fetch;
@@ -293,6 +293,145 @@ describe('HeyGenTool', () => {
       delete process.env.HEYGEN_API_KEY;
       const result = await tool.healthCheck();
       expect(result.available).toBe(false);
+    });
+  });
+});
+
+// ── HeyGen V3 (Avatar V) ─────────────────────────────────────
+
+describe('HeyGenV3Tool', () => {
+  const v3tool = new HeyGenV3Tool();
+
+  beforeEach(() => {
+    globalThis.fetch = mockFetch as typeof fetch;
+    mockFetch.mockReset();
+    process.env.HEYGEN_API_KEY = 'test-key';
+    process.env.HEYGEN_AVATAR_V_ID = 'avatar-v-look-123';
+    delete process.env.HEYGEN_VOICE_ID;
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    delete process.env.HEYGEN_API_KEY;
+    delete process.env.HEYGEN_AVATAR_V_ID;
+  });
+
+  describe('generate', () => {
+    it('uses /v3/videos endpoint with flat body', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { id: 'v3-vid-1' } }),
+      });
+
+      await v3tool.generate({ purpose: 'test', script: 'Hello from Avatar V' });
+
+      const [url, options] = mockFetch.mock.calls[0];
+      expect(url).toBe('https://api.heygen.com/v3/videos');
+
+      const body = JSON.parse(options.body);
+      expect(body.type).toBe('avatar');
+      expect(body.avatar_id).toBe('avatar-v-look-123');
+      expect(body.script).toBe('Hello from Avatar V');
+      expect(body.aspect_ratio).toBe('9:16');
+      expect(body.resolution).toBe('1080p');
+      // Flat body - no video_inputs wrapper
+      expect(body.video_inputs).toBeUndefined();
+    });
+
+    it('extracts id (not video_id) from v3 response', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { id: 'v3-vid-abc' } }),
+      });
+
+      const result = await v3tool.generate({ purpose: 'test', script: 'Test' });
+      expect(result.jobId).toBe('v3-vid-abc');
+      expect(result.toolId).toBe('heygen-v3');
+    });
+
+    it('returns failed when no avatar ID available', async () => {
+      delete process.env.HEYGEN_AVATAR_V_ID;
+      delete process.env.HEYGEN_AVATAR_ID;
+
+      const result = await v3tool.generate({ purpose: 'test', script: 'Test' });
+      expect(result.status).toBe('failed');
+      expect(result.error).toContain('avatar_id');
+    });
+
+    it('falls back to HEYGEN_AVATAR_ID when HEYGEN_AVATAR_V_ID not set', async () => {
+      delete process.env.HEYGEN_AVATAR_V_ID;
+      process.env.HEYGEN_AVATAR_ID = 'fallback-avatar';
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { id: 'v3-vid-fb' } }),
+      });
+
+      await v3tool.generate({ purpose: 'test', script: 'Test' });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.avatar_id).toBe('fallback-avatar');
+    });
+
+    it('passes motion_prompt from heygen_character', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { id: 'v3-vid-mp' } }),
+      });
+
+      await v3tool.generate({
+        purpose: 'test',
+        script: 'Test',
+        heygen_character: { motion_prompt: 'speaks with hand gestures' },
+      });
+
+      const body = JSON.parse(mockFetch.mock.calls[0][1].body);
+      expect(body.motion_prompt).toBe('speaks with hand gestures');
+    });
+
+    it('returns failed when script missing', async () => {
+      const result = await v3tool.generate({ purpose: 'test' });
+      expect(result.status).toBe('failed');
+      expect(result.error).toContain('Script is required');
+    });
+  });
+
+  describe('poll', () => {
+    it('uses /v3/videos/{id} endpoint', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ data: { status: 'processing' } }),
+      });
+
+      await v3tool.poll('v3-job-1');
+      expect(mockFetch.mock.calls[0][0]).toBe('https://api.heygen.com/v3/videos/v3-job-1');
+    });
+
+    it('returns completed with video_url', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: { status: 'completed', video_url: 'https://heygen.ai/v3-out.mp4', duration: 8 },
+        }),
+      });
+
+      const result = await v3tool.poll('v3-job-2');
+      expect(result.status).toBe('completed');
+      expect(result.url).toBe('https://heygen.ai/v3-out.mp4');
+      expect(result.durationSeconds).toBe(8);
+    });
+
+    it('returns failed with failure_message', async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          data: { status: 'failed', failure_message: 'Avatar V rendering error' },
+        }),
+      });
+
+      const result = await v3tool.poll('v3-job-fail');
+      expect(result.status).toBe('failed');
+      expect(result.error).toBe('Avatar V rendering error');
     });
   });
 });

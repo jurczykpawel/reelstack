@@ -32,7 +32,6 @@ describe('RunwayTool', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    globalThis.fetch = originalFetch;
     process.env = { ...originalEnv };
   });
 

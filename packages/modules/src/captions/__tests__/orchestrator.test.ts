@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks (must be before imports) ──────────────────────────────
 
@@ -9,14 +9,20 @@ vi.mock('@reelstack/agent', () => ({
   resolvePresetConfig: vi.fn(),
   createLogger: () => ({
     info: vi.fn(),
-    child: () => ({ info: vi.fn() }),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
   }),
 }));
 
 vi.mock('@reelstack/logger', () => ({
   createLogger: () => ({
     info: vi.fn(),
-    child: () => ({ info: vi.fn() }),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: () => ({ info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() }),
   }),
 }));
 
@@ -33,6 +39,7 @@ vi.mock('@reelstack/transcription', () => ({
 
 vi.mock('child_process', () => ({
   execFileSync: vi.fn(),
+  execSync: vi.fn(),
 }));
 
 // ── Imports ─────────────────────────────────────────────────────
@@ -82,6 +89,10 @@ beforeEach(() => {
 });
 
 // ── Tests ───────────────────────────────────────────────────────
+
+afterEach(() => {
+  vi.restoreAllMocks();
+});
 
 describe('produceCaptions', () => {
   // ── Path A: cues provided, no script ─────────────────────────

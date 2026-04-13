@@ -203,6 +203,9 @@ export const reelPropsSchema = z.object({
   primaryVideoDurationSeconds: z.number().positive().optional(),
   /** CSS objectPosition for primary video (e.g. 'center bottom' for bottom-aligned avatars). */
   primaryVideoObjectPosition: z.string().default('center'),
+  /** When true, primary video has transparent background (WebM alpha / rmbg).
+   *  Renders as overlay on top of b-roll content instead of as background layer. */
+  primaryVideoTransparent: z.boolean().default(false),
   secondaryVideoUrl: z.string().optional(),
   bRollSegments: z.array(bRollSegmentSchema).default([]),
 

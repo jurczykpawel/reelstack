@@ -21,6 +21,7 @@ export interface AssembledProps {
   primaryVideoUrl?: string;
   primaryVideoDurationSeconds?: number;
   primaryVideoObjectPosition?: string;
+  primaryVideoTransparent?: boolean;
   secondaryVideoUrl?: string;
   voiceoverUrl?: string;
   bRollSegments: BRollSegment[];
@@ -81,6 +82,8 @@ export interface AssemblyInput {
   primaryVideoDurationSeconds?: number;
   /** CSS objectPosition for primary video (from avatar framing metadata) */
   primaryVideoObjectPosition?: string;
+  /** Primary video has transparent background (rmbg/greenscreen WebM alpha) */
+  primaryVideoTransparent?: boolean;
 }
 
 /** Extract string from unknown, return undefined if not string */
@@ -413,6 +416,7 @@ export function assembleComposition(input: AssemblyInput): AssembledProps {
     primaryVideoUrl,
     primaryVideoDurationSeconds,
     primaryVideoObjectPosition: input.primaryVideoObjectPosition,
+    ...(input.primaryVideoTransparent ? { primaryVideoTransparent: true } : {}),
     voiceoverUrl: voiceoverFilename,
     bRollSegments,
     effects,

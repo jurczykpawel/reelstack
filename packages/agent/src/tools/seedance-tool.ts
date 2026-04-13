@@ -9,7 +9,7 @@ import type {
 import { createLogger } from '@reelstack/logger';
 import { addCost } from '../context';
 import { calculateToolCost } from '../config/pricing';
-import { isPublicUrl } from '../planner/production-planner';
+import { isPublicUrl } from '../utils/url-validation';
 import { SEEDANCE_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('seedance-tool');

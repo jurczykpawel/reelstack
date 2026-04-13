@@ -1,57 +1,18 @@
 import type { ProductionTool } from './tool-interface';
 import { PexelsTool } from '../tools/pexels-tool';
 import { UserUploadTool } from '../tools/user-upload-tool';
-import { HeyGenTool } from '../tools/heygen-tool';
-import { HeyGenAgentTool } from '../tools/heygen-agent-tool';
+import { HeyGenTool, HeyGenAgentTool, HeyGenV3Tool } from '../tools/heygen-tool';
 import { Veo3Tool } from '../tools/veo3-tool';
 import { KlingTool } from '../tools/kling-tool';
 import { SeedanceTool } from '../tools/seedance-tool';
 import { NanoBananaTool } from '../tools/nanobanana-tool';
 import { falTools } from '../tools/fal-tool';
-import {
-  piapiKlingTool,
-  piapiKlingImg2VideoTool,
-  piapiSeedanceTool,
-  piapiSeedance2Tool,
-  piapiHunyuanTool,
-  piapiHailuoTool,
-  piapiFluxTool,
-} from '../tools/piapi-tool';
-import {
-  replicateWanTool,
-  replicateFluxTool,
-  replicateSdxlTool,
-  replicateIdeogramTool,
-  replicateRecraftTool,
-  replicateFluxProTool,
-} from '../tools/replicate-tool';
+import { allPiapiTools } from '../tools/piapi-tool';
+import { allReplicateTools } from '../tools/replicate-tool';
 import { runwayTool } from '../tools/runway-tool';
-import {
-  aimlapiKlingTool,
-  aimlapiFluxTool,
-  aimlapiKlingV3Tool,
-  aimlapiVeo3Tool,
-  aimlapiSora2Tool,
-  aimlapiPixverseTool,
-} from '../tools/aimlapi-tool';
-import {
-  wavespeedSeedanceTool,
-  wavespeedWanTool,
-  wavespeedFluxTool,
-  wavespeedNanaBananaProTool,
-  wavespeedWan26Tool,
-  wavespeedQwenImageTool,
-} from '../tools/wavespeed-tool';
-import {
-  kieKlingTool,
-  kieSeedanceTool,
-  kieSeedance2Tool,
-  kieSeedance2FastTool,
-  kieSeedanceImg2VideoTool,
-  kieWanTool,
-  kieFluxTool,
-  kieNanaBanana2Tool,
-} from '../tools/kie-tool';
+import { allAimlapiTools } from '../tools/aimlapi-tool';
+import { allWavespeedTools } from '../tools/wavespeed-tool';
+import { allKieTools } from '../tools/kie-tool';
 import { Veo31GeminiTool } from '../tools/veo31-gemini-tool';
 import { MinimaxVideoTool } from '../tools/minimax-tool';
 import { humoTool } from '../tools/humo-tool';
@@ -71,6 +32,7 @@ export function discoverTools(): ProductionTool[] {
   }
 
   if (process.env.HEYGEN_API_KEY) {
+    tools.push(new HeyGenV3Tool());
     tools.push(new HeyGenTool());
     tools.push(new HeyGenAgentTool());
   }
@@ -96,17 +58,9 @@ export function discoverTools(): ProductionTool[] {
     tools.push(...falTools);
   }
 
-  // piapi.ai
+  // piapi.ai — all models auto-registered from allPiapiTools catalog
   if (process.env.PIAPI_KEY) {
-    tools.push(
-      piapiKlingTool,
-      piapiKlingImg2VideoTool,
-      piapiSeedanceTool,
-      piapiSeedance2Tool,
-      piapiHunyuanTool,
-      piapiHailuoTool,
-      piapiFluxTool
-    );
+    tools.push(...allPiapiTools);
   }
 
   // Veo 3.1 via Vertex AI (requires gcloud auth + project ID)
@@ -114,16 +68,9 @@ export function discoverTools(): ProductionTool[] {
     tools.push(new Veo31GeminiTool());
   }
 
-  // Replicate
+  // Replicate — all models auto-registered from allReplicateTools catalog
   if (process.env.REPLICATE_API_TOKEN) {
-    tools.push(
-      replicateWanTool,
-      replicateFluxTool,
-      replicateSdxlTool,
-      replicateIdeogramTool,
-      replicateRecraftTool,
-      replicateFluxProTool
-    );
+    tools.push(...allReplicateTools);
   }
 
   // Runway Gen-4
@@ -131,42 +78,19 @@ export function discoverTools(): ProductionTool[] {
     tools.push(runwayTool);
   }
 
-  // AIML API
+  // AIML API — all models auto-registered from allAimlapiTools catalog
   if (process.env.AIMLAPI_KEY) {
-    tools.push(
-      aimlapiKlingTool,
-      aimlapiFluxTool,
-      aimlapiKlingV3Tool,
-      aimlapiVeo3Tool,
-      aimlapiSora2Tool,
-      aimlapiPixverseTool
-    );
+    tools.push(...allAimlapiTools);
   }
 
-  // WaveSpeed
+  // WaveSpeed — all models auto-registered from allWavespeedTools catalog
   if (process.env.WAVESPEED_API_KEY) {
-    tools.push(
-      wavespeedSeedanceTool,
-      wavespeedWanTool,
-      wavespeedWan26Tool,
-      wavespeedFluxTool,
-      wavespeedNanaBananaProTool,
-      wavespeedQwenImageTool
-    );
+    tools.push(...allWavespeedTools);
   }
 
-  // kie.ai
+  // kie.ai — all models auto-registered from allKieTools catalog
   if (process.env.KIE_API_KEY) {
-    tools.push(
-      kieKlingTool,
-      kieSeedance2Tool,
-      kieSeedance2FastTool,
-      kieSeedanceTool,
-      kieSeedanceImg2VideoTool,
-      kieWanTool,
-      kieFluxTool,
-      kieNanaBanana2Tool
-    );
+    tools.push(...allKieTools);
   }
 
   // MiniMax direct API (platform.minimax.io)

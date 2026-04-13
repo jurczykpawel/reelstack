@@ -1,27 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import crypto from 'crypto';
 import type { NextRequest } from 'next/server';
+import {
+  databaseMockFactory,
+  mockGetUserByEmail,
+  mockAddTokens,
+  mockUpdateUserTier,
+  mockLinkSellfCustomer,
+  mockGetUserBySellfCustomerId,
+  mockPrisma,
+} from '@/__test-utils__/database-mock';
 
-const mockGetUserByEmail = vi.fn();
-const mockAddTokens = vi.fn();
-const mockUpdateUserTier = vi.fn();
-const mockLinkSellfCustomer = vi.fn();
-const mockGetUserBySellfCustomerId = vi.fn();
-const mockWebhookEventCreate = vi.fn();
-
-vi.mock('@reelstack/database', () => ({
-  getUserByEmail: (...args: unknown[]) => mockGetUserByEmail(...args),
-  addTokens: (...args: unknown[]) => mockAddTokens(...args),
-  updateUserTier: (...args: unknown[]) => mockUpdateUserTier(...args),
-  linkSellfCustomer: (...args: unknown[]) => mockLinkSellfCustomer(...args),
-  getUserBySellfCustomerId: (...args: unknown[]) => mockGetUserBySellfCustomerId(...args),
-  createAuditLog: vi.fn().mockResolvedValue({}),
-  prisma: {
-    webhookEvent: {
-      create: (...args: unknown[]) => mockWebhookEventCreate(...args),
-    },
-  },
-}));
+vi.mock('@reelstack/database', databaseMockFactory);
 
 const WEBHOOK_SECRET = 'test-webhook-secret';
 
@@ -61,7 +51,7 @@ describe('POST /api/webhooks/sellf', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLinkSellfCustomer.mockResolvedValue({});
-    mockWebhookEventCreate.mockResolvedValue({});
+    mockPrisma.webhookEvent.create.mockResolvedValue({});
   });
 
   // ── Auth ──────────────────────────────────────
@@ -230,7 +220,7 @@ describe('POST /api/webhooks/sellf', () => {
 
   it('returns 200 with duplicate:true for already-processed event', async () => {
     const error = Object.assign(new Error('Unique constraint'), { code: 'P2002' });
-    mockWebhookEventCreate.mockRejectedValue(error);
+    mockPrisma.webhookEvent.create.mockRejectedValue(error);
 
     const payload = { email: 'test@test.com', product: 'prod_pro', reference: 'dup-ref' };
     const response = await POST(makeRequest(payload));

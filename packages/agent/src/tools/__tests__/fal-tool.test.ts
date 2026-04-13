@@ -31,7 +31,6 @@ describe('FalTool', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    globalThis.fetch = originalFetch;
     process.env = { ...originalEnv };
   });
 

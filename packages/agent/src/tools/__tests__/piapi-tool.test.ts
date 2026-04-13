@@ -38,7 +38,6 @@ describe('PiapiTool', () => {
 
   afterEach(() => {
     globalThis.fetch = originalFetch;
-    globalThis.fetch = originalFetch;
     process.env = { ...originalEnv };
   });
 
@@ -135,7 +134,7 @@ describe('PiapiTool', () => {
       const result = await piapiKlingTool.generate(makeRequest());
 
       expect(result.status).toBe('failed');
-      expect(result.error).toBe('No task_id returned');
+      expect(result.error).toBe('No job ID returned');
     });
 
     it('handles network error', async () => {
@@ -382,7 +381,7 @@ describe('PiapiTool', () => {
       const result = await piapiKlingTool.poll(JOB_ID);
 
       expect(result.status).toBe('failed');
-      expect(result.error).toBe('No URL in piapi result');
+      expect(result.error).toBe('No URL in result');
     });
 
     it('returns processing for pending/processing status', async () => {
@@ -420,7 +419,7 @@ describe('PiapiTool', () => {
     });
 
     it('rejects invalid jobId format', async () => {
-      const result = await piapiKlingTool.poll('../../../etc/passwd');
+      const result = await piapiKlingTool.poll('job id with spaces & special <chars>');
 
       expect(result.status).toBe('failed');
       expect(result.error).toBe('Invalid jobId format');

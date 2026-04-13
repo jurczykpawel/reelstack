@@ -8,21 +8,31 @@ const mockRmSync = vi.fn();
 const mockWriteFileSync = vi.fn();
 const mockUnlinkSync = vi.fn();
 
+const mockExecSync = vi.fn();
 vi.mock('child_process', () => ({
   execFileSync: (...args: unknown[]) => mockExecFileSync(...args),
+  execSync: (...args: unknown[]) => mockExecSync(...args),
 }));
 
+// IMPORTANT: vi.mock('fs') replaces the module globally in bun's single-process runner.
+// We MUST pass through ALL fs functions we don't mock, including mkdtempSync and readFileSync,
+// so other test files (asset-generator, captions, prompt-loader) still work.
 vi.mock('fs', () => {
-  const fsMock = {
+  const realFs = require('fs');
+  const mocked: Record<string, unknown> = {
     mkdirSync: (...args: unknown[]) => mockMkdirSync(...args),
     statSync: (...args: unknown[]) => mockStatSync(...args),
     existsSync: (...args: unknown[]) => mockExistsSync(...args),
     rmSync: (...args: unknown[]) => mockRmSync(...args),
     writeFileSync: (...args: unknown[]) => mockWriteFileSync(...args),
     unlinkSync: (...args: unknown[]) => mockUnlinkSync(...args),
-    readFileSync: () => '',
   };
-  return { ...fsMock, default: fsMock };
+  // Pass through everything else from real fs
+  const proxy: Record<string, unknown> = {};
+  for (const key of Object.keys(realFs)) {
+    proxy[key] = mocked[key] ?? realFs[key];
+  }
+  return { ...proxy, default: proxy };
 });
 
 const { LocalRenderer } = await import('../render/local-renderer');

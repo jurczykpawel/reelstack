@@ -1,14 +1,10 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import type { AssetGenerationRequest } from '../../types';
-
-// isPublicUrl is imported from production-planner — mock the module
-const mockIsPublicUrl = vi.fn();
-
-vi.mock('../../planner/production-planner', () => ({
-  isPublicUrl: (...args: unknown[]) => mockIsPublicUrl(...args),
-}));
-
+import * as urlValidation from '../../utils/url-validation';
 import { UserUploadTool } from '../user-upload-tool';
+
+// Use spyOn instead of vi.mock to avoid contaminating url-validation.test.ts
+const mockIsPublicUrl = vi.spyOn(urlValidation, 'isPublicUrl');
 
 function makeRequest(overrides: Partial<AssetGenerationRequest> = {}): AssetGenerationRequest {
   return {
@@ -24,6 +20,10 @@ describe('UserUploadTool', () => {
   beforeEach(() => {
     tool = new UserUploadTool();
     mockIsPublicUrl.mockReset();
+  });
+
+  afterAll(() => {
+    mockIsPublicUrl.mockRestore();
   });
 
   // ── healthCheck ──────────────────────────────────────────────

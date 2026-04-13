@@ -7,3 +7,4 @@ node-modules-dir = "classic"
 # CRITICAL: Clear API keys during tests to prevent accidental real API calls.
 # .env is auto-loaded by bun — without this, tests hit real Anthropic/OpenRouter APIs.
 preload = ["./tests/setup.ts"]
+exclude = ["**/e2e/**"]

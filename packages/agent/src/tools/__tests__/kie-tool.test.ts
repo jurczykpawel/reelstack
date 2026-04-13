@@ -11,6 +11,10 @@ import {
   kieFluxTool,
   kieWanTool,
   kieNanaBanana2Tool,
+  kieVeo31LiteTool,
+  kieVeo31FastTool,
+  kieVeo31QualityTool,
+  allKieTools,
 } from '../kie-tool';
 
 function makeRequest(overrides: Partial<AssetGenerationRequest> = {}): AssetGenerationRequest {
@@ -36,7 +40,6 @@ describe('KieTool', () => {
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
     globalThis.fetch = originalFetch;
     process.env = { ...originalEnv };
   });
@@ -545,6 +548,101 @@ describe('KieTool', () => {
     it('kieNanaBanana2Tool is an image tool', () => {
       expect(kieNanaBanana2Tool.capabilities[0]!.assetType).toBe('ai-image');
       expect(kieNanaBanana2Tool.id).toBe('nanobanana2-kie');
+    });
+  });
+
+  // ── Veo 3.1 KIE tools ────────────────────────────────────────
+
+  describe('Veo 3.1 KIE tools', () => {
+    beforeEach(() => {
+      process.env.KIE_API_KEY = 'kie-test-key';
+    });
+
+    it('veo31-lite uses /api/v1/veo/generate endpoint with raw body', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ code: 0, data: { taskId: 'veo-task-1' } }), { status: 200 })
+      );
+
+      await kieVeo31LiteTool.generate(makeRequest());
+
+      const [url, options] = mockFetch.mock.calls[0]!;
+      expect(url).toBe('https://api.kie.ai/api/v1/veo/generate');
+
+      const body = JSON.parse(options.body as string);
+      // Raw body: no model/task_type/input wrapper
+      expect(body.model).toBe('veo3_lite');
+      expect(body.prompt).toBe('aerial view of a neon city at night');
+      expect(body.aspect_ratio).toBe('9:16');
+      expect(body.generationType).toBe('TEXT_2_VIDEO');
+      // No task_type or input wrapper
+      expect(body.task_type).toBeUndefined();
+      expect(body.input).toBeUndefined();
+    });
+
+    it('veo31-fast uses veo3_fast model', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ code: 0, data: { taskId: 'veo-task-2' } }), { status: 200 })
+      );
+
+      await kieVeo31FastTool.generate(makeRequest());
+
+      const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
+      expect(body.model).toBe('veo3_fast');
+    });
+
+    it('veo31-quality uses veo3 model', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ code: 0, data: { taskId: 'veo-task-3' } }), { status: 200 })
+      );
+
+      await kieVeo31QualityTool.generate(makeRequest());
+
+      const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
+      expect(body.model).toBe('veo3');
+    });
+
+    it('veo31 passes imageUrls for image-to-video', async () => {
+      mockFetch.mockResolvedValue(
+        new Response(JSON.stringify({ code: 0, data: { taskId: 'veo-task-4' } }), { status: 200 })
+      );
+
+      await kieVeo31LiteTool.generate(makeRequest({ imageUrl: 'https://example.com/frame.png' }));
+
+      const body = JSON.parse(mockFetch.mock.calls[0]![1]!.body as string);
+      expect(body.generationType).toBe('FIRST_AND_LAST_FRAMES_2_VIDEO');
+      expect(body.imageUrls).toEqual(['https://example.com/frame.png']);
+    });
+
+    it('veo31-lite has self-declared pricing', () => {
+      expect(kieVeo31LiteTool.pricing).toEqual({ perRequest: 0.15 });
+    });
+
+    it('veo31-fast has self-declared pricing', () => {
+      expect(kieVeo31FastTool.pricing).toEqual({ perRequest: 0.5 });
+    });
+
+    it('veo31-quality has self-declared pricing', () => {
+      expect(kieVeo31QualityTool.pricing).toEqual({ perRequest: 1.0 });
+    });
+
+    it('all three are in allKieTools catalog', () => {
+      const ids = allKieTools.map((t) => t.id);
+      expect(ids).toContain('veo31-lite-kie');
+      expect(ids).toContain('veo31-fast-kie');
+      expect(ids).toContain('veo31-quality-kie');
+    });
+  });
+
+  // ── allKieTools catalog ───────────────────────────────────────
+
+  describe('allKieTools catalog', () => {
+    it('contains all 11 KIE tools', () => {
+      expect(allKieTools).toHaveLength(11);
+    });
+
+    it('has no duplicate IDs', () => {
+      const ids = allKieTools.map((t) => t.id);
+      expect(new Set(ids).size).toBe(ids.length);
     });
   });
 });

@@ -5,9 +5,7 @@ import * as contextModule from '../../context';
 const mockAddCost = vi.spyOn(contextModule, 'addCost');
 
 // Mock isPublicUrl to accept https URLs
-vi.mock('../../planner/production-planner', () => ({
-  isPublicUrl: (url: string) => url.startsWith('https://'),
-}));
+// isPublicUrl not mocked - real implementation works with test URLs.
 
 import { PexelsTool } from '../pexels-tool';
 
@@ -54,7 +52,6 @@ describe('PexelsTool', () => {
   });
 
   afterEach(() => {
-    globalThis.fetch = originalFetch;
     globalThis.fetch = originalFetch;
     process.env = { ...originalEnv };
   });

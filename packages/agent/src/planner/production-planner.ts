@@ -15,6 +15,7 @@ import { TRANSITION_TYPES, CAPTION_PROPERTY_CATALOG } from '@reelstack/remotion/
 import type { MontageProfileEntry } from '@reelstack/remotion/catalog';
 import { PlanningError } from '../errors';
 import { detectProvider, callLLMWithSystem } from '../llm';
+import { isPublicUrl } from '../utils/url-validation';
 import { createLogger } from '@reelstack/logger';
 
 const log = createLogger('production-planner');
@@ -39,6 +40,14 @@ export interface PlannerInput {
   readonly montageProfile?: MontageProfileEntry;
   /** Preferred tool IDs — planner will strongly favor these tools */
   readonly preferredToolIds?: readonly string[];
+  /** User-provided assets (screenshots, screencasts) the director can reference in shots */
+  readonly userAssets?: readonly {
+    id: string;
+    path: string;
+    url: string;
+    type: 'image' | 'video';
+    description: string;
+  }[];
 }
 
 // detectProvider is now imported from ../llm
@@ -339,6 +348,22 @@ function buildUserMessage(input: PlannerInput): string {
 
   if (input.layout) {
     parts.push(`\nRequested layout: ${input.layout}`);
+  }
+
+  if (input.userAssets?.length) {
+    parts.push('\n## USER-PROVIDED ASSETS');
+    parts.push(
+      'The user has provided their own files. Use these instead of AI-generated content where they fit the narration.'
+    );
+    parts.push(
+      'Reference them as b-roll shots with toolId "user-upload" and searchQuery set to the asset ID.\n'
+    );
+    for (const asset of input.userAssets) {
+      parts.push(`- "${asset.id}" (${asset.type}): ${asset.description} → URL: ${asset.url}`);
+    }
+    parts.push(
+      '\nIMPORTANT: User assets are REAL content (screenshots, screencasts). They are MORE valuable than AI-generated content. Prefer them over AI generation when they match the narration.'
+    );
   }
 
   parts.push('\nReturn only the JSON production plan, no explanation outside the JSON.');
@@ -966,33 +991,5 @@ function enforceToolPreferences(plan: ProductionPlan, availableToolIds: string[]
 }
 
 /** Validate URL is public HTTPS (not internal/private) */
-export function isPublicUrl(url: string): boolean {
-  try {
-    const parsed = new URL(url);
-    // Only allow http(s) — reject javascript:, data:, blob:, file:, ftp:, etc.
-    if (!['http:', 'https:'].includes(parsed.protocol)) return false;
-    // Reject credentials in URL
-    if (parsed.username || parsed.password) return false;
-    const host = parsed.hostname.toLowerCase();
-    // Reject loopback and special addresses
-    if (host === 'localhost' || host === '::1' || host === '0.0.0.0' || host === '[::]')
-      return false;
-    // Reject private IPv4 ranges
-    if (host.startsWith('127.') || host.startsWith('10.') || host.startsWith('169.254.'))
-      return false;
-    if (
-      host.startsWith('172.') &&
-      parseInt(host.split('.')[1]) >= 16 &&
-      parseInt(host.split('.')[1]) <= 31
-    )
-      return false;
-    if (host.startsWith('192.168.') || host.startsWith('0.')) return false;
-    // Reject IPv6 private/link-local (fe80::, fc00::, fd00::, ff00::)
-    if (/^\[?f[cde]|^\[?fe80|^\[?ff/i.test(host)) return false;
-    // Reject cloud metadata endpoints
-    if (host === 'metadata.google.internal' || host === '169.254.169.254') return false;
-    return true;
-  } catch {
-    return false;
-  }
-}
+// Re-exported for backward compatibility. Canonical source: utils/url-validation.ts
+export { isPublicUrl } from '../utils/url-validation';

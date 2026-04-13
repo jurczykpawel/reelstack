@@ -91,7 +91,18 @@ export interface AssetGenerationRequest {
     readonly use_avatar_iv_model?: boolean;
     readonly prompt?: string;
     readonly keep_original_prompt?: boolean;
+    /** v3 API: natural language body motion control */
+    readonly motion_prompt?: string;
+    /** v3 API: photo avatar expressiveness */
+    readonly expressiveness?: 'high' | 'medium' | 'low';
   };
+  /** Background for HeyGen video. */
+  readonly heygen_background?: {
+    readonly type: 'color' | 'image';
+    readonly value: string;
+  };
+  /** Request HeyGen to remove background (avatar must be trained with matting). */
+  readonly heygen_remove_background?: boolean;
   /**
    * HeyGen voice params — exact API field names, zero mapping.
    */

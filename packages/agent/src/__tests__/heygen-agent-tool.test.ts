@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { HeyGenAgentTool } from '../tools/heygen-agent-tool';
+import { HeyGenAgentTool } from '../tools/heygen-tool';
 
 const originalFetch = globalThis.fetch;
 const mockFetch = vi.fn();

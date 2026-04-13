@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll } from 'vitest';
 import fs from 'fs';
 import * as ffmpegModule from '@reelstack/ffmpeg';
 import * as storageModule from '@reelstack/storage';
@@ -20,16 +20,9 @@ const mockCreateStorage = vi.spyOn(storageModule, 'createStorage' as any).mockRe
   getSignedUrl: (...args: unknown[]) => mockGetSignedUrl(...args),
 });
 
-vi.mock('../../planner/production-planner', () => ({
-  isPublicUrl: (url: string) => {
-    try {
-      const parsed = new URL(url);
-      return ['http:', 'https:'].includes(parsed.protocol);
-    } catch {
-      return false;
-    }
-  },
-}));
+// isPublicUrl is NOT mocked. Real implementation from utils/url-validation works fine
+// with test URLs (all https://cdn.example.com/...). No vi.mock means no contamination
+// of other test files in bun's single-process runner.
 
 vi.mock('../../polling', () => ({
   pollUntilDone: vi.fn(),
@@ -552,8 +545,14 @@ describe('generateAssets', () => {
 // ── splitChainedTasks logic (tested indirectly) ────────────────
 
 describe('splitChainedTasks (via generateAssets)', () => {
+  const originalFetch = globalThis.fetch;
+
   beforeEach(() => {
     vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
   });
 
   it('runs independent tasks in parallel batches', async () => {

@@ -8,35 +8,30 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks ────────────────────────────────────────────────────
 
-const mockUpload = vi.fn().mockResolvedValue('ok');
+import {
+  storageMockFactory,
+  mockUpload,
+  mockGetSignedUrl,
+  mockDownload,
+} from '../__test-utils__/storage-mock';
+
 const storedFiles = new Map<string, Buffer>();
 
-vi.mock('@reelstack/storage', () => ({
-  createStorage: () =>
-    Promise.resolve({
-      upload: (buf: Buffer, key: string) => {
-        storedFiles.set(key, buf);
-        return mockUpload(buf, key);
-      },
-      download: (key: string) => {
-        const data = storedFiles.get(key);
-        if (!data) return Promise.reject(new Error(`Not found: ${key}`));
-        return Promise.resolve(data);
-      },
-      getSignedUrl: vi.fn().mockResolvedValue('https://signed.url'),
-      delete: vi.fn(),
-    }),
-}));
+vi.mock('@reelstack/storage', storageMockFactory);
 
-vi.mock('@reelstack/logger', () => ({
-  createLogger: () => ({
-    info: vi.fn(),
-    warn: vi.fn(),
-    debug: vi.fn(),
-    error: vi.fn(),
-    child: vi.fn().mockReturnThis(),
-  }),
-}));
+mockUpload.mockImplementation((buf: Buffer, key: string) => {
+  storedFiles.set(key, buf);
+  return Promise.resolve('ok');
+});
+mockDownload.mockImplementation((key: string) => {
+  const data = storedFiles.get(key);
+  if (!data) return Promise.reject(new Error(`Not found: ${key}`));
+  return Promise.resolve(data);
+});
+mockGetSignedUrl.mockResolvedValue('https://signed.url');
+
+import { loggerMockFactory } from '../__test-utils__/logger-mock';
+vi.mock('@reelstack/logger', loggerMockFactory);
 
 import { PipelineLogger } from '../orchestrator/pipeline-logger';
 import { runWithJobId, addCost, getCostSummary, setApiCallLogger, logApiCall } from '../context';

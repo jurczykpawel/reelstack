@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import type { ProductionTool } from '../registry/tool-interface';
 import type { ToolCapability, AssetGenerationRequest, AssetGenerationJob } from '../types';
-import { isPublicUrl } from '../planner/production-planner';
+import { isPublicUrl } from '../utils/url-validation';
 import { PEXELS_GUIDELINES } from './prompt-guidelines';
 import { createLogger } from '@reelstack/logger';
 import { addCost } from '../context';

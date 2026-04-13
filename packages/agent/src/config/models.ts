@@ -82,6 +82,13 @@ const MODEL_DEFAULTS: Record<string, ModelConfig> = {
     openrouter: MODELS.OR_SONNET,
     openai: MODELS.GPT_TOP,
   },
+  /** Vision model for describing user-provided assets (cheap, fast) */
+  assetDescriber: {
+    envVar: 'ASSET_DESCRIBER_MODEL',
+    anthropic: MODELS.HAIKU,
+    openrouter: MODELS.OR_HAIKU,
+    openai: MODELS.GPT_MINI,
+  },
 } as const;
 
 // ── Presets ──────────────────────────────────────────────────

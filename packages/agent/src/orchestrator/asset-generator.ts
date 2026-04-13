@@ -1,7 +1,7 @@
 import type { ProductionPlan, ShotPlan, AssetGenerationJob, GeneratedAsset } from '../types';
 import type { ToolRegistry } from '../registry/tool-registry';
 import { pollUntilDone } from '../polling';
-import { isPublicUrl } from '../planner/production-planner';
+import { isPublicUrl } from '../utils/url-validation';
 import { extractLastFrame } from '@reelstack/ffmpeg';
 import { createStorage } from '@reelstack/storage';
 import { createLogger } from '@reelstack/logger';
@@ -192,6 +192,42 @@ async function extractAndUploadLastFrame(videoUrl: string): Promise<string | und
       /* cleanup best-effort */
     }
   }
+}
+
+/**
+ * Regenerate a single asset for a specific shot.
+ * Finds the shot in the plan, builds a generation task, generates, and returns the result.
+ * Optionally override the prompt.
+ */
+export async function regenerateAsset(
+  plan: ProductionPlan,
+  shotId: string,
+  registry: ToolRegistry,
+  options?: { prompt?: string; toolId?: string }
+): Promise<GeneratedAsset | null> {
+  const shot = plan.shots.find((s) => s.id === shotId);
+  if (!shot) {
+    log.warn({ shotId }, 'Shot not found in plan');
+    return null;
+  }
+
+  const task = shotToTask(shot);
+  if (!task) {
+    log.warn({ shotId, visualType: shot.visual.type }, 'Shot type does not need asset generation');
+    return null;
+  }
+
+  // Apply overrides
+  const overriddenTask: GenerationTask = {
+    ...task,
+    toolId: options?.toolId ?? task.toolId,
+    request: {
+      ...task.request,
+      ...(options?.prompt ? { prompt: options.prompt } : {}),
+    },
+  };
+
+  return generateSingle(overriddenTask, registry);
 }
 
 function collectTasks(plan: ProductionPlan): GenerationTask[] {

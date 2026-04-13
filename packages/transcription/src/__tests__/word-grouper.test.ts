@@ -1,15 +1,18 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterAll } from 'vitest';
 import { groupWordsIntoCues } from '../word-grouper';
 import type { TranscriptionWord } from '../types';
 
 // Mock crypto.randomUUID for deterministic tests
 let uuidCounter = 0;
-vi.stubGlobal('crypto', {
-  randomUUID: () => `test-uuid-${++uuidCounter}`,
-});
+const originalCrypto = globalThis.crypto;
+globalThis.crypto = { ...originalCrypto, randomUUID: () => `test-uuid-${++uuidCounter}` } as Crypto;
 
 beforeEach(() => {
   uuidCounter = 0;
+});
+
+afterAll(() => {
+  globalThis.crypto = originalCrypto;
 });
 
 const makeWords = (texts: string[], startOffset = 0, wordDuration = 0.5): TranscriptionWord[] =>

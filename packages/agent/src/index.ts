@@ -81,6 +81,7 @@ export {
 export type { ReelModule, BaseModuleRequest, ModuleResult, ProgressCallback } from './modules';
 
 export { detectLanguage } from './utils/detect-language';
+export { isPublicUrl, isPrivateHost } from './utils/url-validation';
 export {
   getJobId,
   runWithJobId,

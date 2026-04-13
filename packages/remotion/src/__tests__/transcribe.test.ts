@@ -127,20 +127,19 @@ describe('whisper.cpp token merging', () => {
   });
 });
 
+vi.mock('child_process', () => ({
+  execFileSync: vi.fn(() => {
+    throw new Error('not found');
+  }),
+}));
+
 describe('transcribeAudio fallback', () => {
   const savedOpenaiKey = process.env.OPENAI_API_KEY;
   const savedOpenrouterKey = process.env.OPENROUTER_API_KEY;
 
   beforeEach(() => {
-    // Restore original env before each test
     process.env.OPENAI_API_KEY = savedOpenaiKey ?? '';
     process.env.OPENROUTER_API_KEY = savedOpenrouterKey ?? '';
-    // Prevent whisper-cli from running on this machine
-    vi.mock('child_process', () => ({
-      execFileSync: vi.fn(() => {
-        throw new Error('not found');
-      }),
-    }));
   });
 
   afterEach(() => {

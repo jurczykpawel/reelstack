@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ==========================================
 // Mock BullMQ Queue
@@ -19,11 +19,17 @@ import { BullMQQueueAdapter } from '../bullmq-adapter';
 
 describe('BullMQQueueAdapter', () => {
   let adapter: BullMQQueueAdapter;
+  const savedRedisUrl = process.env.REDIS_URL;
 
   beforeEach(() => {
     vi.clearAllMocks();
     process.env.REDIS_URL = 'redis://localhost:6379';
     adapter = new BullMQQueueAdapter();
+  });
+
+  afterEach(() => {
+    if (savedRedisUrl === undefined) delete process.env.REDIS_URL;
+    else process.env.REDIS_URL = savedRedisUrl;
   });
 
   describe('enqueue', () => {

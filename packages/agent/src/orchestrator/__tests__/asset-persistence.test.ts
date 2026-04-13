@@ -2,16 +2,16 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 
 // ── Mocks ──────────────────────────────────────────────────────
 
-const mockUpload = vi.fn().mockResolvedValue(undefined);
-const mockGetSignedUrl = vi.fn().mockResolvedValue('https://r2.example.com/signed-url');
-const mockCreateStorage = vi.fn().mockResolvedValue({
-  upload: mockUpload,
-  getSignedUrl: mockGetSignedUrl,
-});
+import {
+  storageMockFactory,
+  mockUpload,
+  mockGetSignedUrl,
+  mockCreateStorage,
+} from '../../__test-utils__/storage-mock';
 
-vi.mock('@reelstack/storage', () => ({
-  createStorage: (...args: unknown[]) => mockCreateStorage(...args),
-}));
+vi.mock('@reelstack/storage', storageMockFactory);
+mockUpload.mockResolvedValue(undefined);
+mockGetSignedUrl.mockResolvedValue('https://r2.example.com/signed-url');
 
 vi.mock('crypto', () => ({
   randomUUID: () => 'mock-uuid-1234',

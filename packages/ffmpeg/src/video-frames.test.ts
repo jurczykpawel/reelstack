@@ -1,9 +1,16 @@
 import { describe, test, expect } from 'vitest';
-import { execFileSync } from 'child_process';
+import { execFileSync, execSync } from 'child_process';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { extractLastFrame, extractFrameAt } from './video-frames';
+
+let ffmpegAvailable = false;
+try {
+  execSync('ffmpeg -version', { stdio: 'ignore' });
+  ffmpegAvailable = true;
+} catch {}
+const describeIf = ffmpegAvailable ? describe : describe.skip;
 
 // Generate a tiny 2s test video with ffmpeg
 function createTestVideo(): string {
@@ -28,7 +35,7 @@ function createTestVideo(): string {
   return videoPath;
 }
 
-describe('video-frames', () => {
+describeIf('video-frames', () => {
   let testVideo: string;
 
   test('extractLastFrame returns a JPEG file', () => {

@@ -1,16 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const mockUpload = vi.fn().mockResolvedValue('uploaded-key');
-
-vi.mock('@reelstack/storage', () => ({
-  createStorage: () =>
-    Promise.resolve({
-      upload: (...args: unknown[]) => mockUpload(...args),
-      download: vi.fn(),
-      getSignedUrl: vi.fn().mockResolvedValue('https://signed.url'),
-      delete: vi.fn(),
-    }),
-}));
+import { storageMockFactory, mockUpload } from '../../__test-utils__/storage-mock';
+vi.mock('@reelstack/storage', storageMockFactory);
+mockUpload.mockResolvedValue('uploaded-key');
 
 import { PipelineLogger } from '../pipeline-logger';
 

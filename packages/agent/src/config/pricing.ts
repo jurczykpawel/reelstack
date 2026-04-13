@@ -53,8 +53,8 @@ const TOOL_PRICING: Record<string, ToolPricing> = {
   minimax: { perSecond: 0.08 },
   wavespeed: { perSecond: 0.06 },
   kie: { perSecond: 0.1 },
-  'seedance2-kie': { perSecond: 0.205 }, // Seedance 2.0 720p via kie.ai
-  'seedance2-fast-kie': { perSecond: 0.165 }, // Seedance 2.0 Fast 720p via kie.ai
+  // seedance2-kie, seedance2-fast-kie: pricing self-declared on tools (tool.pricing)
+  // Veo 3.1 KIE + Seedance 2.0 KIE: pricing self-declared on tools (tool.pricing)
   runway: { perSecond: 0.25 },
   piapi: { perSecond: 0.1 },
   aimlapi: { perSecond: 0.08 },
@@ -91,12 +91,34 @@ export function calculateLLMCost(model: string, inputTokens: number, outputToken
   return (inputTokens * pricing.inputPer1M + outputTokens * pricing.outputPer1M) / 1_000_000;
 }
 
+/**
+ * Calculate tool cost. Checks tool-declared pricing first (from registry),
+ * then falls back to the static TOOL_PRICING table.
+ * New tools should self-declare pricing via ProductionTool.pricing.
+ */
 export function calculateToolCost(toolId: string, durationSeconds?: number): number {
-  // Exact match first, then try provider suffix (e.g., 'kling-piapi' → 'piapi')
-  const pricing = TOOL_PRICING[toolId] ?? TOOL_PRICING[toolId.split('-').pop() ?? ''];
+  // Check tool registry for self-declared pricing
+  const toolPricing = getToolPricingFromRegistry(toolId);
+  const pricing =
+    toolPricing ?? TOOL_PRICING[toolId] ?? TOOL_PRICING[toolId.split('-').pop() ?? ''];
   if (!pricing) return 0;
   if (pricing.perSecond && durationSeconds) return pricing.perSecond * durationSeconds;
   return pricing.perRequest ?? 0;
+}
+
+// Lazy reference to tool registry — avoids circular import at module load time.
+let registryRef: {
+  get(id: string): { pricing?: { perRequest?: number; perSecond?: number } } | undefined;
+} | null = null;
+
+/** Set the tool registry reference. Called once from tool-registry.ts after construction. */
+export function setToolRegistryRef(registry: typeof registryRef): void {
+  registryRef = registry;
+}
+
+function getToolPricingFromRegistry(toolId: string): ToolPricing | null {
+  const tool = registryRef?.get(toolId);
+  return tool?.pricing ?? null;
 }
 
 export function calculateTTSCost(provider: string, charCount: number): number {

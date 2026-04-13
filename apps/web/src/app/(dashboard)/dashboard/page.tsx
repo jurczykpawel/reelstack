@@ -51,7 +51,7 @@ export default function DashboardPage() {
         .then((res) => (res.ok ? res.json() : null))
         .then((resp) => setUsage(resp?.data ?? null)),
     ])
-      .catch(err => console.warn('[dashboard] request failed:', err))
+      .catch((err) => console.warn('[dashboard] request failed:', err))
       .finally(() => setLoading(false));
   }, []);
 

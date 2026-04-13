@@ -1,19 +1,25 @@
-import { describe, it, expect, vi, beforeEach, afterEach, type Mock } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach, afterAll, type Mock } from 'vitest';
 import type { AssetGenerationRequest } from '../../types';
 
 import fs from 'fs';
 
 // child_process needs vi.mock (tool destructures execSync at import time)
-// Use delegate pattern: mocks object is initialized before hoisting resolves
-const mocks = { execSync: vi.fn() };
-vi.mock('child_process', () => ({ execSync: (...a: unknown[]) => mocks.execSync(...a) }));
+import {
+  childProcessMockFactory,
+  mockExecSync as sharedMockExecSync,
+} from '../../__test-utils__/child-process-mock';
+vi.mock('child_process', childProcessMockFactory);
 
 // fs uses spyOn — no vi.mock, no leaking to other test files
 import { Veo31GeminiTool } from '../veo31-gemini-tool';
 
-const mockExecSync = mocks.execSync;
+const mockExecSync = sharedMockExecSync;
 const mockReadFileSync = vi.spyOn(fs, 'readFileSync');
 const mockWriteFileSync = vi.spyOn(fs, 'writeFileSync').mockImplementation(() => {});
+afterAll(() => {
+  mockReadFileSync.mockRestore();
+  mockWriteFileSync.mockRestore();
+});
 
 const PROJECT_ID = 'my-gcp-project';
 const FAKE_TOKEN = 'ya29.fake-access-token';

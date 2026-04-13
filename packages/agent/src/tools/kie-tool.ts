@@ -9,7 +9,7 @@ import type {
 import { createLogger } from '@reelstack/logger';
 import { addCost } from '../context';
 import { calculateToolCost } from '../config/pricing';
-import { SEEDANCE_GUIDELINES, NANOBANANA_GUIDELINES } from './prompt-guidelines';
+import { SEEDANCE_GUIDELINES, NANOBANANA_GUIDELINES, VEO3_GUIDELINES } from './prompt-guidelines';
 
 const log = createLogger('kie-tool');
 
@@ -39,7 +39,13 @@ interface KieModelConfig {
   task_type: 'txt2video' | 'txt2img';
   capabilities: ToolCapability[];
   promptGuidelines?: string;
+  /** Self-declared pricing (used by calculateToolCost instead of static table) */
+  pricing?: { perRequest?: number; perSecond?: number };
   buildInput(req: AssetGenerationRequest): Record<string, unknown>;
+  /** Custom endpoint path (default: /api/v1/jobs/createTask) */
+  endpoint?: string;
+  /** If true, buildInput returns the full body (not wrapped in {model, task_type, input}) */
+  rawBody?: boolean;
 }
 
 function parseResultUrl(data: KieRecordData): string | undefined {
@@ -57,10 +63,13 @@ class KieTool implements ProductionTool {
   readonly name: string;
   readonly capabilities: ToolCapability[];
   readonly promptGuidelines?: string;
+  readonly pricing?: { perRequest?: number; perSecond?: number };
 
   private readonly model: string;
   private readonly task_type: 'txt2video' | 'txt2img';
   private readonly buildInput: (req: AssetGenerationRequest) => Record<string, unknown>;
+  private readonly endpoint: string;
+  private readonly rawBody: boolean;
 
   constructor(config: KieModelConfig) {
     this.id = config.id;
@@ -69,7 +78,10 @@ class KieTool implements ProductionTool {
     this.task_type = config.task_type;
     this.capabilities = config.capabilities;
     this.promptGuidelines = config.promptGuidelines;
+    this.pricing = config.pricing;
     this.buildInput = config.buildInput;
+    this.endpoint = config.endpoint ?? '/api/v1/jobs/createTask';
+    this.rawBody = config.rawBody ?? false;
   }
 
   private get apiKey(): string | undefined {
@@ -93,13 +105,12 @@ class KieTool implements ProductionTool {
 
     try {
       const inputPayload = this.buildInput(request);
-      const requestBody = {
-        model: this.model,
-        task_type: this.task_type,
-        input: inputPayload,
-      };
+      const requestBody = this.rawBody
+        ? inputPayload
+        : { model: this.model, task_type: this.task_type, input: inputPayload };
 
       const startTime = performance.now();
+      const url = `https://api.kie.ai${this.endpoint}`;
 
       log.info(
         {
@@ -107,12 +118,12 @@ class KieTool implements ProductionTool {
           model: this.model,
           taskType: this.task_type,
           prompt: (inputPayload.prompt as string)?.substring(0, 200),
-          endpoint: `${KIE_BASE}/jobs/createTask`,
+          endpoint: url,
         },
         'kie generate request'
       );
 
-      const res = await fetch(`${KIE_BASE}/jobs/createTask`, {
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -425,15 +436,16 @@ export const kieSeedance2Tool: ProductionTool = new KieTool({
   model: 'bytedance/seedance-2',
   task_type: 'txt2video',
   promptGuidelines: SEEDANCE_GUIDELINES,
+  pricing: { perSecond: 0.205 },
   capabilities: [
     {
       assetType: 'ai-video',
       supportsPrompt: true,
       supportsScript: false,
       maxDurationSeconds: 15,
-      estimatedLatencyMs: 600_000, // ~10 min
+      estimatedLatencyMs: 600_000,
       isAsync: true,
-      costTier: 'expensive', // $0.205/s at 720p
+      costTier: 'expensive',
     },
   ],
   buildInput: (req) => ({
@@ -453,15 +465,16 @@ export const kieSeedance2FastTool: ProductionTool = new KieTool({
   model: 'bytedance/seedance-2-fast',
   task_type: 'txt2video',
   promptGuidelines: SEEDANCE_GUIDELINES,
+  pricing: { perSecond: 0.165 },
   capabilities: [
     {
       assetType: 'ai-video',
       supportsPrompt: true,
       supportsScript: false,
       maxDurationSeconds: 15,
-      estimatedLatencyMs: 300_000, // ~5 min
+      estimatedLatencyMs: 300_000,
       isAsync: true,
-      costTier: 'moderate', // $0.165/s at 720p
+      costTier: 'moderate',
     },
   ],
   buildInput: (req) => ({
@@ -495,3 +508,101 @@ export const kieNanaBanana2Tool: ProductionTool = new KieTool({
     aspect_ratio: req.aspectRatio ?? '9:16',
   }),
 });
+
+// ── Veo 3.1 via KIE (dedicated /veo/generate endpoint) ─────
+
+function buildVeoInput(req: AssetGenerationRequest, model: string): Record<string, unknown> {
+  return {
+    prompt: req.prompt ?? 'abstract cinematic background',
+    model,
+    aspect_ratio: req.aspectRatio ?? '9:16',
+    generationType: req.imageUrl ? 'FIRST_AND_LAST_FRAMES_2_VIDEO' : 'TEXT_2_VIDEO',
+    ...(req.imageUrl ? { imageUrls: [req.imageUrl] } : {}),
+  };
+}
+
+export const kieVeo31LiteTool: ProductionTool = new KieTool({
+  id: 'veo31-lite-kie',
+  name: 'Veo 3.1 Lite via kie.ai',
+  model: 'veo3_lite',
+  task_type: 'txt2video',
+  endpoint: '/api/v1/veo/generate',
+  rawBody: true,
+  promptGuidelines: VEO3_GUIDELINES,
+  pricing: { perRequest: 0.15 },
+  capabilities: [
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 8,
+      estimatedLatencyMs: 120_000,
+      isAsync: true,
+      costTier: 'cheap',
+    },
+  ],
+  buildInput: (req) => buildVeoInput(req, 'veo3_lite'),
+});
+
+export const kieVeo31FastTool: ProductionTool = new KieTool({
+  id: 'veo31-fast-kie',
+  name: 'Veo 3.1 Fast via kie.ai',
+  model: 'veo3_fast',
+  task_type: 'txt2video',
+  endpoint: '/api/v1/veo/generate',
+  rawBody: true,
+  promptGuidelines: VEO3_GUIDELINES,
+  pricing: { perRequest: 0.5 },
+  capabilities: [
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 8,
+      estimatedLatencyMs: 180_000,
+      isAsync: true,
+      costTier: 'moderate',
+    },
+  ],
+  buildInput: (req) => buildVeoInput(req, 'veo3_fast'),
+});
+
+export const kieVeo31QualityTool: ProductionTool = new KieTool({
+  id: 'veo31-quality-kie',
+  name: 'Veo 3.1 Quality via kie.ai',
+  model: 'veo3',
+  task_type: 'txt2video',
+  endpoint: '/api/v1/veo/generate',
+  rawBody: true,
+  promptGuidelines: VEO3_GUIDELINES,
+  pricing: { perRequest: 1.0 },
+  capabilities: [
+    {
+      assetType: 'ai-video',
+      supportsPrompt: true,
+      supportsScript: false,
+      maxDurationSeconds: 8,
+      estimatedLatencyMs: 300_000,
+      isAsync: true,
+      costTier: 'expensive',
+    },
+  ],
+  buildInput: (req) => buildVeoInput(req, 'veo3'),
+});
+
+// ── All KIE tools (for discovery) ───────────────────────────
+
+/** All KIE tools. Import this instead of individual exports in discovery.ts. */
+export const allKieTools: readonly ProductionTool[] = [
+  kieKlingTool,
+  kieSeedance2Tool,
+  kieSeedance2FastTool,
+  kieSeedanceTool,
+  kieSeedanceImg2VideoTool,
+  kieWanTool,
+  kieFluxTool,
+  kieNanaBanana2Tool,
+  kieVeo31LiteTool,
+  kieVeo31FastTool,
+  kieVeo31QualityTool,
+];

@@ -1,17 +1,12 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { EventEmitter } from 'events';
+import { databaseMockFactory, mockPrisma } from '@/__test-utils__/database-mock';
 
-const mockQueryRaw = vi.fn();
-vi.mock('@reelstack/database', () => ({
-  prisma: {
-    $queryRawUnsafe: (...args: unknown[]) => mockQueryRaw(...args),
-  },
-}));
+vi.mock('@reelstack/database', databaseMockFactory);
 
-vi.mock('@reelstack/queue', () => ({
-  detectDeploymentMode: () => 'local',
-}));
+import { queueMockFactory } from '@/__test-utils__/queue-mock';
+vi.mock('@reelstack/queue', queueMockFactory);
 
 // --- Redis mock (net.createConnection) ---
 let mockSocketBehavior: 'pong' | 'error' | 'connect-error' = 'pong';
@@ -112,7 +107,7 @@ describe('GET /api/health', () => {
   });
 
   it('returns ok when all checks pass', async () => {
-    mockQueryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ '?column?': 1 }]);
 
     const response = await GET();
     const body = await response.json();
@@ -127,7 +122,7 @@ describe('GET /api/health', () => {
   });
 
   it('returns error (503) when database is down', async () => {
-    mockQueryRaw.mockRejectedValue(new Error('Connection refused'));
+    mockPrisma.$queryRawUnsafe.mockRejectedValue(new Error('Connection refused'));
 
     const response = await GET();
     expect(response.status).toBe(503);
@@ -139,7 +134,7 @@ describe('GET /api/health', () => {
   });
 
   it('returns degraded (200) when redis is down but database is ok', async () => {
-    mockQueryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ '?column?': 1 }]);
     mockSocketBehavior = 'connect-error';
 
     const response = await GET();
@@ -152,7 +147,7 @@ describe('GET /api/health', () => {
   });
 
   it('omits storage check when MINIO_ENDPOINT is not set', async () => {
-    mockQueryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ '?column?': 1 }]);
 
     const response = await GET();
     const body = await response.json();
@@ -163,7 +158,7 @@ describe('GET /api/health', () => {
     process.env['MINIO_ENDPOINT'] = 'localhost';
     process.env['MINIO_PORT'] = '9000';
     process.env['MINIO_USE_SSL'] = 'false';
-    mockQueryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ '?column?': 1 }]);
 
     const response = await GET();
     const body = await response.json();
@@ -175,7 +170,7 @@ describe('GET /api/health', () => {
     process.env['MINIO_ENDPOINT'] = 'localhost';
     process.env['MINIO_PORT'] = '9000';
     process.env['MINIO_USE_SSL'] = 'false';
-    mockQueryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ '?column?': 1 }]);
     mockMinioError = new Error('ECONNREFUSED');
 
     const response = await GET();
@@ -186,7 +181,7 @@ describe('GET /api/health', () => {
 
   it('returns redis error when REDIS_URL is not set', async () => {
     process.env['REDIS_URL'] = '';
-    mockQueryRaw.mockResolvedValue([{ '?column?': 1 }]);
+    mockPrisma.$queryRawUnsafe.mockResolvedValue([{ '?column?': 1 }]);
 
     const response = await GET();
     const body = await response.json();
